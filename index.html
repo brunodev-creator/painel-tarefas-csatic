@@ -72,7 +72,8 @@
   const loadLocal=()=>{try{const stored=JSON.parse(localStorage.getItem(STORAGE));return Array.isArray(stored)?stored:clone(INITIAL)}catch{return clone(INITIAL)}};
   tasks=loadLocal();
   const parseUrlConfig=()=>{try{const raw=params.get('cfg');if(!raw)return null;const decoded=atob(raw.replace(/-/g,'+').replace(/_/g,'/'));return JSON.parse(new TextDecoder().decode(Uint8Array.from(decoded,c=>c.charCodeAt(0))))}catch{return null}};
-  try{config=parseUrlConfig()||JSON.parse(localStorage.getItem(CFG_KEY)||'null')}catch{config=null}
+  const DEFAULT_FIREBASE_CONFIG={"apiKey":"AIzaSyCYtoZp-qqNOw9IPaIZx2AZray7pB3UErw","authDomain":"painel-tarefas-csatic.firebaseapp.com","projectId":"painel-tarefas-csatic","storageBucket":"painel-tarefas-csatic.firebasestorage.app","messagingSenderId":"110298425391","appId":"1:110298425391:web:dc2d6c567372ff2a8cfeda","measurementId":"G-G55FSTXTVX"};
+  try{config=parseUrlConfig()||JSON.parse(localStorage.getItem(CFG_KEY)||'null')||DEFAULT_FIREBASE_CONFIG}catch{config=DEFAULT_FIREBASE_CONFIG}
   const localSave=()=>{if(!cloud&&!isInvite)localStorage.setItem(STORAGE,JSON.stringify(tasks))};
   const canWrite=()=>cloud&&signedUser?isOwner:!isInvite;
   const dateFmt=d=>{if(!d)return '';const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d};
