@@ -74,6 +74,79 @@ function empty(label='Nenhum registro encontrado'){return `<div class="empty"><d
 function periodNotice(){return cloud()?`<div class="info-note">Dados consultados no banco da organização ${lastLoad?'· última atualização '+new Date(lastLoad).toLocaleTimeString('pt-BR'):''}. Confirme a completude das importações antes de tomar decisões orçamentárias.</div>`:`<div class="info-note warning-note">Indicadores baseados exclusivamente em <strong>registros fictícios</strong>. Os cálculos não representam saldos oficiais ou situação real de qualquer processo.</div>`}
 function updateChrome(){document.getElementById('nav').innerHTML=NAV.filter(([v])=>v!=='usuarios'||isAdmin()).map(([v,ico,label])=>`<button class="navitem ${view===v?'active':''}" data-view="${v}"><span class="nav-ico">${ico}</span><span>${label}</span>${v==='tarefas'&&db.tarefas.filter(t=>t.status!=='Concluída').length?`<span class="bubble">${db.tarefas.filter(t=>t.status!=='Concluída').length}</span>`:''}</button>`).join('');document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';const indicator=document.getElementById('sync-indicator');indicator.classList.toggle('online',cloud()&&!!session);indicator.lastElementChild.textContent=cloud()?(session?'Conectado · banco em nuvem':'Conexão pendente'):'Modo demonstração';document.getElementById('demo-banner').style.display=cloud()?'none':'block';document.getElementById('avatar-initial').textContent=(profile.nome||'D').charAt(0).toUpperCase()}
 function navigate(v){if(v==='usuarios'&&!isAdmin())return showToast('Somente o administrador pode gerenciar usuários.');view=v;filters={q:'',setor:'Todos',status:'Todos'};updateChrome();render();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');window.scrollTo(0,0);if(v==='usuarios'&&cloud())loadAdminUsers().catch(e=>showToast(errMsg(e)))}
+
+function v3MyNotifications(){return (db.notificacoes||[]).filter(n=>n.destinatario_auth_id===currentAuthId()).sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em))}
+function v3Unread(){return v3MyNotifications().filter(n=>!n.lida_em).length}
+function v3LastMovement(p){
+ const dates=[p.created_at,p.updated_at,...db.eventos.filter(e=>e.processo_id===p.id).map(e=>e.criado_em),...db.tramites.filter(t=>t.processo_id===p.id).map(t=>t.criado_em)];
+ return new Date(Math.max(...dates.filter(Boolean).map(x=>new Date(x).getTime()).filter(Number.isFinite),0));
+}
+function v3Reasons(p){
+ if(!activeProcess(p))return [];
+ const out=[];
+ if(p.status==='Bloqueado')out.push('Bloqueio registrado');
+ if(p.prazo&&daysLeft(p.prazo)<0)out.push('Prazo vencido há '+Math.abs(daysLeft(p.prazo))+' dia(s)');
+ if(!p.responsavel_auth_id&&(!p.responsavel||/^(fila|equipe|compras|licita|sofi|não atribu)/i.test(p.responsavel)))out.push('Sem responsável individual');
+ const last=v3LastMovement(p);if(last.getTime()>0&&ageDays(last)>=stallDays)out.push('Sem movimentação há '+ageDays(last)+' dia(s)');
+ return out;
+}
+function v3AlertView(){
+ const alerts=db.processos.map(p=>({p,motivos:v3Reasons(p)})).filter(x=>x.motivos.length).sort((a,b)=>daysLeft(a.p.prazo)-daysLeft(b.p.prazo));
+ const counts=SECTORS.map(sector=>({sector,n:alerts.filter(x=>x.p.setor===sector).length}));
+ const chooser='<label class="v3-select">Sinalizar ausência de movimentação após <select id="stallDays">'+[3,5,7,10,15,30].map(n=>'<option value="'+n+'" '+(stallDays===n?'selected':'')+'>'+n+' dias corridos</option>').join('')+'</select></label>';
+ let html=heading('Monitoramento','Pendências e gargalos','Alertas derivados dos registros do banco; a classificação não substitui a análise do responsável.',chooser)+periodNotice();
+ html+='<div class="v3-tiles">'+counts.map(c=>'<div class="card v3-tile"><small>'+esc(c.sector)+'</small><strong>'+c.n+'</strong><span>com alerta(s)</span></div>').join('')+'</div>';
+ html+='<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo / Objeto</th><th>Setor</th><th>Responsável</th><th>Alerta(s)</th><th>Última movimentação</th><th>Prazo</th><th>Ação</th></tr></thead><tbody>';
+ html+=alerts.map(x=>'<tr><td><button class="link-button cell-main" data-action="detail" data-id="'+esc(x.p.id)+'">'+esc(x.p.numero)+'</button><div class="cell-sub">'+esc(x.p.objeto)+'</div></td><td>'+esc(x.p.setor)+'</td><td>'+esc(x.p.responsavel||'Não definido')+'</td><td>'+x.motivos.map(m=>'<span class="v3-chip">'+esc(m)+'</span>').join(' ')+'</td><td>'+v3LastMovement(x.p).toLocaleString('pt-BR')+'</td><td>'+fmtDate(x.p.prazo)+'</td><td><button class="btn small" data-action="detail" data-id="'+esc(x.p.id)+'">Ver processo</button></td></tr>').join('')||'<tr><td colspan="7" class="table-empty">Nenhum processo atende aos critérios de alerta.</td></tr>';
+ return html+'</tbody></table></div></div><p class="v3-hint">Regra piloto: dias corridos, considerando alterações do processo, registros da linha do tempo e tramitações. Confirme a causa da espera antes de classificar como gargalo.</p>';
+}
+function v3ChiefView(){
+ if(!['admin','chefia'].includes(profile.role))return heading('Acesso restrito','Painel da chefia','Esta visão é destinada à chefia e à administração.');
+ const opened=processOpen(),issues=opened.filter(p=>v3Reasons(p).length),tasks=db.tarefas.filter(t=>t.status!=='Concluída');
+ let html=heading('Gestão gerencial','Painel da chefia','Visão consolidada dos três setores, responsáveis, prazos e gargalos.')+periodNotice();
+ html+='<div class="v3-tiles">'+[{t:'Processos abertos',v:opened.length},{t:'Com alertas',v:issues.length},{t:'Tarefas vencidas',v:tasks.filter(isOverdue).length},{t:'Sem responsável individual',v:opened.filter(p=>v3Reasons(p).includes('Sem responsável individual')).length}].map(x=>'<div class="card v3-tile"><small>'+x.t+'</small><strong>'+x.v+'</strong></div>').join('')+'</div>';
+ html+='<div class="v3-tiles">'+SECTORS.map(sector=>{const ps=opened.filter(p=>p.setor===sector),ts=tasks.filter(t=>t.setor===sector);return '<div class="card v3-dept"><h3>'+esc(sector)+'</h3><div>Processos em aberto: <strong>'+ps.length+'</strong></div><div>Com alertas: <strong>'+ps.filter(p=>v3Reasons(p).length).length+'</strong></div><div>Tarefas pendentes: <strong>'+ts.length+'</strong></div><div>Vencidas: <strong>'+ts.filter(isOverdue).length+'</strong></div><button class="btn small" data-action="chiefSector" data-sector="'+esc(sector)+'">Ver processos →</button></div>'}).join('')+'</div>';
+ html+='<div class="card section">'+cardTitle('Principais pendências','Ordenadas pelo vencimento', '<button class="btn small" data-view="alertas">Todos os alertas →</button>')+(issues.sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo)).slice(0,12).map(p=>'<div class="row-item"><div><button class="link-button item-title" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+' · '+esc(p.objeto)+'</button><div class="item-meta">'+esc(p.setor)+' · '+esc(p.responsavel)+' · '+esc(v3Reasons(p).join('; '))+'</div></div>'+iconBadge(p.status)+'</div>').join('')||empty('Nenhum alerta no momento'))+'</div>';
+ return html;
+}
+function v3NotificationsView(){
+ let notes=v3MyNotifications();let html=heading('Avisos pessoais','Notificações','Avisos gerados automaticamente quando um processo ou tarefa é atribuído a você.',notes.some(n=>!n.lida_em)?'<button class="btn" data-action="readAllNotifications">Marcar todas como lidas</button>':'')+periodNotice();
+ html+='<div class="card section"><div class="v3-notes">'+notes.map(n=>'<div class="v3-note '+(n.lida_em?'':'v3-unread')+'"><div><strong>'+esc(n.titulo)+'</strong><p>'+esc(n.mensagem)+'</p><small>'+new Date(n.criado_em).toLocaleString('pt-BR')+' · '+(n.lida_em?'Lida':'Não lida')+'</small></div><div class="v3-note-actions">'+(n.processo_id?'<button class="btn small" data-action="openNotification" data-id="'+esc(n.id)+'">Abrir processo</button>':'')+(!n.lida_em?'<button class="btn small" data-action="readNotification" data-id="'+esc(n.id)+'">Marcar como lida</button>':'')+'</div></div>').join('')+(notes.length?'':empty('Nenhuma notificação pessoal'))+'</div></div>';
+ return html+'<p class="v3-hint">Avisos dentro do SIG; atualizados periodicamente com a página aberta. Ainda não são notificações push ou mensagens por e-mail.</p>';
+}
+function v3CurrentRoute(t){
+ const related=db.tramites.filter(r=>r.processo_id===t.processo_id);
+ const newest=related.sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em))[0];
+ return newest?.id===t.id;
+}
+function v3ReceiptView(){
+ const me=currentAuthId(),sector=setorUsuario(),arr=db.tramites.filter(t=>v3CurrentRoute(t)).filter(t=>receiptScope==='all'?(profile.role==='admin'||profile.role==='chefia'||t.destino===sector):receiptScope==='sector'?t.destino===sector:(t.destinatario_auth_id===me||(!t.destinatario_auth_id&&t.destino===sector))).sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em));
+ const buttons='<button class="btn '+(receiptScope==='mine'?'primary':'')+'" data-action="receiptScope" data-scope="mine">Minha fila</button><button class="btn '+(receiptScope==='sector'?'primary':'')+'" data-action="receiptScope" data-scope="sector">Meu setor</button>'+(['admin','chefia'].includes(profile.role)?'<button class="btn '+(receiptScope==='all'?'primary':'')+'" data-action="receiptScope" data-scope="all">Todos</button>':'');
+ let html=heading('Tramitação','Recebimentos','Último encaminhamento de cada processo, com prioridade, prazo e responsável.',buttons)+periodNotice();
+ html+='<div class="v3-receipts">'+arr.map(t=>{const p=findProcess(t.processo_id),task=db.tarefas.find(x=>x.processo_id===t.processo_id&&x.setor===t.destino&&x.status!=='Concluída'&&x.responsavel_auth_id===t.destinatario_auth_id),can=!!task&&canWrite(t.destino),reasons=p?v3Reasons(p):[];return '<div class="card v3-receipt"><div class="v3-receipt-head"><div><button class="link-button item-title" data-action="detail" data-id="'+esc(t.processo_id)+'">'+esc(p?.numero||'Processo')+'</button><div class="cell-sub">'+esc(p?.objeto||'')+'</div></div><span class="v3-chip">'+esc(p?.prioridade||'Média')+'</span></div><div class="v3-receipt-meta"><span><b>Origem:</b> '+esc(t.origem)+'</span><span><b>Destino:</b> '+esc(t.destino)+'</span><span><b>Responsável:</b> '+esc(t.responsavel_destino)+'</span><span><b>Prazo:</b> '+fmtDate(t.prazo)+(t.prazo&&daysLeft(t.prazo)<0?' (vencido)':'')+'</span></div><p><b>Próxima providência:</b> '+esc(t.proxima_acao)+'</p><p class="cell-sub"><b>Motivo:</b> '+esc(t.motivo)+'</p>'+ (reasons.length?'<p class="v3-alerttext">⚠ '+esc(reasons.join(' · '))+'</p>':'')+'<div class="v3-actions"><button class="btn small" data-action="detail" data-id="'+esc(t.processo_id)+'">Abrir processo</button>'+(can?'<button class="btn small" data-action="editTask" data-id="'+esc(task.id)+'">Providências da tarefa</button>':'')+(can&&task.status==='Pendente'?'<button class="btn small primary" data-action="startReceipt" data-id="'+esc(task.id)+'">Iniciar atendimento</button>':'')+'</div></div>'}).join('')||empty('Nenhum processo na fila ativa');
+ return html+'</div>';
+}
+async function v3ReadNotification(id){
+ const n=v3MyNotifications().find(x=>x.id===id);if(!n||n.lida_em)return;
+ if(cloud())await rest('/rest/v1/notificacoes?id=eq.'+encodeURIComponent(id),'PATCH',{lida_em:nowIso()});
+ n.lida_em=nowIso();
+ if(!cloud())saveLocal();
+ render();
+}
+async function v3ReadAll(){
+ for(const n of v3MyNotifications().filter(x=>!x.lida_em)){await v3ReadNotification(n.id)}
+ showToast('Notificações marcadas como lidas.');
+}
+async function v3StartReceipt(id){
+ const task=db.tarefas.find(t=>t.id===id);
+ if(!task||!canWrite(task.setor))throw Error('Tarefa indisponível ou sem autorização');
+ if(task.status!=='Pendente')return;
+ const next={...task,status:'Em andamento',updated_at:nowIso()};
+ await persist('tarefas',next,true);
+ if(cloud())await fetchCloud();else render();
+ showToast('Tarefa iniciada; prazo e responsável permanecem registrados.');
+}
+
 function dashboardView(){
  const opened=processOpen(),waiting=db.processos.filter(p=>p.status==='Aguardando empenho'),blocked=opened.filter(processBlocked),lateTasks=db.tarefas.filter(isOverdue),coverage=db.contratos.filter(c=>c.status==='Vigente'&&digits(c.custo_mensal)>0&&digits(c.saldo_empenho)/digits(c.custo_mensal)<digits(c.cobertura_alvo));
  const dept=SECTORS.map(s=>({s,n:opened.filter(p=>p.setor===s).length})),max=Math.max(...dept.map(x=>x.n),1);
@@ -159,7 +232,7 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
-function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=contractsView();break;case'sofi':html=financeView();break;case'assistente':html=assistantView();break;case'recebimentos':html=recebimentosView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
+function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=contractsView();break;case'sofi':html=financeView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
