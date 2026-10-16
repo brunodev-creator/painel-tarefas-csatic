@@ -129,16 +129,16 @@ function sigV5BuildReport_(){
       const money={},invalid=[];
       spec.money.forEach(name=>{const x=f(name);if(!x)return;const cents=sigV5MoneyCents_(x);if(cents===null)invalid.push(name);else{money[name]=cents;amountTotal[name]=(amountTotal[name]||0)+cents;}});
       if(invalid.length){issue('BLOQUEIO',spec.name,i+1,'Valor inválido: '+invalid.join(', '));continue;}
+      const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','linhaoriginal','dataatualizacao','responsavelatualizacao']);
+      const significativos=headers.map((h,j)=>[h,String(row[j]||'')]).filter(item=>item[0]&&!volateis.has(item[0]));
       let key;
       if(spec.key.length===1)key=f(spec.key[0]);
       else if(spec.key.length>1)key=spec.key.map(h=>h==='Ano'?sigV5Year_(f(h)):h==='Dotacao'?sigV5Dotacao_(f(h)):h==='Doc_Repasse'?sigV5Doc_(f(h)):f(h)).join('|');
-      else key='LINHA_SHA256:'+sigV5Hash_(JSON.stringify(row.map(String)));
+      else key='LINHA_SHA256:'+sigV5Hash_(JSON.stringify(significativos));
       if(!key){issue('BLOQUEIO',spec.name,i+1,'Não foi possível identificar chave do registro');continue;}
       if(spec.kind==='cotas'&&!/^\d{4}\|[^|]+\|\d+$/.test(key)){issue('BLOQUEIO',spec.name,i+1,'Chave Ano|Documento|Dotação inválida');continue;}
       if(seen[key])issue(spec.kind==='execucao'?'AVISO':'BLOQUEIO',spec.name,i+1,'Chave repetida (primeira linha '+seen[key]+'): '+key);
       else seen[key]=i+1;
-      const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','linhaoriginal','dataatualizacao','responsavelatualizacao']);
-      const significativos=headers.map((h,j)=>[h,String(row[j]||'')]).filter(item=>item[0]&&!volateis.has(item[0]));
       const hash=sigV5Hash_(JSON.stringify(significativos));
       const principal=spec.money[0],value=Object.prototype.hasOwnProperty.call(money,principal)?money[principal]:'';
       recs.push({sheet:spec.name,key,hash,valor_centavos:value});
