@@ -1,72 +1,53 @@
-# SIG CSA-TIC — Sistema Integrado de Gestão | MVP v1.0
+# SIG CSA-TIC — versão 2.0 (piloto)
 
-**Protótipo funcional, responsivo e gratuito** para acompanhamento de Compras, Licitação, SOFI e contratos continuados. Nenhum serviço comercial de IA é necessário. Por padrão o site inicia com **dados inteiramente fictícios** e armazenamento isolado no navegador.
+Sistema web de gestão de Compras, Licitação, SOFI, tarefas, contratos e fluxo de processos. A versão web usa PostgreSQL/Supabase (custo de licença zero dentro das cotas gratuitas), autenticação de usuários e trilha de eventos.
 
-## O que já funciona
+## Novos recursos v2
 
-- Painel geral: processos abertos, bloqueios, tarefas atrasadas, processos aguardando empenho, carga por setor.
-- Processos: cadastro, edição, responsável, setor, prazos, etapa, situação, motivo do bloqueio, próxima providência, detalhe e histórico.
-- Tarefas: cadastro, vínculo a processo, responsável, prioridade, prazo, atualização.
-- SOFI: repasses, dotações, empenhos e valores estimados, com alertas sobre limitações dos cálculos.
-- Contratos: vigência, custo mensal estimado, saldo do empenho informado, meta de cobertura e alertas.
-- Assistente de consultas: regras determinísticas e explicáveis, sem enviar documentos para IA externa.
-- Exportação/importação de JSON de demonstração e versão responsiva para dispositivos móveis.
-- Conexão com Supabase (PostgreSQL + Auth) **opcional**, permitindo banco compartilhado com login e sincronização por atualização de 60 s.
+- **Gestão de usuários**: área do administrador para convidar por e-mail, alterar perfil, setor e desativar acesso sem executar SQL; Supabase Edge Function `gerenciar-usuarios`, que valida a identidade e a função de administrador no servidor.
+- **Encaminhamento registrado**: formulário próprio para setor de destino, destinatário, motivo, prazo e próxima providência.
+- **Transação atômica no PostgreSQL**: função RPC `encaminhar_processo` atualiza o setor e o responsável, insere o trâmite, tarefa recebida e evento histórico, ou não aplica nenhuma mudança em caso de erro. Inclui proteção contra edição concorrente.
+- **Recebimentos**: consulta separada para minha fila, meu setor e todos (chefia/administrador).
+- **Minhas tarefas**: filtro por responsável autenticado e alternativa para consultar todas as tarefas.
+- **Ocorrências**: função RPC `registrar_ocorrencia`, com identidade do autor imposta pelo servidor; inserção direta no histórico foi bloqueada.
+- **Primeiro acesso**: o link de convite permite definir senha de pelo menos 12 caracteres no próprio sistema (fluxo de links do tipo convite/recuperação).
 
-## Como abrir agora
+## Endereço
 
-Abra `index.html` no navegador ou sirva a pasta com:
+`https://brunodev-creator.github.io/painel-tarefas-csatic/gestao/`
 
-```bash
-python3 -m http.server 8080
-# endereço local http://localhost:8080
-```
+Ao abrir em novo aparelho, o sistema já conhece a URL do ambiente piloto e sua chave **pública** do Supabase, mas sempre exige login. As configurações podem ser alteradas pelo próprio usuário. A chave de serviço (`service_role`) não foi publicada no site.
 
-> No modo demonstrativo as edições ficam **somente no navegador utilizado**; não são compartilhadas entre aparelhos. Não coloque dados reais, internos, pessoais ou sigilosos na demonstração hospedada publicamente.
+## Convites: passo de configuração no Supabase
 
-## Como ativar o banco de dados compartilhado
+Em Supabase > Authentication > URL Configuration, configure a Site URL e a lista de Redirect URLs para permitir:
 
-1. Obtenha a aprovação institucional para o tratamento/hospedagem dos dados e defina um administrador do ambiente.
-2. Crie um **novo** projeto Supabase no plano gratuito, na organização escolhida pelo titular da conta. A plataforma gratuita possui limites e não equivale a uma infraestrutura homologada para produção.
-3. No editor SQL do projeto, execute `database/schema.sql` **num banco novo**. Ele cria as tabelas vazias e políticas RLS, sem migrar o XLSX original.
-4. Em Supabase Auth, crie/convide os usuários internos autorizados; o responsável pelo projeto deverá associar cada UUID de Auth à tabela `usuarios`. Exemplo comentado no final do SQL.
-5. Em Authentication > Providers, restrinja inscrições e confirme as opções de segurança autorizadas. Não deixe auto cadastro indiscriminado.
-6. No site, clique **Conexão e ajustes**, preencha a **Project URL** e a chave **pública publishable/anon**. **Nunca** use `service_role`, `sb_secret_` ou senha administrativa no navegador.
-7. Faça login por e-mail/senha. Usuários autorizados carregam os dados do banco. O sistema consulta alterações a cada 60 s enquanto aberto e oferece atualização manual.
+`https://brunodev-creator.github.io/painel-tarefas-csatic/gestao/`
 
-### Limitações relevantes do MVP
+Se o serviço de e-mail do projeto impuser limite de envio (plano gratuito), aguarde a recuperação da cota ou configure SMTP autorizado. **Não compartilhe senhas por mensagem**.
 
-- Este sistema ainda **não importa automaticamente** dados do Armazém/BO, SIAD, SEI, Google Drive ou a planilha de 39 abas. Essas integrações exigem APIs/permissões e rotina de ETL com reconciliação antes do uso institucional.
-- Os registros financeiros são simplificados; **não** substituem lançamentos oficiais, saldo disponível, conformidade ou as regras específicas de execução orçamentária.
-- O assistente realiza consultas guiadas por palavras-chave; **não** é um LLM. IA local baseada em Ollama pode ser adicionada depois em servidor autorizado.
-- Responsáveis são campos textuais nesta fase. Para produção, devem referenciar usuários e unidades com identidade institucional estável.
-- Histórico do banco gera eventos automáticos de criação/alteração de processos. O protótipo não é substituto do SEI nem de trilhas oficiais.
-- Não possui uploads de documentos, assinaturas eletrônicas, OCR, importação financeira automatizada, notificações push ou interface administrativa para criação de contas.
-- Segurança exige auditoria adicional (RLS, acesso por setor, rede, MFA, backup, proteção contra abuso e classificação de informação). A primeira versão permite que usuários autenticados visualizem processos dos três setores; isso **não** é adequado para registros restritos sem políticas adicionais.
-- O banco é consultado por paginação simplificada até 1.000 registros/tabela. Antes de uso com volume real será necessária paginação completa.
-- Não há garantia de disponibilidade nos planos gratuitos e é necessário backup independente sob governança institucional.
+## Modelo de permissões
 
-## Arquitetura
+- `admin`: convidar, editar e desativar perfis, ver setores e encaminhar processos.
+- `chefia`: ver dados e editar/encaminhar processos dos três setores, sem administrar usuários.
+- `compras`, `licitacao`, `sofi`: edição dos registros do próprio setor; SOFI tem atribuições financeiras.
+- `leitura`: consulta sem edição.
 
-```
-index.html + assets/styles.css + assets/app.js
-                  ↕
-           API Supabase Auth
-                  ↕
-         PostgREST + RLS
-                  ↕
-           PostgreSQL
-```
+Perfis são guardados no banco e verificados por RLS e funções protegidas. O setor de um processo não pode ser alterado por um PATCH comum da API; use a RPC atômica para tramitar. As contas existentes de Auth só passam a ser autorizadas depois do cadastro na tabela `usuarios`.
 
-A interface é HTML/CSS/JavaScript nativo (sem npm, frameworks pagos ou build). Pode ser hospedada em GitHub Pages ou Cloudflare Pages. Quando conectada, todas as mutações são autorizadas pelo banco e não apenas pela interface.
+## Cuidados
 
-## Dados da planilha que orientarão a migração
+- **Piloto somente com dados fictícios ou devidamente anonimizados.** Hospedagem externa de dados institucionais requer autorização da PMMG e revisão de segurança, backup, disponibilidade e privacidade.
+- Convites por e-mail e troca de senha dependem da configuração do Auth e do provedor de e-mail. Sucesso no formulário não significa que a mensagem já chegou à caixa de entrada.
+- A base financeira não foi importada da planilha; saldos dependem de conciliação com sistemas oficiais.
+- O assistente utiliza consultas programadas, não uma API paga de IA.
+- Regras de autorização protegem o banco; a versão 2 ainda precisa de testes de penetração e procedimento de recuperação de incidentes antes de uso operacional.
 
-Arquivo analisado: `saldos_2_0.xlsx` (39 abas), com `DESTINACAO_REPASSES`, `ITENS_AQUISICAO`, `IMPORT_SALDOS_BO`, `INDICE_EMPENHOS`, `CONTROLE_SERVICOS_CONTINUOS` etc. **Nenhuma linha real foi importada neste protótipo**. A migração deverá preservar números completos como texto, origem, competência, documento de repasse, dotação, RIPC e chave de empenho, associando todos os movimentos oficiais a uma camada imutável de staging.
+## Estrutura
 
-## Próxima evolução recomendada
+- `index.html` / `assets/app.js` / `assets/styles.css`: site estático.
+- `functions/gerenciar-usuarios/index.ts`: função Supabase Deno, publicada no ambiente de teste.
+- `database/schema.sql`: esquema inicial; migrações v2 foram aplicadas diretamente ao banco de testes.
+- `tests/test_ui.py`, `tests/test_v2.py`, `tests/test_cloud_v2.py`: testes de interface (incluindo conexão simulada).
 
-Adicionar `documentos`, `alocacoes_repasse`, `itens`, `movimentos_empenho`, `contratos_aditivos`, `parcelas_contratuais` e `import_jobs` após validação de modelo de dados com Compras, Licitação e SOFI. Construir conciliação automática e painéis de SLA antes de habilitar a IA generativa.
-
----
-Desenvolvido como prova de conceito. Custos de licenças e APIs do MVP: R$ 0. Infraestrutura e manutenção podem gerar custos na operação.
+Não é necessário instalar dependências de frontend. Para testes locais, execute `python3 -m http.server 8080` na pasta raiz.
