@@ -137,7 +137,9 @@ function sigV5BuildReport_(){
       if(spec.kind==='cotas'&&!/^\d{4}\|[^|]+\|\d+$/.test(key)){issue('BLOQUEIO',spec.name,i+1,'Chave Ano|Documento|Dotação inválida');continue;}
       if(seen[key])issue(spec.kind==='execucao'?'AVISO':'BLOQUEIO',spec.name,i+1,'Chave repetida (primeira linha '+seen[key]+'): '+key);
       else seen[key]=i+1;
-      const hash=sigV5Hash_(JSON.stringify(row.map(String)));
+      const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','linhaoriginal','dataatualizacao','responsavelatualizacao']);
+      const significativos=headers.map((h,j)=>[h,String(row[j]||'')]).filter(item=>item[0]&&!volateis.has(item[0]));
+      const hash=sigV5Hash_(JSON.stringify(significativos));
       const principal=spec.money[0],value=Object.prototype.hasOwnProperty.call(money,principal)?money[principal]:'';
       recs.push({sheet:spec.name,key,hash,valor_centavos:value});
     }
@@ -149,6 +151,11 @@ function sigV5BuildReport_(){
   // Chaves somente para análise; nunca fazer sum(arquivoAnterior+arquivoAtual).
   result._index.sort((a,b)=>a.sheet.localeCompare(b.sheet)||a.key.localeCompare(b.key));
   result.assinatura_geral=sigV5Hash_(result._index.map(r=>r.sheet+'|'+r.key+'|'+r.hash).join('\n'));
+  const anterior=sigV5GetState_(ss),chavesAtuais={};let novos=0,alterados=0,ausentes=0;
+  result._index.forEach(r=>{const k=r.sheet+'|'+r.key;chavesAtuais[k]=true;
+    if(!anterior[k])novos++;else if(anterior[k].hash!==r.hash)alterados++;});
+  Object.keys(anterior).forEach(k=>{if(!chavesAtuais[k])ausentes++;});
+  result.comparacao=Object.keys(anterior).length?{novos,alterados,ausentes}:null;
   return result;
 }
 function sigV5WritePreview_(report){
