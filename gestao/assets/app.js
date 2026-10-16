@@ -68,7 +68,7 @@ function findProcess(id){return db.processos.find(p=>p.id===id)}
 function optionsWithAll(items,label='Todos'){return `<option value="Todos">${esc(label)}</option>`+items.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
 function processOpen(){return db.processos.filter(activeProcess)}
 function processBlocked(p){return p.status==='Bloqueado'||(p.prazo&&daysLeft(p.prazo)<0&&activeProcess(p))}
-function moneyToCommit(p){return Math.max(0,digits(p.valor_homologado)-db.empenhos.filter(e=>e.processo_id===p.id).reduce((a,b)=>a+digits(b.valor_empenhado),0))}
+function moneyToCommit(p){return Math.max(0,digits(p.valor_homologado)-db.empenhos.filter(e=>e.processo_id===p.id&&['Ativo','Encerrado'].includes(e.status)).reduce((a,b)=>a+digits(b.valor_empenhado),0))}
 function normalizeProcess(o){return Object.fromEntries(Object.entries(o).map(([k,v])=>[k,typeof v==='string'?v.trim():v]))}
 function heading(eyebrow,title,sub,buttons=''){return `<div class="pagehead"><div><div class="eyebrow">${esc(eyebrow)}</div><h1>${esc(title)}</h1><div class="sub">${esc(sub)}</div></div><div class="head-actions">${buttons}</div></div>`}
 function cardTitle(title,sub='',act=''){return `<div class="section-heading"><div><h2>${esc(title)}</h2>${sub?`<div class="sub">${esc(sub)}</div>`:''}</div>${act}</div>`}
@@ -199,7 +199,7 @@ function v4SofiView(){
  html+='<div class="card section">'+cardTitle('Solicitações de empenho','Uma solicitação só fica "Empenhado" se vinculada a um empenho cadastrado.')+
  '<div class="table-scroll"><table class="data-table"><thead><tr><th>Processo</th><th>Dotação</th><th>Valor solicitado</th><th>Estado</th><th>Prazo</th><th>Pendência / ação</th><th></th></tr></thead><tbody>'+
  (requests.map(r=>'<tr><td>'+esc(v4ProcessLabel(r.processo_id))+'</td><td>'+esc(r.dotacao)+'</td><td>'+v4Value(r.valor_solicitado)+'</td><td>'+iconBadge(r.status)+'</td><td>'+fmtDate(r.prazo)+'</td><td>'+esc(r.pendencia||r.descricao||'—')+'</td><td>'+(canFinance()?'<button class="btn small" data-action="v4EditRequest" data-id="'+esc(r.id)+'">Atualizar</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="7" class="table-empty">Nenhuma solicitação cadastrada.</td></tr>')+'</tbody></table></div></div>';
- const empenhos=db.empenhos.filter(e=>e.status!=='Anulado');
+ const empenhos=db.empenhos.filter(e=>['Ativo','Encerrado'].includes(e.status));
  const sumEmp=empenhos.reduce((a,e)=>a+digits(e.valor_empenhado),0),sumExe=empenhos.reduce((a,e)=>a+digits(e.valor_consumido),0);
  html+='<div class="card section">'+cardTitle('Empenhos cadastrados','Total registrado: '+v4Value(sumEmp)+' · Execução informada: '+v4Value(sumExe),
  canFinance()?'<button class="btn small" data-action="newEmpenho">+ Registrar empenho</button>':'')+
@@ -216,7 +216,7 @@ function v4RequestForm(id,selectedProcess){
  if(!canFinance())return showToast('Somente SOFI ou chefia podem alterar demandas de empenho.');
  const r=v4Solicitacoes().find(x=>x.id===id)||{processo_id:selectedProcess||'',dotacao:findProcess(selectedProcess)?.dotacao||'',valor_solicitado:0,status:'Em análise',descricao:'',pendencia:'',prazo:dayOffset(5),empenho_id:null};
  const procs=db.processos.filter(x=>activeProcess(x)||x.id===r.processo_id);
- const options=procs.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===r.processo_id?'selected':'')+'>'+esc(p.numero)+' · '+esc(p.setor)+' · '+esc(p.objeto.slice(0,50))+'</option>').join('');
+ const options='<option value="" '+(!r.processo_id?'selected':'')+'>Selecione um processo</option>'+procs.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===r.processo_id?'selected':'')+'>'+esc(p.numero)+' · '+esc(p.setor)+' · '+esc(p.objeto.slice(0,50))+'</option>').join('');
  const empenhos='<option value="">Nenhum empenho vinculado</option>'+db.empenhos.filter(e=>e.status!=='Anulado').map(e=>'<option value="'+esc(e.id)+'" '+(e.id===r.empenho_id?'selected':'')+'>'+esc(e.numero)+'/'+esc(e.ano)+' · '+esc(v4ProcessLabel(e.processo_id))+'</option>').join('');
  const html='<form data-form="v4Request" data-id="'+esc(id||'')+'"><div class="form-grid"><div class="form-row full"><label>Processo relacionado</label><select name="processo_id" required '+(id?'disabled':'')+'>'+options+'</select></div>'+
  inputField('dotacao','Dotação para conferência',r.dotacao,'text','required maxlength="100"')+inputField('valor_solicitado','Valor solicitado (R$)',r.valor_solicitado,'number','required min="0.01" step="0.01"')+
