@@ -220,7 +220,7 @@ async function activateAccount(d){if(!inviteActive||!session)return;
 }
 async function requestRecovery(d){
  const email=String(d.email||'').trim().toLowerCase();
- if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)){showToast('Informe um endereço de e-mail válido.');return}
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showToast('Informe um endereço de e-mail válido.');return}
  if(!cloud()){showToast('Configure a conexão com o Supabase.');return}
  busy=true;
  try{
