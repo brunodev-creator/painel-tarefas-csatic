@@ -154,10 +154,14 @@ async function v3ReadAll(){
 async function v3StartReceipt(id){
  const task=db.tarefas.find(t=>t.id===id);
  if(!task||!canWrite(task.setor))throw Error('Tarefa indisponível ou sem autorização');
- if(task.status!=='Pendente')return;
- const next={...task,status:'Em andamento',updated_at:nowIso()};
- await persist('tarefas',next,true);
- if(cloud())await fetchCloud();else render();
+ if(task.status!=='Pendente')return showToast('A tarefa já foi movimentada. Atualize a página.');
+ if(cloud()){
+  const result=await rest('/rest/v1/tarefas?id=eq.'+encodeURIComponent(id)+'&status=eq.Pendente','PATCH',{status:'Em andamento'});
+  if(!Array.isArray(result)||result.length!==1)throw Error('A tarefa foi alterada por outro usuário. Atualize e tente novamente.');
+  await fetchCloud();
+ }else{
+  task.status='Em andamento';task.updated_at=nowIso();saveLocal();render();
+ }
  showToast('Tarefa iniciada; prazo e responsável permanecem registrados.');
 }
 
