@@ -12,7 +12,7 @@ const supabase = createClient(URL, SERVICE_KEY, { auth:{ autoRefreshToken:false,
 function respond(req:Request, data:unknown, status=200) {
  const origin=req.headers.get("Origin") || "";
  const headers:Record<string,string>={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","Vary":"Origin"};
- if(ALLOWED.has(origin)){headers["Access-Control-Allow-Origin"]=origin;headers["Access-Control-Allow-Headers"]="authorization, apikey, content-type, x-client-info";headers["Access-Control-Allow-Methods"]="POST, OPTIONS"}
+ if(ALLOWED.has(origin)){headers["Access-Control-Allow-Origin"]=origin;headers["Access-Control-Allow-Headers"]="authorization, apikey, content-type, x-client-info, prefer, accept";headers["Access-Control-Allow-Methods"]="POST, OPTIONS"}
  return new Response(JSON.stringify(data),{status,headers});
 }
 function clean(v:unknown,max=120){return typeof v==="string"?v.trim().slice(0,max):""}
