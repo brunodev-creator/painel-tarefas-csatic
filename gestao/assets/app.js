@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
-const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes'];
+const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['sofi','▥','SOFI / Finanças'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 const SECTORS=['Compras','Licitação','SOFI'];
 const STATUSES=['Em andamento','Aguardando providência','Aguardando documentação','Aguardando empenho','Bloqueado','Concluído','Cancelado'];
@@ -47,7 +47,7 @@ function seed(){
  return {processos,tarefas,contratos,repasses,empenhos,eventos,tramites:[],usuarios:[{auth_id:'demo-compras',nome:'Analista Compras (demo)',role:'compras',setor:'Compras',ativo:true},{auth_id:'demo-licitacao',nome:'Analista Licitação (demo)',role:'licitacao',setor:'Licitação',ativo:true},{auth_id:'demo-sofi',nome:'Analista SOFI (demo)',role:'sofi',setor:'SOFI',ativo:true}]};
 }
 function storage(){try{const item=JSON.parse(localStorage.getItem(KEYS.data));return item&&['processos','tarefas','contratos','repasses','empenhos','eventos'].every(k=>Array.isArray(item[k]))?{...item,tramites:item.tramites||[],usuarios:item.usuarios||seed().usuarios}:seed()}catch{return seed()}}
-let db=storage();db.notificacoes=db.notificacoes||[];let config=loadSettings();let session=loadSession();let profile={nome:'Demonstração',role:localStorage.getItem(KEYS.profile)||'admin',setor:'Todos',ativo:true};let v3UnreadSeen=0,v3NotificationsReady=false;let stallDays=Math.max(1,Math.min(30,Number(localStorage.getItem('sig-alert-days')||5)));let view='dashboard',filters={q:'',setor:'Todos',status:'Todos'},chat=[],busy=false,lastLoad=null,taskScope='mine',receiptScope='mine',adminUsers=[],adminLoaded=false,inviteActive=false;
+let db=storage();db.notificacoes=db.notificacoes||[];db.solicitacoes_empenho=db.solicitacoes_empenho||[];db.competencias_contratuais=db.competencias_contratuais||[];let config=loadSettings();let session=loadSession();let profile={nome:'Demonstração',role:localStorage.getItem(KEYS.profile)||'admin',setor:'Todos',ativo:true};let v3UnreadSeen=0,v3NotificationsReady=false;let stallDays=Math.max(1,Math.min(30,Number(localStorage.getItem('sig-alert-days')||5)));let view='dashboard',filters={q:'',setor:'Todos',status:'Todos'},chat=[],busy=false,lastLoad=null,taskScope='mine',receiptScope='mine',adminUsers=[],adminLoaded=false,inviteActive=false;
 function loadSettings(){const defaults={url:'https://nrcobonppfbqgarfoqgj.supabase.co',key:'sb_publishable_q7Lhoq9CbOSJH0llBi6w_A_L8Qabbyl'};try{const v=localStorage.getItem(KEYS.settings);if(v===null)return defaults;const x=JSON.parse(v);return x&&typeof x.url==='string'?x:defaults}catch{return defaults}}
 function loadSession(){try{return JSON.parse(sessionStorage.getItem(KEYS.session)||'null')}catch{return null}}
 const cloud=()=>!!(config.url&&config.key);
@@ -165,6 +165,160 @@ async function v3StartReceipt(id){
  showToast('Tarefa iniciada; prazo e responsável permanecem registrados.');
 }
 
+
+/* === SIG CSA-TIC V4 : controle operacional SOFI e contratos === */
+function v4Solicitacoes(){return db.solicitacoes_empenho||[]}
+function v4Competencias(){return db.competencias_contratuais||[]}
+function v4ProcessLabel(id){return findProcess(id)?.numero||'Processo não localizado'}
+function v4Value(v){return money(v)}
+function v4OpenRequests(){return v4Solicitacoes().filter(r=>!['Empenhado','Cancelado'].includes(r.status))}
+function v4PredictedContract(c){
+ const first=new Date(today()+'T12:00:00');first.setDate(1);
+ const future=[];
+ for(let i=0;i<Math.max(1,digits(c.cobertura_alvo||3));i++){
+  const date=new Date(first);date.setMonth(date.getMonth()+i);
+  const period=isoDay(date),entry=v4Competencias().find(x=>x.contrato_id===c.id&&x.competencia===period);
+  future.push({month:period,value:entry?digits(entry.valor_previsto):digits(c.custo_mensal),hasRecord:!!entry});
+ }
+ const needed=future.reduce((x,y)=>x+y.value,0),available=digits(c.saldo_empenho),shortfall=Math.max(0,needed-available);
+ return {future,needed,available,shortfall,hasMissing:future.some(x=>!x.hasRecord)};
+}
+function v4SofiView(){
+ const requests=v4Solicitacoes(),open=v4OpenRequests(),current=db.processos.filter(p=>p.setor==='SOFI'&&activeProcess(p));
+ const waiting=current.filter(p=>p.status==='Aguardando empenho'),pendingValue=open.reduce((n,r)=>n+digits(r.valor_solicitado),0);
+ const k=(title,value,sub)=>'<div class="card v4-kpi"><small>'+esc(title)+'</small><strong>'+esc(value)+'</strong><span>'+esc(sub)+'</span></div>';
+ let html=heading('SOFI · Controle operacional','Demandas financeiras','Processos recebidos, solicitações de empenho e execução informada; não equivale a saldo oficial.',
+ canFinance()?'<button class="btn primary" data-action="v4NewRequest">+ Solicitação de empenho</button><button class="btn" data-action="newEmpenho">+ Empenho</button>':'')+periodNotice();
+ html+='<div class="info-note warning-note">Ambiente piloto: os valores desta tela dependem de lançamentos e conferência com BO, SIAD e documentos oficiais. Nenhum dado da planilha institucional foi importado.</div>';
+ html+='<div class="v4-grid">'+k('Processos na SOFI',current.length,'Em andamento no setor')+k('Aguardando empenho',waiting.length,'Classificação do processo')+k('Solicitações abertas',open.length,'Registros sob análise')+k('Valor em solicitações abertas',v4Value(pendingValue),'Demandado, não disponível')+'</div>';
+ html+='<div class="card section">'+cardTitle('Fila de processos da SOFI','Abrir providências e analisar pendências')+
+ '<div class="table-scroll"><table class="data-table"><thead><tr><th>Processo / Objeto</th><th>Responsável</th><th>Situação</th><th>Prazo</th><th>Próxima providência</th><th>Ação</th></tr></thead><tbody>'+
+ (current.map(p=>'<tr><td><button class="link-button cell-main" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><div class="cell-sub">'+esc(p.objeto)+'</div></td><td>'+esc(p.responsavel)+'</td><td>'+iconBadge(p.status)+'</td><td>'+fmtDate(p.prazo)+'</td><td>'+esc(p.proxima_acao||'Não definida')+'</td><td>'+(canFinance()?'<button class="btn small" data-action="v4NewRequest" data-process="'+esc(p.id)+'">Solicitar</button>':'<button class="btn small" data-action="detail" data-id="'+esc(p.id)+'">Ver</button>')+'</td></tr>').join('')||'<tr><td colspan="6" class="table-empty">Nenhum processo na SOFI.</td></tr>')+'</tbody></table></div></div>';
+ html+='<div class="card section">'+cardTitle('Solicitações de empenho','Uma solicitação só fica "Empenhado" se vinculada a um empenho cadastrado.')+
+ '<div class="table-scroll"><table class="data-table"><thead><tr><th>Processo</th><th>Dotação</th><th>Valor solicitado</th><th>Estado</th><th>Prazo</th><th>Pendência / ação</th><th></th></tr></thead><tbody>'+
+ (requests.map(r=>'<tr><td>'+esc(v4ProcessLabel(r.processo_id))+'</td><td>'+esc(r.dotacao)+'</td><td>'+v4Value(r.valor_solicitado)+'</td><td>'+iconBadge(r.status)+'</td><td>'+fmtDate(r.prazo)+'</td><td>'+esc(r.pendencia||r.descricao||'—')+'</td><td>'+(canFinance()?'<button class="btn small" data-action="v4EditRequest" data-id="'+esc(r.id)+'">Atualizar</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="7" class="table-empty">Nenhuma solicitação cadastrada.</td></tr>')+'</tbody></table></div></div>';
+ const empenhos=db.empenhos.filter(e=>e.status!=='Anulado');
+ const sumEmp=empenhos.reduce((a,e)=>a+digits(e.valor_empenhado),0),sumExe=empenhos.reduce((a,e)=>a+digits(e.valor_consumido),0);
+ html+='<div class="card section">'+cardTitle('Empenhos cadastrados','Total registrado: '+v4Value(sumEmp)+' · Execução informada: '+v4Value(sumExe),
+ canFinance()?'<button class="btn small" data-action="newEmpenho">+ Registrar empenho</button>':'')+
+ '<div class="table-scroll"><table class="data-table"><thead><tr><th>Empenho</th><th>Processo</th><th>Dotação</th><th>Empenhado</th><th>Executado</th><th>Status</th><th></th></tr></thead><tbody>'+
+ (db.empenhos.map(e=>'<tr><td>'+esc(e.numero)+'/'+esc(e.ano)+'</td><td>'+esc(v4ProcessLabel(e.processo_id))+'</td><td>'+esc(e.dotacao)+'</td><td>'+v4Value(e.valor_empenhado)+'</td><td>'+v4Value(e.valor_consumido)+'</td><td>'+iconBadge(e.status)+'</td><td>'+(canFinance()?'<button class="btn small" data-action="editEmpenho" data-id="'+esc(e.id)+'">Editar</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="7" class="table-empty">Nenhum empenho cadastrado.</td></tr>')+'</tbody></table></div></div>';
+ const received=db.repasses.reduce((a,r)=>a+digits(r.valor_recebido),0),destined=db.repasses.reduce((a,r)=>a+digits(r.valor_destinado),0);
+ html+='<div class="card section">'+cardTitle('Documentos de repasse','Recebido: '+v4Value(received)+' · Destinado informado: '+v4Value(destined),
+ canFinance()?'<button class="btn small" data-action="newRepasse">+ Repasse</button>':'')+
+ '<div class="table-scroll"><table class="data-table"><thead><tr><th>Documento</th><th>Dotação</th><th>Recebido</th><th>Destinado</th><th></th></tr></thead><tbody>'+
+ (db.repasses.map(r=>'<tr><td>'+esc(r.documento)+'</td><td>'+esc(r.dotacao)+'</td><td>'+v4Value(r.valor_recebido)+'</td><td>'+v4Value(r.valor_destinado)+'</td><td>'+(canFinance()?'<button class="btn small" data-action="editRepasse" data-id="'+esc(r.id)+'">Editar</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="5" class="table-empty">Nenhum repasse cadastrado.</td></tr>')+'</tbody></table></div><p class="v4-disclaimer">Recebido − destinado não indica automaticamente disponibilidade para empenhar.</p></div>';
+ return html;
+}
+function v4RequestForm(id,selectedProcess){
+ if(!canFinance())return showToast('Somente SOFI ou chefia podem alterar demandas de empenho.');
+ const r=v4Solicitacoes().find(x=>x.id===id)||{processo_id:selectedProcess||'',dotacao:findProcess(selectedProcess)?.dotacao||'',valor_solicitado:0,status:'Em análise',descricao:'',pendencia:'',prazo:dayOffset(5),empenho_id:null};
+ const procs=db.processos.filter(x=>activeProcess(x)||x.id===r.processo_id);
+ const options=procs.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===r.processo_id?'selected':'')+'>'+esc(p.numero)+' · '+esc(p.setor)+' · '+esc(p.objeto.slice(0,50))+'</option>').join('');
+ const empenhos='<option value="">Nenhum empenho vinculado</option>'+db.empenhos.filter(e=>e.status!=='Anulado').map(e=>'<option value="'+esc(e.id)+'" '+(e.id===r.empenho_id?'selected':'')+'>'+esc(e.numero)+'/'+esc(e.ano)+' · '+esc(v4ProcessLabel(e.processo_id))+'</option>').join('');
+ const html='<form data-form="v4Request" data-id="'+esc(id||'')+'"><div class="form-grid"><div class="form-row full"><label>Processo relacionado</label><select name="processo_id" required '+(id?'disabled':'')+'>'+options+'</select></div>'+
+ inputField('dotacao','Dotação para conferência',r.dotacao,'text','required maxlength="100"')+inputField('valor_solicitado','Valor solicitado (R$)',r.valor_solicitado,'number','required min="0.01" step="0.01"')+
+ selectField('status','Situação',['Em análise','Aguardando documentação','Pronto para empenhar','Empenhado','Devolvido','Cancelado'],r.status)+inputField('prazo','Prazo de análise',r.prazo,'date')+
+ textareaField('descricao','Descrição e justificativa',r.descricao)+textareaField('pendencia','Pendência ou motivo de devolução',r.pendencia||'')+
+ '<div class="form-row full"><label>Empenho relacionado (obrigatório para marcar "Empenhado")</label><select name="empenho_id">'+empenhos+'</select></div></div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar solicitação</button></div></form>';
+ openModal(id?'Atualizar solicitação de empenho':'Nova solicitação de empenho','Registro de controle interno. A situação Empenhado exige vínculo com registro cadastrado.',html,true);
+}
+function v4ContractsView(){
+ const contracts=db.contratos.filter(c=>searchText(c.numero,c.objeto,c.fornecedor,c.gestor).includes(filters.q.toLowerCase()));
+ const alert=contracts.filter(c=>c.status==='Vigente'&&(daysLeft(c.fim)<=60||v4PredictedContract(c).shortfall>0));
+ let html=heading('Execução continuada','Contratos continuados','Projeção mensal, cobertura estimada e alertas de vigência.',
+ canFinance()?'<button class="btn primary" data-action="newContract">+ Contrato</button>':'')+periodNotice();
+ html+='<div class="v4-grid"><div class="card v4-kpi"><small>Contratos cadastrados</small><strong>'+contracts.length+'</strong></div><div class="card v4-kpi"><small>Com alerta de cobertura ou vigência</small><strong>'+alert.length+'</strong></div><div class="card v4-kpi"><small>Competências previstas</small><strong>'+v4Competencias().length+'</strong></div></div>';
+ html+='<div class="info-note">Saldo informado e custo mensal são lançamentos manuais: a cobertura calculada representa planejamento, <strong>não comprova saldo oficial nem autoriza reforço</strong>.</div>';
+ html+='<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar contrato, objeto ou fornecedor..." value="'+esc(filters.q)+'"></label></div>';
+ html+='<div class="v4-contract-grid">'+contracts.map(c=>{
+ const forecast=v4PredictedContract(c),due=daysLeft(c.fim),warning=c.status==='Vigente'&&(due<=60||forecast.shortfall>0);
+ return '<div class="card v4-contract"><div class="v4-contract-top"><div><h3>'+esc(c.numero)+'</h3><div class="cell-sub">'+esc(c.objeto)+' · '+esc(c.fornecedor)+'</div></div>'+iconBadge(c.status)+'</div>'+
+ '<div class="v4-contract-data"><div><small>Vigência</small><b>'+fmtDate(c.fim)+'</b></div><div><small>Saldo informado</small><b>'+v4Value(c.saldo_empenho)+'</b></div><div><small>Previsão '+esc(c.cobertura_alvo)+' mês(es)</small><b>'+v4Value(forecast.needed)+'</b></div><div><small>Diferença projetada</small><b>'+v4Value(forecast.shortfall)+'</b></div></div>'+
+ (warning?'<div class="v4-alert">Atenção: '+(due<=60?'vigência em até 60 dias. ':'')+(forecast.shortfall>0?'previsão acima do saldo informado.':'')+'</div>':'')+
+ '<p class="v4-disclaimer">'+(forecast.hasMissing?'Parte da previsão usa o custo mensal padrão por ausência de competência cadastrada.':'Todas as competências do horizonte possuem previsão cadastrada.')+'</p>'+
+ '<div class="v4-mini-calendar">'+forecast.future.map(f=>'<div><span>'+fmtDate(f.month)+'</span><strong>'+v4Value(f.value)+'</strong>'+(f.hasRecord?'':'<small>estimado</small>')+'</div>').join('')+'</div>'+
+ '<div class="v4-actions">'+(canFinance()?'<button class="btn small" data-action="editContract" data-id="'+esc(c.id)+'">Editar contrato</button><button class="btn small" data-action="v4NewCompetence" data-id="'+esc(c.id)+'">+ Competência</button>':'')+
+ '<button class="btn small" data-action="v4ContractSchedule" data-id="'+esc(c.id)+'">Ver calendário</button></div></div>';
+ }).join('')||empty('Nenhum contrato cadastrado.')+'</div>';
+ return html;
+}
+function v4ScheduleModal(contractId){
+ const c=db.contratos.find(x=>x.id===contractId);
+ if(!c)return showToast('Contrato não encontrado.');
+ const comps=v4Competencias().filter(x=>x.contrato_id===c.id).sort((a,b)=>a.competencia.localeCompare(b.competencia));
+ const html='<div class="info-note">Competências registradas manualmente. Previsões, liquidações e pagamentos precisam ser conciliados com os documentos oficiais.</div>'+
+ '<div class="table-scroll"><table class="data-table"><thead><tr><th>Competência</th><th>Previsto</th><th>Executado informado</th><th>Situação</th><th>Documento</th><th></th></tr></thead><tbody>'+
+ (comps.map(x=>'<tr><td>'+fmtDate(x.competencia)+'</td><td>'+v4Value(x.valor_previsto)+'</td><td>'+v4Value(x.valor_executado)+'</td><td>'+iconBadge(x.status)+'</td><td>'+esc(x.documento_referencia||'—')+'</td><td>'+(canFinance()?'<button class="btn small" data-action="v4EditCompetence" data-id="'+esc(x.id)+'">Editar</button>':'—')+'</td></tr>').join('')||'<tr><td colspan="6" class="table-empty">Nenhuma competência registrada.</td></tr>')+'</tbody></table></div>'+
+ (canFinance()?'<div class="modal-footer"><button class="btn primary" data-action="v4NewCompetence" data-id="'+esc(c.id)+'">+ Nova competência</button></div>':'');
+ openModal('Calendário contratual',c.numero+' · '+c.objeto,html,true);
+}
+function v4CompetenceForm(id,contractId){
+ if(!canFinance())return showToast('Somente SOFI e chefia podem editar competências.');
+ const x=v4Competencias().find(e=>e.id===id)||{contrato_id:contractId,competencia:today().slice(0,7)+'-01',valor_previsto:0,valor_executado:0,status:'Prevista',documento_referencia:'',observacoes:''};
+ const c=db.contratos.find(a=>a.id===x.contrato_id);
+ if(!c)return showToast('Contrato não localizado.');
+ const html='<form data-form="v4Competence" data-id="'+esc(id||'')+'" data-contract="'+esc(c.id)+'"><div class="form-grid">'+inputField('competencia','Competência',String(x.competencia).slice(0,7),'month','required')+
+ inputField('valor_previsto','Valor previsto (R$)',x.valor_previsto,'number','required min="0" step="0.01"')+
+ inputField('valor_executado','Execução informada (R$)',x.valor_executado,'number','required min="0" step="0.01"')+
+ selectField('status','Situação',['Prevista','Atestada','Liquidada','Paga'],x.status)+
+ inputField('documento_referencia','Documento de referência',x.documento_referencia||'')+textareaField('observacoes','Observações',x.observacoes||'')+
+ '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar competência</button></div></form>';
+ openModal(id?'Editar competência':'Nova competência',c.numero+' · Registros informados manualmente',html,true);
+}
+function v4FinishTaskModal(id){
+ const t=db.tarefas.find(x=>x.id===id);
+ if(!t||!canWrite(t.setor))return showToast('Sem permissão para concluir a tarefa.');
+ if(t.status==='Concluída')return showToast('Tarefa já concluída.');
+ const html='<div class="info-note"><strong>'+esc(t.titulo)+'</strong><p>Responsável: '+esc(t.responsavel)+' · Setor: '+esc(t.setor)+'</p></div>'+
+ '<form data-form="v4FinishTask" data-id="'+esc(id)+'"><div class="form-grid">'+textareaField('conclusao_observacao','Providência executada e resultado','')+
+ '</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Concluir tarefa</button></div></form>';
+ openModal('Concluir tarefa','A conclusão ficará registrada com data, autor e justificativa.',html,true);
+}
+async function v4HandleFinishTask(form){
+ const t=db.tarefas.find(x=>x.id===form.dataset.id);
+ if(!t||!canWrite(t.setor))throw Error('Tarefa indisponível.');
+ const obs=String(gather(form).conclusao_observacao||'').trim();
+ if(obs.length<8)return showToast('Descreva a providência executada (mínimo 8 caracteres).');
+ if(t.status==='Concluída')return showToast('Tarefa já concluída.');
+ busy=true;
+ try{
+ if(cloud()){
+  const res=await rest('/rest/v1/tarefas?id=eq.'+encodeURIComponent(t.id)+'&status=neq.Conclu%C3%ADda','PATCH',{status:'Concluída',conclusao_observacao:obs});
+  if(!Array.isArray(res)||res.length!==1)throw Error('A tarefa já foi alterada. Atualize antes de concluir.');
+  await fetchCloud();
+ }else{
+  t.status='Concluída';t.conclusao_observacao=obs;t.concluida_em=nowIso();t.concluida_por=currentAuthId();t.updated_at=nowIso();
+  db.eventos.unshift({id:uuid(),processo_id:t.processo_id,tipo:'Tarefa concluída',descricao:t.titulo+' · '+obs,usuario:profile.nome,criado_em:nowIso()});saveLocal();
+ }
+ closeModal();render();showToast('Tarefa concluída e registrada no histórico.');
+ }catch(e){showToast('Falha ao concluir tarefa: '+errMsg(e))}finally{busy=false}
+}
+async function v4HandleRequest(form){
+ if(!canFinance())return showToast('Acesso financeiro não autorizado.');
+ const d=gather(form),old=v4Solicitacoes().find(x=>x.id===form.dataset.id);
+ if(old)d.processo_id=old.processo_id;
+ d.valor_solicitado=Number(d.valor_solicitado);d.empenho_id=d.empenho_id||null;d.pendencia=d.pendencia||null;
+ if(!d.processo_id||!findProcess(d.processo_id))return showToast('Selecione um processo válido.');
+ if(!Number.isFinite(d.valor_solicitado)||d.valor_solicitado<=0)return showToast('Valor solicitado inválido.');
+ if((d.descricao||'').trim().length<8)return showToast('Informe a justificativa da solicitação.');
+ if(d.status==='Empenhado'&&!d.empenho_id)return showToast('Vincule o empenho antes de marcar "Empenhado".');
+ if(['Devolvido','Aguardando documentação'].includes(d.status)&&(!d.pendencia||d.pendencia.trim().length<8))return showToast('Descreva o motivo da pendência/devolução.');
+ const record={...old,...d,id:old?.id||uuid()};
+ busy=true;try{await persist('solicitacoes_empenho',record,!!old);closeModal();await (cloud()?fetchCloud():Promise.resolve());render();showToast('Solicitação financeira registrada.');}catch(e){showToast('Erro: '+errMsg(e))}finally{busy=false}
+}
+async function v4HandleCompetence(form){
+ if(!canFinance())return showToast('Acesso financeiro não autorizado.');
+ const d=gather(form),old=v4Competencias().find(x=>x.id===form.dataset.id);
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(d.competencia||''))return showToast('Competência inválida.');
+ const contractId=old?.contrato_id||form.dataset.contract;
+ if(!db.contratos.some(x=>x.id===contractId))return showToast('Contrato não encontrado.');
+ const record={...old,...d,id:old?.id||uuid(),contrato_id:contractId,competencia:d.competencia+'-01',valor_previsto:Number(d.valor_previsto),valor_executado:Number(d.valor_executado)};
+ if(!Number.isFinite(record.valor_previsto)||!Number.isFinite(record.valor_executado)||record.valor_previsto<0||record.valor_executado<0)return showToast('Valores devem ser não negativos.');
+ if(v4Competencias().some(x=>x.id!==record.id&&x.contrato_id===contractId&&x.competencia===record.competencia))return showToast('Essa competência já está cadastrada no contrato.');
+ busy=true;try{await persist('competencias_contratuais',record,!!old);closeModal();await (cloud()?fetchCloud():Promise.resolve());render();showToast('Competência contratual salva.');}catch(e){showToast('Erro: '+errMsg(e))}finally{busy=false}
+}
+
 function dashboardView(){
  const opened=processOpen(),waiting=db.processos.filter(p=>p.status==='Aguardando empenho'),blocked=opened.filter(processBlocked),lateTasks=db.tarefas.filter(isOverdue),coverage=db.contratos.filter(c=>c.status==='Vigente'&&digits(c.custo_mensal)>0&&digits(c.saldo_empenho)/digits(c.custo_mensal)<digits(c.cobertura_alvo));
  const dept=SECTORS.map(s=>({s,n:opened.filter(p=>p.setor===s).length})),max=Math.max(...dept.map(x=>x.n),1);
@@ -250,7 +404,7 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
-function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=contractsView();break;case'sofi':html=financeView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
+function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
@@ -352,7 +506,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(busy)return;
- const type=form.dataset.form;if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -393,6 +547,12 @@ function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de re
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}if(btn.dataset.view){navigate(btn.dataset.view);return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'v4NewRequest':v4RequestForm(null,btn.dataset.process);break;
+ case 'v4EditRequest':v4RequestForm(id);break;
+ case 'v4NewCompetence':v4CompetenceForm(null,id);break;
+ case 'v4EditCompetence':v4CompetenceForm(id);break;
+ case 'v4ContractSchedule':v4ScheduleModal(id);break;
+ case 'v4FinishTask':v4FinishTaskModal(id);break;
  case 'readNotification': await v3ReadNotification(id);break;
  case 'readAllNotifications': await v3ReadAll();break;
  case 'openNotification': {const n=v3MyNotifications().find(x=>x.id===id);if(n){await v3ReadNotification(id);if(n.processo_id)detail(n.processo_id)}break;}
