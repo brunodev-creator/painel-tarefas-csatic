@@ -3,7 +3,7 @@
  * NÃO acessa o Gmail, NÃO envia dados para servidores externos, NÃO modifica as 39 abas originais.
  * Instale como arquivo NOVO (.gs) em Extensões > Apps Script da planilha saldos_2_0.
  *
- * Menu: SIG V5 (prévia) -> Gerar análise / Registrar versão / Baixar prévia JSON.
+ * Depois de executar sigV5InstalarMenu() uma vez: Menu SIG V5 (prévia) -> Gerar análise / Registrar versão / Baixar prévia JSON.
  * A análise somente escreve a aba SIG_V5_PREVIA. Registrar versão é opt-in.
  */
 const SIGV5 = Object.freeze({
@@ -24,12 +24,20 @@ const SIGV5 = Object.freeze({
   ]
 });
 
-function onOpen() {
+function sigV5CriarMenu() {
   SpreadsheetApp.getUi().createMenu('SIG V5 (prévia)')
     .addItem('1. Gerar análise (sem envio)', 'sigV5GerarPrevia')
     .addItem('2. Registrar versão conferida', 'sigV5RegistrarVersao')
     .addItem('3. Baixar relatório JSON', 'sigV5BaixarPrevia')
     .addToUi();
+}
+/** Execute esta função UMA VEZ para instalar o menu, sem alterar onOpen() já existente. */
+function sigV5InstalarMenu() {
+  const ss=SpreadsheetApp.getActiveSpreadsheet();
+  const exists=ScriptApp.getProjectTriggers().some(t=>
+    t.getHandlerFunction()==='sigV5CriarMenu'&&t.getEventType()===ScriptApp.EventType.ON_OPEN);
+  if(!exists)ScriptApp.newTrigger('sigV5CriarMenu').forSpreadsheet(ss).onOpen().create();
+  sigV5CriarMenu();
 }
 function sigV5GerarPrevia() {
   const report=sigV5BuildReport_();
