@@ -108,13 +108,14 @@ function sigV6Construir_(){
  const continuos=sigV6Ler_(SIGV6.names.continuos,['Chave_Empenho','Saldo_Atual_Empenho'],alert);
  const processos=sigV6Ler_(SIGV6.names.processos,['ID_Processo','Processo_Compra','Status_Processo'],alert);
  const byCota=Object.create(null),byRipc=Object.create(null),byDot=Object.create(null),byEmp=Object.create(null);
- const itemByRipc=Object.create(null),continuosOut=[],processosOut=[];
+ const itemByRipc=Object.create(null),continuosOut=[],processosOut=[];const dotacaoCotasConhecidas=new Set();let empenhosNormalizados=0,empenhosComCota=0;
  const ensureDot=(key)=>byDot[key]||(byDot[key]={dotacao:key,cotas_centavos:0,ripc_centavos:0,empenhado_liquido_centavos:0,
     saldo_empenhos_centavos:0,documentos:0,empenhos:0,avisos:[]});
  const cotaFingerprint=Object.create(null);
  for(const r of cotas){
   const y=sigV6Year_(r.get('Ano')),doc=sigV6Doc_(r.get('Doc_Repasse')),dot=sigV6Dot_(r.get('Dotacao'));
   const key=sigV6Key_(y,doc,dot),value=sigV6Reais_(r.get('Valor_Descentralizado'));
+  if(dot)dotacaoCotasConhecidas.add(dot);
   if(!y||!doc||dot.length<10||value===null){alert('BLOQUEIO','COTA_INVALIDA',SIGV6.names.cotas,r.linha,'Ano, documento, dotação ou valor inválido');continue;}
   const unique=key+'|'+r.get('Linha_Original')+'|'+value;
   if(cotaFingerprint[unique])alert('BLOQUEIO','MOVIMENTO_IDÊNTICO',SIGV6.names.cotas,r.linha,'Movimentação idêntica à linha '+cotaFingerprint[unique]);else cotaFingerprint[unique]=r.linha;
@@ -151,8 +152,8 @@ function sigV6Construir_(){
  Object.keys(itemByRipc).forEach(id=>{if(!ripcSeen[id])alert('ATENCAO','ITEM_SEM_RIPC',SIGV6.names.itens,0,'Itens vinculados a RIPC ausente: '+id);});
  const repasses=Object.values(byCota).map(c=>{
   c.diferenca_nao_destinada_centavos=c.credito_liquido_centavos-c.valor_ripc_centavos;
-  c.situacao=c.diferenca_nao_destinada_centavos<0?'RIPC_SUPERA_DOCUMENTO':
-     c.quantidade_ripc===0?'SEM_RIPC':'CONCILIADO_ARITMETICAMENTE';
+  c.situacao=c.quantidade_ripc===0?(c.credito_liquido_centavos<0?'COTA_NEGATIVA_SEM_RIPC':'SEM_RIPC'):
+    c.diferenca_nao_destinada_centavos<0?'RIPC_SUPERA_DOCUMENTO':'CONCILIADO_ARITMETICAMENTE';
   if(c.situacao==='RIPC_SUPERA_DOCUMENTO')
     alert('ATENCAO','RIPC_SUPERA_DOCUMENTO',SIGV6.names.ripc,0,
      'Documento '+c.ano+'/'+c.documento+' possui RIPC acima da cota líquida (pode haver utilização de outra fonte ou ajuste)');
@@ -172,13 +173,21 @@ function sigV6Construir_(){
  });
  const empSeen=Object.create(null),empenhos=[];
  for(const r of emps){
-  const id=r.get('Chave_Empenho'),dot=sigV6Dot_(r.get('Dotacao'));
+  const id=r.get('Chave_Empenho'),dotOrigem=sigV6Dot_(r.get('Dotacao'));
+  let dot=dotOrigem;
+  // Aplicar preenchimento de zero SOMENTE se resultar em uma dotação já conhecida na fonte BO.
+  // Não adivinhar o significado de códigos compactados distintos.
+  if(dot.length===31 && dot.startsWith('12516')){
+    const candidata=dot.slice(0,4)+'0'+dot.slice(4);
+    if(dotacaoCotasConhecidas.has(candidata)){dot=candidata;empenhosNormalizados++;}
+  }
+  if(dotacaoCotasConhecidas.has(dot))empenhosComCota++;
   if(!id||dot.length<10){alert('BLOQUEIO','EMPENHO_IDENTIFICACAO',SIGV6.names.empenhos,r.linha,'Chave ou dotação inválida');continue;}
   if(empSeen[id]){alert('BLOQUEIO','EMPENHO_DUPLICADO',SIGV6.names.empenhos,r.linha,'Chave repetida: '+id);continue;}
   empSeen[id]=true;
   const liquid=sigV6Reais_(r.get('Total_Empenhado_Liquido')),saldo=sigV6Reais_(r.get('Saldo_Atual_Empenho'));
   if(liquid===null||saldo===null){alert('BLOQUEIO','EMPENHO_VALORES',SIGV6.names.empenhos,r.linha,'Montante empenhado ou saldo inválido');continue;}
-  const e={chave_empenho:id,processo:r.get('Processo_Compra'),dotacao:dot,
+  const e={chave_empenho:id,processo:r.get('Processo_Compra'),dotacao:dot,dotacao_orig:dotOrigem,
     empenhado_liquido_centavos:liquid,saldo_informado_centavos:saldo,
     classificacao:r.get('Tipo_Execucao_Contabil')||'',historico:r.get('Data_Atualizacao')||''};
   empenhos.push(e);byEmp[id]=e;
@@ -210,7 +219,7 @@ function sigV6Construir_(){
  const rawCotas=repasses.filter(x=>x.credito_liquido_centavos!==null);
  const summary={repasses:repasses.length,dotacoes:dotacoes.length,ripcs:Object.keys(byRipc).length,
    itens:Object.keys(itemSeen).length,empenhos:empenhos.length,continuos:continuosOut.length,
-   processos:processosOut.length,
+   processos:processosOut.length,empenhos_com_dotacao_de_cota:empenhosComCota,empenhos_dotacao_normalizada:empenhosNormalizados,
    cota_liquida_centavos:rawCotas.reduce((n,x)=>n+x.credito_liquido_centavos,0),
    ripc_total_centavos:Object.values(byRipc).reduce((n,x)=>n+x.valor_ripc_centavos,0),
    documentos_sem_cota:orphan.length,
@@ -227,6 +236,7 @@ function sigV6Construir_(){
    'Valor_Total_Repasse no RIPC é referência documental repetida e NÃO é somado.',
    'Diferenças negativas por documento são alertas para conferência, não prova de irregularidade.',
    'Posição financeira por dotação não identifica qual documento de repasse financiou cada empenho.',
+   'Códigos compactos de empenho só recebem zero à esquerda se houver correspondência EXATA de uma dotação de cota; casos restantes não são relacionados por aproximação.',
    'Disponibilidade para empenhar, reforço de contrato e classificação de serviço contínuo exigem conferência oficial.'
   ]};
  report.assinatura_geral=sigV6Sha_(JSON.stringify({repasses:repasses.map(x=>[x.chave,x.credito_liquido_centavos,x.valor_ripc_centavos]),
@@ -248,7 +258,8 @@ function sigV6Escrever_(r){
  sigV6CriarAba_(ss,n.resumo,['Indicador','Valor'],[
   ['Data da análise',r.gerado_em],['Documentos de repasse',r.resumo.repasses],
   ['Dotações diferentes',r.resumo.dotacoes],['RIPC',r.resumo.ripcs],['Itens RIPC',r.resumo.itens],
-  ['Empenhos no índice',r.resumo.empenhos],['Serviços prováveis',r.resumo.continuos],
+  ['Empenhos no índice',r.resumo.empenhos],['Empenhos em dotações presentes nas cotas',r.resumo.empenhos_com_dotacao_de_cota],
+  ['Empenhos com código normalizado por fonte',r.resumo.empenhos_dotacao_normalizada],['Serviços prováveis',r.resumo.continuos],
   ['Cota líquida (R$)',fmt(r.resumo.cota_liquida_centavos)],
   ['RIPC destinado (R$)',fmt(r.resumo.ripc_total_centavos)],
   ['Diferença global apenas informativa (R$)',fmt(r.resumo.diferenca_global_informativa_centavos)],
@@ -264,9 +275,9 @@ function sigV6Escrever_(r){
   'Empenhado líquido informado (R$)','Saldo em empenhos (R$)','Documentos','Empenhos'],r.dotacoes.map(x=>[
   x.dotacao,fmt(x.cotas_centavos),fmt(x.ripc_centavos),fmt(x.nao_destinado_teorico_centavos),
   fmt(x.empenhado_liquido_centavos),fmt(x.saldo_empenhos_centavos),x.documentos,x.empenhos]));
- sigV6CriarAba_(ss,n.empenhos,['Chave Empenho','Processo','Dotação','Empenhado líquido (R$)',
+ sigV6CriarAba_(ss,n.empenhos,['Chave Empenho','Processo','Dotação consolidada','Dotação original','Empenhado líquido (R$)',
   'Saldo de empenho (R$)','Tipo de execução'],r.empenhos.map(x=>[
-  x.chave_empenho,x.processo,x.dotacao,fmt(x.empenhado_liquido_centavos),
+  x.chave_empenho,x.processo,x.dotacao,x.dotacao_orig,fmt(x.empenhado_liquido_centavos),
   fmt(x.saldo_informado_centavos),x.classificacao]));
  sigV6CriarAba_(ss,n.continuos,['Chave empenho','Processo','Dotação','Status',
   'Saldo informado (R$)','Reforço sugerido (R$)','Tipo execução','Observação'],r.continuos.map(x=>[
