@@ -66,6 +66,20 @@ A diferença **cota líquida menos empenhos atribuídos** é valor gerencial, N�
 **Exemplo:** aquisição 14/2026, empenhos 116 e 123 em `5207`, relacionados à cota global `52XX` pela família orçamentária. Não há obrigação de valores idênticos. O RIPC e a cota do documento 62 apresentam diferença de R$ 10,00, que permanece sujeita a conferência.
 
 **Operacionalização:** atualizar manualmente o arquivo `SIG_V6_Conciliacao.gs` no editor Apps Script da planilha; executar Gerar conciliação local; revisar `SIG_V6_ABATIMENTOS`; gerar novo JSON e importar no SIG. Atualizar GitHub não atualiza automaticamente Apps Script.
+## TDCO e correções históricas autorizadas (17/10/2026)
+
+**Regra contábil:** as contas de controle 998020301 (global) e 998020302 (item) da conciliação são da unidade contábil executora 1250070. Qualquer empenho sinalizado como `Eh_TDCO = SIM`, como `Tipo_Execucao_Contabil = TDCO` ou com unidade contábil executora diferente de 1250070 é mantido no histórico e listado com `TDCO_FORA_ESCOPO` ou `OUTRA_UNIDADE_FORA_ESCOPO`, mas **não é debitado** das cotas da unidade 1250070. As classificações e os 53 registros de contratos contínuos não são alterados.
+
+**Correção histórica com rastreabilidade:** algumas funcionalidades programáticas de 16 dígitos passaram por armazenamento numérico e perderam o último dígito (0001 tornou-se 0000). O código público não contém registros institucionais específicos nem tenta corrigir genericamente todos os `0000`. Correções aprovadas ficam na aba privada `SIG_V6_CORRECOES_APROVADAS`, colunas `Chave_Empenho`, `Dotacao_Original`, `Dotacao_Corrigida`, `Status`, `Justificativa`. A aplicação exige:
+
+1. Status `APROVADO` e chave de empenho única.
+2. Código original idêntico ao registrado no índice.
+3. Alteração EXCLUSIVAMENTE do sexto segmento, `0000` para `0001`; todos os outros componentes da dotação devem permanecer idênticos.
+4. Existência da cota de destino corrigida e inexistência de cota com o código incorreto.
+
+O SIG preserva dotação de origem, texto importado e justificativa em `SIG_V6_EMPENHOS` e `SIG_V6_ABATIMENTOS`. A correção só existe na conciliação; **não altera** `IMPORT_EXECUCAO_DESPESA_BO`, `BASE_EXECUCAO_EMPENHOS` nem `INDICE_EMPENHOS`. Revogação pela mudança do `Status` na aba privada impede a reaplicação ao gerar um novo relatório.
+
+**Aplicação efetiva:** nova aba de correções já criada na planilha privada. Atualize o arquivo Apps Script V6 instalado, gere o relatório local e importe novo JSON no navegador. O GitHub não altera o Apps Script já instalado automaticamente. A posição original de cotas é de 30/06/2026; não interpretar a diferença como saldo oficial de 17/10/2026.
 ## Regras de interpretação verificadas
 
 - **Cotas**: são movimentos, com créditos e anulações, e podem repetir `Ano|Doc_Repasse|Dotacao`. O saldo líquido é a soma algébrica.
