@@ -335,7 +335,7 @@ function v5View(){
  '<ol class="v5-steps"><li>Abra <b>saldos_2_0 → Extensões → Apps Script</b>.</li><li>Crie um arquivo separado chamado <b>SIG_V5_AppsScript.gs</b> e cole o código fornecido no GitHub.</li><li>Salve e execute <code>sigV5InstalarMenu</code> uma vez; autorize apenas os escopos que o Google solicitar.</li><li>Use o menu <b>SIG V5 (prévia) → Gerar análise (sem envio)</b>.</li><li>Revise a nova aba <code>SIG_V5_PREVIA</code>. Se quiser registrar as diferenças dentro da própria planilha, escolha <b>Registrar versão conferida</b>.</li></ol>'+
  '<p class="v5-guide"><a href="https://github.com/brunodev-creator/painel-tarefas-csatic/blob/main/gestao/integracao/SIG_V5_AppsScript.gs" target="_blank" rel="noopener">Abrir código do extrator no GitHub ↗</a></p></div>';
  if(!v5Report)return html+'<div class="card section">'+empty('Selecione um relatório JSON ou use o exemplo fictício para conhecer a conferência.')+'</div>';
- const r=v5Report,check=Array.isArray(r.resumo)?r.resumo:[],alerts=Array.isArray(r.alertas)?r.alertas:[],blocks=Array.isArray(r.bloqueios)?r.bloqueios:[];
+ const r=v5Report,check=Array.isArray(r.resumo)?r.resumo:[],alerts=Array.isArray(r.alertas)?r.alertas:[],blocks=Array.isArray(r.bloqueios)?r.bloqueios:[],groups=Array.isArray(r.agrupamentos)?r.agrupamentos:[];
  html+='<div class="v5-grid">'+[{title:'Registros analisados',value:v5Count(r.total_registros),sub:'Posição dos relatórios'},{title:'Abas reconhecidas',value:check.length,sub:'Estruturas mapeadas'},{title:'Alertas',value:alerts.length,sub:'Itens para revisão'},{title:'Bloqueios',value:blocks.length,sub:'Impedem registrar versão'}].map(x=>'<div class="card v5-metric"><small>'+esc(x.title)+'</small><strong>'+esc(String(x.value))+'</strong><span>'+esc(x.sub)+'</span></div>').join('')+'</div>';
  html+='<div class="card section">'+cardTitle('Prévia carregada',esc(r.origem||'Planilha sem identificação'))+
  '<div class="v5-meta"><span><b>Tipo:</b> '+esc(r.tipo||'—')+'</span><span><b>Gerado em:</b> '+esc(r.gerado_em||'—')+'</span><span><b>Assinatura:</b> <code>'+esc(String(r.assinatura_geral||'').slice(0,30))+'…</code></span></div>'+
@@ -344,6 +344,9 @@ function v5View(){
  '<div class="table-scroll"><table class="data-table"><thead><tr><th>Fonte</th><th>Tipo</th><th>Linhas interpretadas</th><th>Valor principal (informativo)</th></tr></thead><tbody>'+
  check.map(x=>{const entries=Object.entries(x.total_centavos||{}),p=entries[0];return '<tr><td><b>'+esc(x.aba)+'</b></td><td>'+esc(x.tipo||'')+'</td><td>'+v5Count(x.registros)+'</td><td>'+(p?esc(p[0])+': '+v5FormatCents(p[1]):'Não aplicável')+'</td></tr>'}).join('')+
  '</tbody></table></div></div>';
+ html+='<div class="card section">'+cardTitle('Movimentações consolidadas de cotas','Linhas do mesmo documento e dotação são consolidadas pelo valor líquido, mantendo sua quantidade de movimentos.')+
+ (groups.length?'<div class="table-scroll"><table class="data-table"><thead><tr><th>Documento e dotação</th><th>Linhas</th><th>Movimentos</th><th>Valor líquido</th></tr></thead><tbody>'+
+ groups.map(g=>'<tr><td><code>'+esc(g.chave)+'</code></td><td>'+esc((g.linhas||[]).join(', '))+'</td><td>'+v5Count(g.movimentos)+'</td><td><b>'+v5FormatCents(g.valor_liquido_centavos)+'</b></td></tr>').join('')+'</tbody></table></div>':'<p class="v5-guide">Nenhuma chave com múltiplas movimentações identificada.</p>')+'</div>';
  html+='<div class="card section">'+cardTitle('Ocorrências de qualidade','A aprovação da versão deve ocorrer após tratar os bloqueios.')+
  (alerts.length?'<div class="table-scroll"><table class="data-table"><thead><tr><th>Gravidade</th><th>Aba / linha</th><th>Motivo</th></tr></thead><tbody>'+alerts.slice(0,80).map(a=>'<tr><td><span class="v5-chip '+(a.gravidade==='BLOQUEIO'?'v5-block':'')+'">'+esc(a.gravidade)+'</span></td><td>'+esc(a.aba)+' · '+esc(a.linha)+'</td><td>'+esc(a.motivo)+'</td></tr>').join('')+'</tbody></table></div>':'<div class="v5-clean">Nenhuma inconsistência sinalizada nas regras atuais.</div>')+'</div>';
  html+='<p class="v5-footer">Relatório limitado a regras estruturais. Não substitui conformidade orçamentária, análise contábil ou validação nos sistemas oficiais.</p>';
@@ -351,7 +354,7 @@ function v5View(){
 }
 function v5Demo(){
  v5Report={sig_version:'5.0.0',tipo:'PREVIA_LOCAL',origem:'Demonstração fictícia (sem dados reais)',gerado_em:new Date().toISOString(),
- total_registros:9,comparacao:{novos:2,alterados:1,ausentes:0},assinatura_geral:'DEMO-SEM-HASH-REAL',resumo:[
+ total_registros:9,comparacao:{novos:2,alterados:1,ausentes:0},assinatura_geral:'DEMO-SEM-HASH-REAL',agrupamentos:[{aba:'IMPORT_SALDOS_BO',chave:'2026|1|DOTACAO-FICTICIA',linhas:[2,3],movimentos:2,valor_liquido_centavos:297000}],resumo:[
  {aba:'IMPORT_SALDOS_BO',tipo:'cotas',registros:3,total_centavos:{Valor_Descentralizado:5000000}},
  {aba:'DESTINACAO_REPASSES',tipo:'destinacoes',registros:4,total_centavos:{Valor_RIPC:1800000}},
  {aba:'INDICE_EMPENHOS',tipo:'empenhos',registros:2,total_centavos:{Total_Empenhado_Liquido:1000000}}],
