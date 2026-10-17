@@ -172,6 +172,10 @@ function sigV6GlobalDoItem_(dot) {
  * quando a dotação específica OU global correspondente existe nas cotas.
  */
 function sigV6DotEmpenhoParaAbate_(emp, cotasConhecidas) {
+ // A correção histórica foi aprovada e validada contra a cota na construção
+ // do índice. Não voltar ao valor bruto nesta segunda etapa.
+ if(emp.normalizacao_dotacao==='FUNCIONAL_0000_PARA_0001_APROVADA'&&
+    sigV6DotFromDigits_(emp.dotacao)&&cotasConhecidas.has(emp.dotacao))return emp.dotacao;
  const raw=sigV6Dot_(emp.dotacao_orig||emp.dotacao);
  if(sigV6DotFromDigits_(raw))return raw;
  if(raw.length===31&&raw.startsWith('12516')){
