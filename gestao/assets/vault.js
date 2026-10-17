@@ -41,7 +41,7 @@ async function transact(mode,method,arg){
  }finally{db.close();}
 }
 function keyFor(user,project,kind){
- if(typeof user!=='string'||!user||typeof project!=='string'||!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(project)||!['v5','v6'].includes(kind))
+ if(typeof user!=='string'||!user||typeof project!=='string'||!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(project)||!['v5','v6','v7'].includes(kind))
   throw Error('Conta, projeto ou versão não identificados.');
  return 'v1|'+project.toLowerCase().replace(/\/$/,'')+'|'+user+'|'+kind;
 }
@@ -58,7 +58,7 @@ async function save(user,project,kind,data,password){
  validatePass(password);
  const id=keyFor(user,project,kind);requireSupported();
  if(!data||typeof data!=='object')throw Error('Relatório inválido.');
- if((kind==='v5'&&data.sig_version!=='5.0.0')||(kind==='v6'&&data.sig_version!=='6.0.0'))throw Error('Versão do relatório incorreta.');
+ if((kind==='v5'&&data.sig_version!=='5.0.0')||(kind==='v6'&&data.sig_version!=='6.0.0')||(kind==='v7'&&data.sig_version!=='7.0.0'))throw Error('Versão do relatório incorreta.');
  // never persist original demo/test data by accident
  if(String(data.origem||'').toLowerCase().includes('demonstra')||String(data.origem||'').toLowerCase().includes('fictíc')||String(data.origem||'').toLowerCase().includes('simula'))
    throw Error('Exemplo fictício não precisa ser guardado.');
@@ -81,7 +81,7 @@ async function unlock(user,project,kind,password){
   const key=await derive(password,fromB64(item.salt),item.iterations);
   const clear=await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64(item.iv),additionalData:encoder.encode(id)},key,fromB64(item.encrypted));
   const result=JSON.parse(decoder.decode(clear));
-  if(!result||result.sig_version!==(kind==='v5'?'5.0.0':'6.0.0'))throw Error('Arquivo salvo não corresponde à versão.');
+  if(!result||result.sig_version!==({v5:'5.0.0',v6:'6.0.0',v7:'7.0.0'}[kind]))throw Error('Arquivo salvo não corresponde à versão.');
   return result;
  }catch(e){throw Error('Não foi possível desbloquear. Confira a senha do cofre ou importe novamente o JSON.');}
 }
