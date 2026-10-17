@@ -62,6 +62,8 @@ function view(authorized){
  const repasses=filter(r.repasses),dotacoes=filter(r.dotacoes),empenhos=filter(r.empenhos);
  if(!summary.regra_dotacao_global_v2)html+='<div class="v5-notice"><b>JSON anterior à correção de dotações globais.</b> Atualize o Apps Script V6, gere novo relatório e importe o JSON atualizado.</div>';
  if(!summary.regra_mestre_abate_v1)html+='<div class="v5-notice"><b>JSON sem a regra mestre de abatimento.</b> O abatimento por dotação específica ou global somente será exibido após gerar um novo relatório no Apps Script V6 atualizado.</div>';
+ if(summary.regra_mestre_abate_v1&&(!summary.regra_exclusao_tdco_v1||!summary.regra_normalizacao_historica_v1))
+ html+='<div class="v5-notice"><b>Relatório anterior ao tratamento dos TDCO e à correção histórica 18/56.</b> Gere um novo JSON no Apps Script atualizado. Não utilize os abatimentos deste arquivo para fechar a conciliação.</div>';
  if(summary.regra_mestre_abate_v1&&!summary.posicao_cotas_atualizada_hoje)
  html+='<div class="v5-notice"><b>Posição histórica.</b> Última importação de cotas: '+esc(summary.referencia_cotas_data||'não informada')+'. A conciliação não demonstra quais dotações estão disponíveis hoje. Consulte a posição atual antes de decidir operacionalmente.</div>';
  const kpi=(label,value,sub)=>'<div class="card v5-metric"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong><span>'+esc(sub)+'</span></div>';
@@ -72,7 +74,8 @@ function view(authorized){
  kpi('Empenhos',integer(summary.empenhos),'Registros distintos no índice')+
  (summary.regra_mestre_abate_v1?
  kpi('Abatimento gerencial',amount(summary.valor_abatido_gerencial_centavos),'Soma dos empenhos atribuídos uma vez, NÃO baixa contábil')+
- kpi('Empenhos atribuídos',integer(summary.empenhos_abatidos),'Específica ou global, sem comparação de valores'):'')+'</div>';
+ kpi('Empenhos atribuídos',integer(summary.empenhos_abatidos),'Específica ou global, sem comparação de valores')+
+ (summary.regra_exclusao_tdco_v1?kpi('TDCO só listados',integer(summary.empenhos_tdco_listados),'Fora do abatimento da UE 1250070'):''):'')+'</div>';
  html+=panel('Origem e consistência','<p class="v6-data-info"><b>Origem:</b> '+esc(r.origem)+' · <b>Gerado em:</b> '+esc(r.gerado_em)+' · <b>Versão:</b> '+esc(r.sig_version)+'</p>'+
  '<div class="v6-counters">'+[
   'Documentos: '+integer(summary.repasses),'RIPC: '+integer(summary.ripcs),'Itens: '+integer(summary.itens),
@@ -80,7 +83,9 @@ function view(authorized){
   ...(summary.regra_mestre_abate_v1?['Empenhos na global: '+integer(summary.empenhos_abatidos_globais),
      'Empenhos na específica: '+integer(summary.empenhos_abatidos_especificos),
      'Empenhos ambíguos: '+integer(summary.empenhos_ambiguos),
-     'Empenhos sem cota: '+integer(summary.empenhos_sem_cota)]:[]),
+     'Empenhos sem cota: '+integer(summary.empenhos_sem_cota),
+     ...(summary.regra_exclusao_tdco_v1?['TDCO fora de abatimento: '+integer(summary.empenhos_tdco_listados),
+       'Dotações históricas corrigidas: '+integer(summary.empenhos_dota_corrigidos)]:[])]:[]),
   'Empenhos associados a dotações de cota: '+integer(summary.empenhos_com_dotacao_de_cota),
   'Alertas para conferência: '+integer(warnings.length)].map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'+
  '<p class="v5-guide">Assinatura da posição: <code>'+esc(r.assinatura_geral||'')+'</code>. O documento informa a posição das abas, não garante atualização até hoje.</p>');
@@ -108,7 +113,8 @@ function view(authorized){
   const label={ABATIDO_ESPECIFICA:'Abatido na específica',ABATIDO_GLOBAL:'Abatido na global',
    AMBIGUA_SEM_ABATE:'ALERTA — duas dotações',SEM_COTA:'ALERTA — sem cota',
    CODIGO_INCOMPLETO:'ALERTA — código incompleto',VALOR_NEGATIVO_CONFERIR:'ALERTA — valor negativo',
-   SEM_VALOR_LIQUIDO:'Sem valor líquido'};
+   SEM_VALOR_LIQUIDO:'Sem valor líquido',TDCO_FORA_ESCOPO:'TDCO — só listado, sem abate',
+   OUTRA_UNIDADE_FORA_ESCOPO:'Outra UE — sem abate'};
   html+=panel('Regra mestre — abatimentos de empenhos',
    '<p class="v5-guide">Não exige igualdade de valores entre cota e empenho. O abatimento é apenas uma conciliação gerencial sobre a posição importada, não uma operação no SIAFI nem uma vinculação a documento de repasse. Se houver global e específica, o SIG não escolhe automaticamente.</p>'+
    table(['Empenho / Processo','Dotação do empenho','Dotação abatida','Valor líquido','Resultado'],
@@ -117,7 +123,19 @@ function view(authorized){
     '<td>'+esc(v6DotLabel(x.dotacao_empenho).formatted)+'</td>'+
     '<td>'+(x.dotacao_de_abate?esc(v6DotLabel(x.dotacao_de_abate).formatted):'—')+'</td>'+
     '<td>'+amount(x.valor_empenhado_liquido_centavos)+'</td>'+
-    '<td><span class="v6-status">'+esc(label[x.status]||x.status)+'</span></td></tr>')));
+    '<td><span class="v6-status">'+esc(label[x.status]||x.status)+'</span>'+
+    (x.normalizacao_dotacao?'<div class="cell-sub">0000 → 0001 (histórico): '+esc(x.dotacao_texto_fonte||x.dotacao_empenho_original)+
+    ' → '+esc(v6DotLabel(x.dotacao_empenho).formatted)+'</div>':'')+
+    (x.eh_tdco?'<div class="cell-sub">Unidade contábil '+esc(x.unidade_contabil_executora)+'</div>':'')+
+    '</td></tr>')));
+  const tdc=r.abatimentos.filter(x=>x.status==='TDCO_FORA_ESCOPO');
+  if(tdc.length)html+=panel('TDCO — somente listados, sem abatimento',
+   '<p class="v5-guide">Empenhos de outra unidade contábil executora. Não abatem recursos das contas 998020301/998020302 da UE 1250070.</p>'+
+   table(['Empenho / Processo','Unidade contábil','Valor líquido (não abatido)','Situação'],
+    tdc.map(x=>'<tr><td><b>'+esc(x.chave_empenho)+'</b><div class="cell-sub">'+esc(x.processo||'')+'</div></td>'+
+    '<td>'+esc(x.unidade_contabil_executora||'—')+'</td>'+
+    '<td>'+amount(x.valor_empenhado_liquido_centavos)+'</td>'+
+    '<td>TDCO — fora do abatimento</td></tr>')));
  }
  html+=panel('Empenhos identificados',
  table(['Chave','Processo','Dotação','Empenhado líquido','Saldo informado'],empenhos.slice(0,200).map(x=>
