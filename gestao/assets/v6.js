@@ -7,6 +7,37 @@ let report=null,search='';
 const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const amount=v=>typeof v==='number'&&Number.isFinite(v)?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v/100):'—';
 const integer=v=>new Intl.NumberFormat('pt-BR').format(Number(v)||0);
+
+// Exibição retrocompatível: também lê JSONs V6 antigos, mas alerta que é preciso regenerá-los.
+const v6DotSizes=[4,2,3,3,4,4,4,4,2,1,1];
+function v6DotLabel(raw){
+ const orig=String(raw??'').trim().toUpperCase(),parts=orig.split('.');
+ let digits=orig.replace(/\D/g,'');
+ if(parts.length===11&&/^\d{2}XX$/.test(parts[7])){
+  parts[7]=parts[7].slice(0,2)+'00';digits=parts.join('');
+ }
+ if(!/^\d{32}$/.test(digits)){
+  const it=parts.length===7?parts[3]:'';
+  return {formatted:orig,normalized:digits,
+   type:/^\d{4}$/.test(it)?it.slice(2)==='00'?'GLOBAL':'ITEM_DEFINIDO':'FORMATO_A_CONFERIR',
+   account:/^\d{4}$/.test(it)?it.slice(2)==='00'?'998020301':'998020302':''};
+ }
+ const seg=[];let off=0;for(const n of v6DotSizes){seg.push(digits.slice(off,off+n));off+=n;}
+ if(/^00\d{2}$/.test(seg[7]))seg[7]=seg[7].slice(2)+'00';
+ const normalized=seg.join(''),glob=seg[7].slice(2)==='00';
+ if(glob)seg[7]=seg[7].slice(0,2)+'XX';
+ return {formatted:seg.join('.'),normalized,type:glob?'GLOBAL':'ITEM_DEFINIDO',account:glob?'998020301':'998020302'};
+}
+function v6DotCell(row){
+ const info=v6DotLabel(row.dotacao),formatted=row.dotacao_exibicao||info.formatted;
+ const type=row.tipo_dotacao||info.type,account=row.conta_controle||info.account;
+ const originals=row.origens_bo||[];
+ const source=originals.length?'Origem BO: '+originals.join(' | '):'';
+ return '<b>'+esc(formatted)+'</b><div class="cell-sub">'+esc(type==='GLOBAL'?'GLOBAL · sem item':type==='ITEM_DEFINIDO'?'ITEM DEFINIDO':'Código a conferir')+
+ (account?' · Conta '+esc(account):'')+'</div>'+
+ (source?'<div class="cell-sub">'+esc(source)+'</div>':'');
+}
+
 const title=(name,sub)=>'<div class="pagehead"><div><div class="eyebrow">CONCILIAÇÃO ORÇAMENTÁRIA</div><h1>'+esc(name)+'</h1><div class="sub">'+esc(sub)+'</div></div>'+
  '<div class="head-actions"><button class="btn" data-action="vaultRestore" data-kind="v6">Restaurar cópia protegida</button>'+
  (report?'<button class="btn" data-action="vaultSave" data-kind="v6">Salvar cópia protegida</button>':'')+
@@ -22,9 +53,14 @@ function view(authorized){
  html+='<div class="card v5-upload"><div><h2>Importar prévia da planilha</h2><p>Na planilha <b>saldos_2_0</b>, clique em <b>SIG V6 (conciliação) → Baixar JSON para SIG (local)</b>.</p></div><label class="btn primary v5-label" for="v6-upload">Selecionar relatório JSON</label><input id="v6-upload" type="file" accept=".json,application/json" class="v5-file"></div>';
  html+=panel('Instalação do Apps Script V6','<ol class="v5-steps"><li>Em <b>Extensões → Apps Script</b>, crie um arquivo separado chamado <code>SIG_V6_Conciliacao.gs</code>.</li><li>Cole o <a target="_blank" rel="noopener noreferrer" href="https://github.com/brunodev-creator/painel-tarefas-csatic/blob/main/gestao/integracao/SIG_V6_Conciliacao.gs">código V6 do GitHub ↗</a>.</li><li>Salve, execute <code>sigV6InstalarMenu</code> apenas uma vez e volte à planilha.</li><li>Execute <b>SIG V6 (conciliação) → Gerar conciliação local</b> e confira as abas <code>SIG_V6_*</code>.</li></ol>');
  if(!report)return html+panel('Relatório','<p class="v5-guide">Nenhum JSON selecionado. Use o botão de exemplo fictício para conhecer a interface.</p>');
- const r=report,summary=r.resumo||{},warnings=Array.isArray(r.alertas)?r.alertas:[],f=search.replace(/\D/g,'');
- const filter=arr=>Array.isArray(arr)?arr.filter(x=>!f||String(x.dotacao||'').includes(f)):[];
+ const r=report,summary=r.resumo||{},warnings=Array.isArray(r.alertas)?r.alertas:[],
+ q=search.trim().toUpperCase().replace(/(\d{2})XX/g,(_,el)=>el+'00').replace(/\D/g,'');
+ const filter=arr=>Array.isArray(arr)?arr.filter(x=>!q||[x.dotacao,x.dotacao_exibicao,x.dotacao_orig,...(x.origens_bo||[])].some(v=>{
+   const str=String(v||''),i=v6DotLabel(str);
+   return i.normalized.includes(q)||str.replace(/\D/g,'').includes(q);
+ })):[];
  const repasses=filter(r.repasses),dotacoes=filter(r.dotacoes),empenhos=filter(r.empenhos);
+ if(!summary.regra_dotacao_global_v2)html+='<div class="v5-notice"><b>JSON anterior à correção de dotações globais.</b> A leitura EEXX abaixo é apenas visual. Para reconciliar corretamente, atualize o Apps Script V6, gere novo relatório e importe o JSON atualizado.</div>';
  const kpi=(label,value,sub)=>'<div class="card v5-metric"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong><span>'+esc(sub)+'</span></div>';
  html+='<div class="v6-metrics">'+
  kpi('Cotas líquidas',amount(summary.cota_liquida_centavos),'Valor descentralizado, com anulações')+
@@ -45,18 +81,18 @@ function view(authorized){
  (search? ' <strong>Filtro: '+esc(search)+'</strong>':' Sem filtro aplicado.')+'</p>');
  html+=panel('Documentos de repasse e RIPC',
  table(['Documento / Dotação','Cota líquida','Valor RIPC','Diferença','Situação'],repasses.slice(0,200).map(x=>
- '<tr><td><b>'+esc(x.ano)+' / '+esc(x.documento)+'</b><div class="cell-sub">'+esc(x.dotacao)+'</div></td>'+
+ '<tr><td><b>'+esc(x.ano)+' / '+esc(x.documento)+'</b><div class="cell-sub">'+v6DotCell(x)+'</div></td>'+
  '<td>'+amount(x.credito_liquido_centavos)+'</td><td>'+amount(x.valor_ripc_centavos)+'</td>'+
  '<td>'+amount(x.diferenca_nao_destinada_centavos)+'</td><td><span class="v6-status">'+esc(x.situacao)+'</span></td></tr>')));
  html+=panel('Consolidação por dotação',
- '<p class="v5-guide">O agrupamento dos empenhos não prova a qual repasse ou RIPC cada empenho pertence.</p>'+
- table(['Dotação','Cota líquida','RIPC','Empenhado líquido','Saldo em empenhos','Empenhos'],dotacoes.slice(0,200).map(x=>
- '<tr><td><b>'+esc(x.dotacao)+'</b></td><td>'+amount(x.cotas_centavos)+'</td><td>'+amount(x.ripc_centavos)+
+ '<p class="v5-guide">Global = elemento sem item, conta 998020301. Item definido = conta 998020302. Esses recursos não são automaticamente somados entre as contas, nem associados a um documento de repasse por dotação apenas.</p>'+
+ table(['Dotação / Tipo e conta','Cota líquida','RIPC','Empenhado líquido','Saldo em empenhos','Empenhos'],dotacoes.slice(0,200).map(x=>
+ '<tr><td>'+v6DotCell(x)+'</td><td>'+amount(x.cotas_centavos)+'</td><td>'+amount(x.ripc_centavos)+
  '</td><td>'+amount(x.empenhado_liquido_centavos)+'</td><td>'+amount(x.saldo_empenhos_centavos)+
  '</td><td>'+integer(x.empenhos)+'</td></tr>')));
  html+=panel('Empenhos identificados',
  table(['Chave','Processo','Dotação','Empenhado líquido','Saldo informado'],empenhos.slice(0,200).map(x=>
- '<tr><td>'+esc(x.chave_empenho)+'</td><td>'+esc(x.processo)+'</td><td>'+esc(x.dotacao)+'</td><td>'+
+ '<tr><td>'+esc(x.chave_empenho)+'</td><td>'+esc(x.processo)+'</td><td>'+v6DotCell(x)+'</td><td>'+
  amount(x.empenhado_liquido_centavos)+'</td><td>'+amount(x.saldo_informado_centavos)+'</td></tr>')));
  html+=panel('Ocorrências para conferência',warnings.length?
  table(['Nível','Código','Referência'],warnings.slice(0,300).map(x=>'<tr><td>'+esc(x.nivel)+'</td><td>'+esc(x.codigo)+'</td><td>'+esc(x.mensagem)+'</td></tr>')):
