@@ -3,7 +3,7 @@
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
-const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['conciliacao','▥','Conciliação V6'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['conciliacao','▥','Conciliação V6'],['auditoria','shield-check','Auditoria de Compras'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 const SECTORS=['Compras','Licitação','SOFI'];
 const STATUSES=['Em andamento','Aguardando providência','Aguardando documentação','Aguardando empenho','Bloqueado','Concluído','Cancelado'];
 const TASK_STATUSES=['Pendente','Em andamento','Aguardando terceiro','Concluída'];
@@ -77,7 +77,7 @@ function periodNotice(){return cloud()?`<div class="info-note">Dados consultados
 function updateChrome(){
  const personalTaskCount=db.tarefas.filter(t=>t.status!=='Concluída'&&assignedToMe(t)).length;
  const unread=v3Unread();
- document.getElementById('nav').innerHTML=NAV.filter(([v])=>(v!=='usuarios'||isAdmin())&&(v!=='importacoes'||canFinance())&&(v!=='conciliacao'||canFinance())&&(v!=='chefia'||['admin','chefia'].includes(profile.role))).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
+ document.getElementById('nav').innerHTML=NAV.filter(([v])=>(v!=='usuarios'||isAdmin())&&(v!=='importacoes'||canFinance())&&(v!=='conciliacao'||canFinance())&&(v!=='auditoria'||canFinance())&&(v!=='chefia'||['admin','chefia'].includes(profile.role))).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
  document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';
  const indicator=document.getElementById('sync-indicator');
  indicator.classList.toggle('online',cloud()&&!!session);
@@ -89,7 +89,7 @@ function updateChrome(){
  const bell=document.getElementById('v3-bell');
  if(bell){bell.style.display=session||!cloud()?'inline-flex':'none';const count=document.getElementById('v3-count');count.textContent=unread;count.style.display=unread?'inline-flex':'none'}
 }
-function navigate(v){if(v==='conciliacao'&&!canFinance())return showToast('Conciliação restrita à SOFI e chefia.');if(v==='importacoes'&&!canFinance())return showToast('Somente SOFI e chefia podem conferir importações.');if(v==='chefia'&&!['admin','chefia'].includes(profile.role))return showToast('Visão gerencial restrita à chefia.');if(v==='usuarios'&&!isAdmin())return showToast('Somente o administrador pode gerenciar usuários.');view=v;filters={q:'',setor:'Todos',status:'Todos'};updateChrome();render();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');window.scrollTo(0,0);if(v==='usuarios'&&cloud())loadAdminUsers().catch(e=>showToast(errMsg(e)))}
+function navigate(v){if(v==='auditoria'&&!canFinance())return showToast('Auditoria financeira restrita aos perfis autorizados.');if(v==='conciliacao'&&!canFinance())return showToast('Conciliação restrita à SOFI e chefia.');if(v==='importacoes'&&!canFinance())return showToast('Somente SOFI e chefia podem conferir importações.');if(v==='chefia'&&!['admin','chefia'].includes(profile.role))return showToast('Visão gerencial restrita à chefia.');if(v==='usuarios'&&!isAdmin())return showToast('Somente o administrador pode gerenciar usuários.');view=v;filters={q:'',setor:'Todos',status:'Todos'};updateChrome();render();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');window.scrollTo(0,0);if(v==='usuarios'&&cloud())loadAdminUsers().catch(e=>showToast(errMsg(e)))}
 
 function v3MyNotifications(){return (db.notificacoes||[]).filter(n=>n.destinatario_auth_id===currentAuthId()).sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em))}
 function v3Unread(){return v3MyNotifications().filter(n=>!n.lida_em).length}
@@ -385,9 +385,9 @@ function vaultScope(){
  if(!window.SIG_VAULT?.supported())throw Error('O navegador não oferece criptografia e armazenamento local compatíveis.');
  return {uid:session.user.id,project:config.url};
 }
-function vaultData(kind){return kind==='v5'?v5Report:window.SIG_V6.getData();}
+function vaultData(kind){return kind==='v5'?v5Report:kind==='v6'?window.SIG_V6.getData():window.SIG_V7.getData();}
 function vaultShow(kind,mode){
- if(!['v5','v6'].includes(kind))return;
+ if(!['v5','v6','v7'].includes(kind))return;
  try{vaultScope()}catch(e){showToast(errMsg(e));return;}
  if(mode==='delete'){
   if(!window.confirm('Apagar a cópia protegida de '+kind.toUpperCase()+' armazenada NESTE navegador para esta conta? Os arquivos JSON originais não serão apagados.'))return;
@@ -409,7 +409,7 @@ function vaultShow(kind,mode){
 async function vaultSubmit(form){
  if(busy)return;
  const kind=form.dataset.kind,mode=form.dataset.mode;
- if(!['v5','v6'].includes(kind)||!['save','restore'].includes(mode))return;
+ if(!['v5','v6','v7'].includes(kind)||!['save','restore'].includes(mode))return;
  const {uid,project}=vaultScope();
  const pass=form.elements.namedItem('cofre_senha')?.value||'';
  if(pass.length<12)throw Error('Frase-senha com no mínimo 12 caracteres.');
@@ -428,8 +428,10 @@ async function vaultSubmit(form){
     if(data.sig_version!=='5.0.0'||data.tipo!=='PREVIA_LOCAL'||!Array.isArray(data.resumo)||!Array.isArray(data.alertas)||!Array.isArray(data.bloqueios))
       throw Error('Cópia V5 não reconhecida.');
     v5Report=data;view='importacoes';
-   }else{
+   }else if(kind==='v6'){
     window.SIG_V6.restore(data);view='conciliacao';
+   }else{
+    window.SIG_V7.restore(data);view='auditoria';
    }
    closeModal();render();showToast('Cópia '+kind.toUpperCase()+' restaurada neste navegador.');
   }
@@ -442,6 +444,7 @@ async function vaultDelete(kind){
 }
 function vaultClearOpenReports(){
  v5Report=null;
+ window.SIG_V7.clear();
  window.SIG_V6.reset();
 }
 
@@ -530,7 +533,7 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
-function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
+function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}content.innerHTML=html;document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
@@ -658,6 +661,7 @@ async function signIn({email,password}){if(!cloud())return;busy=true;try{const r
 async function signOut(){try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
 function saveSettings({url,key}){url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(config));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
 function assistantAnswer(question){const q=String(question||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ const respostaV7=window.SIG_V7.answer(question,canFinance());if(respostaV7)return respostaV7;
  const respostaV6=window.SIG_V6.answer(question,canFinance());if(respostaV6)return respostaV6;
 
  if(/solicitac|solicitad|pedido de empenho|a empenhar|demandas financeiras/.test(q)){
@@ -688,6 +692,10 @@ function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de re
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}if(btn.dataset.view){navigate(btn.dataset.view);return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'v7Demo':window.SIG_V7.demo();render();break;
+ case 'v7Clear':window.SIG_V7.clear();render();break;
+ case 'v7ApplyFilter':window.SIG_V7.filter(document.getElementById('v7-filter')?.value||'');render();break;
+ case 'v7ClearFilter':window.SIG_V7.filter('');render();break;
  case 'vaultSave':vaultShow(btn.dataset.kind,'save');break;
  case 'vaultRestore':vaultShow(btn.dataset.kind,'restore');break;
  case 'vaultDelete':vaultShow(btn.dataset.kind,'delete');break;
@@ -711,7 +719,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case'menu':document.getElementById('sidebar').classList.toggle('open');document.getElementById('shade').classList.toggle('visible');break;
  case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id);break;case'newTask':taskForm(null,btn.dataset.process);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
-function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{if(e.target.id==='v6-upload'){window.SIG_V6.load(e.target.files?.[0]).then(()=>{render();showToast('Conciliação V6 carregada localmente; nenhum dado foi enviado ao servidor.');}).catch(err=>showToast('Arquivo V6: '+errMsg(err)));return}if(e.target.id==='v6-filter'){window.SIG_V6.filter(e.target.value);render();return}if(e.target.id==='v5-json-file'){v5ReadLocal(e.target.files?.[0]).catch(err=>showToast('Prévia: '+errMsg(err)));return}if(e.target.id==='stallDays'){stallDays=Math.max(1,Math.min(30,Number(e.target.value)||5));localStorage.setItem('sig-alert-days',String(stallDays));render();return}if(e.target.name==='destino'&&e.target.closest('form[data-form=transfer]')){document.getElementById('f-destinatario_auth_id').innerHTML=setorOptionsUsers(e.target.value,'')}if(e.target.dataset?.filter&&e.target.dataset.filter!=='q')handleFilter(e)});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'&&e.target?.id==='v6-filter'){e.preventDefault();window.SIG_V6.filter(e.target.value);render();}});if(!localStorage.getItem(KEYS.data))saveLocal();render();acceptInviteFromUrl().then(hasInvite=>{if(!hasInvite&&cloud()&&session)fetchCloud()}).catch(e=>{showToast('Falha ao validar convite: '+errMsg(e));render()});setInterval(()=>{if(cloud()&&session&&!busy&&document.visibilityState==='visible'&&!document.getElementById('modal-root').childElementCount)fetchCloud().catch(()=>{})},30000)}
+function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{if(e.target.id==='v7-upload'){window.SIG_V7.load(e.target.files?.[0]).then(()=>{render();showToast('Auditoria V7 carregada localmente.');}).catch(err=>showToast('Arquivo V7: '+errMsg(err)));return}if(e.target.id==='v6-upload'){window.SIG_V6.load(e.target.files?.[0]).then(()=>{render();showToast('Conciliação V6 carregada localmente; nenhum dado foi enviado ao servidor.');}).catch(err=>showToast('Arquivo V6: '+errMsg(err)));return}if(e.target.id==='v6-filter'){window.SIG_V6.filter(e.target.value);render();return}if(e.target.id==='v5-json-file'){v5ReadLocal(e.target.files?.[0]).catch(err=>showToast('Prévia: '+errMsg(err)));return}if(e.target.id==='stallDays'){stallDays=Math.max(1,Math.min(30,Number(e.target.value)||5));localStorage.setItem('sig-alert-days',String(stallDays));render();return}if(e.target.name==='destino'&&e.target.closest('form[data-form=transfer]')){document.getElementById('f-destinatario_auth_id').innerHTML=setorOptionsUsers(e.target.value,'')}if(e.target.dataset?.filter&&e.target.dataset.filter!=='q')handleFilter(e)});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if(e.key==='Enter'&&e.target?.id==='v7-filter'){e.preventDefault();window.SIG_V7.filter(e.target.value);render();}if(e.key==='Enter'&&e.target?.id==='v6-filter'){e.preventDefault();window.SIG_V6.filter(e.target.value);render();}});if(!localStorage.getItem(KEYS.data))saveLocal();render();acceptInviteFromUrl().then(hasInvite=>{if(!hasInvite&&cloud()&&session)fetchCloud()}).catch(e=>{showToast('Falha ao validar convite: '+errMsg(e));render()});setInterval(()=>{if(cloud()&&session&&!busy&&document.visibilityState==='visible'&&!document.getElementById('modal-root').childElementCount)fetchCloud().catch(()=>{})},30000)}
 // Exposição limitada para testes automatizados locais.
 if(typeof window!=='undefined')window.SIG_TEST={seed,assistantAnswer,moneyToCommit,daysLeft,activeProcess};
 init();
