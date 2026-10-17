@@ -108,3 +108,11 @@
 .v6-status{font-size:10px;padding:6px 9px;border-radius:12px;background:#f2f5f8;color:#556981;font-weight:700;word-break:break-word}
 @media(max-width:1050px){.v6-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.v6-metrics{gap:8px}.v6-metrics .v5-metric{padding:12px}.v6-metrics .v5-metric strong{font-size:18px}.v6-counters{flex-direction:column}}
+
+/* V6.1: filtro financeiro explícito */
+.v6-filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:9px}
+.v6-filterbar .v6-search{flex:1 1 340px;width:auto;min-width:180px;margin-top:0}
+.v6-filterbar .btn{white-space:nowrap}
+.v6-count{font-size:12px;color:#5a7085;margin-top:12px;line-height:1.6}
+.v6-count strong{color:#075f5a;overflow-wrap:anywhere}
+@media(max-width:600px){.v6-filterbar .v6-search{flex-basis:100%}.v6-filterbar .btn{flex:1}}
