@@ -87,18 +87,11 @@ function sigV6Reais_(value){
  const n=Number(integer)*100+Number((fraction+'00').slice(0,2));
  return Number.isSafeInteger(n)?(negative?-n:n):null;
 }
-/* Valor_RIPC, Valor_Total_Repasse, Valor_Total da aba ITENS_AQUISICAO
- * são ARMAZENADOS EM CENTAVOS, mesmo quando aparecem como inteiros (1141390 -> R$ 11.413,90).
- * Qualquer formato monetário explícito ainda é aceito, mas não se tenta adivinhar a unidade.
+/* Valor_RIPC, Valor_Total_Repasse e Valor_Total dos itens são montantes em REAIS.
+ * O valor 1141390 equivale a R$ 1.141.390,00; 105711,2 a R$ 105.711,20.
+ * O parser retorna centavos apenas para CÁLCULO INTERNO (não é a unidade da fonte).
  */
-function sigV6CentavosOrigem_(value){
- const s=String(value||'').trim();
- if(!s)return null;
- if(/^-?\d+$/.test(s)){const n=Number(s);return Number.isSafeInteger(n)?n:null;}
- if(/R\$/i.test(s)||/\d,\d{1,2}$/.test(s)||/^-?\d+\.\d{1,2}$/.test(s))
-   return sigV6Reais_(s);
- return null;
-}
+function sigV6CentavosOrigem_(value){return sigV6Reais_(value);}
 function sigV6Sha_(v){
  const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(v),Utilities.Charset.UTF_8);
  return bytes.map(b=>('0'+(b<0?b+256:b).toString(16)).slice(-2)).join('');
@@ -230,7 +223,7 @@ function sigV6Construir_(){
   resumo:summary,repasses,dotacoes,ripcs:Object.values(byRipc),empenhos,continuos:continuosOut,
   processos:processosOut,alertas:notices,
   avisos_metodologicos:[
-   'RIPC e Valor_Total de itens em valores inteiros representam CENTAVOS, diferentemente de valores formatados em reais das cotas e empenhos.',
+   'RIPC e Valor_Total de itens são valores em REAIS, mesmo quando inteiros e sem R$; o parser converte para centavos apenas internamente.',
    'Valor_Total_Repasse no RIPC é referência documental repetida e NÃO é somado.',
    'Diferenças negativas por documento são alertas para conferência, não prova de irregularidade.',
    'Posição financeira por dotação não identifica qual documento de repasse financiou cada empenho.',
