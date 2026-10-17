@@ -130,7 +130,10 @@ function sigV5BuildReport_(){
       const money={},invalid=[];
       spec.money.forEach(name=>{const x=f(name);if(!x)return;const cents=sigV5MoneyCents_(x);if(cents===null)invalid.push(name);else money[name]=cents;});
       if(invalid.length){issue('BLOQUEIO',spec.name,i+1,'Valor inválido: '+invalid.join(', '));continue;}
-      const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','linhaoriginal','dataatualizacao','responsavelatualizacao']);
+      const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','dataatualizacao','responsavelatualizacao']);
+      // Em cotas, Linha_Original registra a data efetiva da movimentação. Dois movimentos de igual valor
+      // em datas diferentes são eventos distintos; o campo integra a assinatura somente para cotas.
+      if(spec.kind!=='cotas')volateis.add('linhaoriginal');
       const significativos=headers.map((h,j)=>[h,String(row[j]||'')]).filter(item=>item[0]&&!volateis.has(item[0]));
       let key;
       if(spec.key.length===1)key=f(spec.key[0]);
