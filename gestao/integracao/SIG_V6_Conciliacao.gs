@@ -196,17 +196,20 @@ function sigV6Construir_(){
  const byCota=Object.create(null),byRipc=Object.create(null),byDot=Object.create(null),byEmp=Object.create(null);
  const itemByRipc=Object.create(null),continuosOut=[],processosOut=[];const dotacaoCotasConhecidas=new Set();let empenhosNormalizados=0,empenhosComCota=0;
  const ensureDot=(key)=>byDot[key]||(byDot[key]={dotacao:key,cotas_centavos:0,ripc_centavos:0,empenhado_liquido_centavos:0,
-    saldo_empenhos_centavos:0,documentos:0,empenhos:0,avisos:[]});
+    saldo_empenhos_centavos:0,documentos:0,empenhos:0,avisos:[],origens_bo:[]});
+ const origemDot=(code,raw)=>{if(!code||!raw)return;const o=ensureDot(code).origens_bo;if(!o.includes(raw))o.push(raw);};
  const cotaFingerprint=Object.create(null);
  for(const r of cotas){
   const y=sigV6Year_(r.get('Ano')),doc=sigV6Doc_(r.get('Doc_Repasse')),dot=sigV6Dot_(r.get('Dotacao'));
   const key=sigV6Key_(y,doc,dot),value=sigV6Reais_(r.get('Valor_Descentralizado'));
   if(dot)dotacaoCotasConhecidas.add(dot);
   if(!y||!doc||dot.length<10||value===null){alert('BLOQUEIO','COTA_INVALIDA',SIGV6.names.cotas,r.linha,'Ano, documento, dotação ou valor inválido');continue;}
+  origemDot(dot,r.get('Dotacao'));
   const unique=key+'|'+r.get('Linha_Original')+'|'+value;
   if(cotaFingerprint[unique])alert('BLOQUEIO','MOVIMENTO_IDÊNTICO',SIGV6.names.cotas,r.linha,'Movimentação idêntica à linha '+cotaFingerprint[unique]);else cotaFingerprint[unique]=r.linha;
   const c=byCota[key]||(byCota[key]={chave:key,ano:y,documento:doc,dotacao:dot,credito_liquido_centavos:0,valor_ripc_centavos:0,
-    quantidade_movimentos:0,quantidade_ripc:0,linhas:[]});
+    quantidade_movimentos:0,quantidade_ripc:0,linhas:[],origens_bo:[]});
+  if(!c.origens_bo.includes(r.get('Dotacao')))c.origens_bo.push(r.get('Dotacao'));
   c.credito_liquido_centavos+=value;c.quantidade_movimentos++;c.linhas.push(r.linha);
  }
  const itemSeen=Object.create(null);
@@ -225,12 +228,14 @@ function sigV6Construir_(){
   if(!id||!year||!doc||dot.length<10||value===null){alert('BLOQUEIO','RIPC_INVALIDO',SIGV6.names.ripc,r.linha,'RIPC, chave ou valor inválido');continue;}
   if(ripcSeen[id]){alert('BLOQUEIO','RIPC_DUPLICADO',SIGV6.names.ripc,r.linha,'ID_RIPC duplicado: '+id);continue;}
   ripcSeen[id]=true;
+  origemDot(dot,r.get('Dotacao'));
   const totalItens=itemByRipc[id];
   if(!totalItens)alert('ATENCAO','RIPC_SEM_ITEM',SIGV6.names.ripc,r.linha,'RIPC não possui itens vinculados: '+id);
   else if(totalItens.centavos!==value)alert('ATENCAO','RIPC_DIFERENCA_ITENS',SIGV6.names.ripc,r.linha,
       'RIPC '+id+': diferença de '+(value-totalItens.centavos)+' centavos em relação aos itens');
   byRipc[id]={id_ripc:id,chave_repasse:key,valor_ripc_centavos:value,itens_centavos:totalItens?.centavos??null,
-   quantidade_itens:totalItens?.itens??0,processo_informado:r.get('Processo_Compra')||'',
+   quantidade_itens:totalItens?.itens??0,dotacao:dot,dotacao_original:r.get('Dotacao'),
+   tipo_dotacao:sigV6DotInfo_(dot).tipo,processo_informado:r.get('Processo_Compra')||'',
    referencia:r.get('Objeto_Geral').slice(0,110)};
   if(byCota[key]){byCota[key].valor_ripc_centavos+=value;byCota[key].quantidade_ripc++;}
   else noCota.push(key);
@@ -253,7 +258,7 @@ function sigV6Construir_(){
   const total=rows.reduce((n,x)=>n+x.valor_ripc_centavos,0);
   const dot=key.split('|')[2];ensureDot(dot).ripc_centavos+=total;
   alert('ATENCAO','RIPC_SEM_COTA',SIGV6.names.ripc,0,'RIPC sem documento de cota correspondente: '+key);
-  repasses.push({chave:key,ano:key.split('|')[0],documento:key.split('|')[1],dotacao:dot,
+  repasses.push({chave:key,ano:key.split('|')[0],documento:key.split('|')[1],dotacao:dot,origens_bo:[],
    credito_liquido_centavos:null,valor_ripc_centavos:total,quantidade_movimentos:0,quantidade_ripc:rows.length,
    diferenca_nao_destinada_centavos:null,situacao:'SEM_COTA_CORRESPONDENTE',linhas:[]});
  });
@@ -277,7 +282,8 @@ function sigV6Construir_(){
     empenhado_liquido_centavos:liquid,saldo_informado_centavos:saldo,
     classificacao:r.get('Tipo_Execucao_Contabil')||'',historico:r.get('Data_Atualizacao')||''};
   empenhos.push(e);byEmp[id]=e;
-  const d=ensureDot(dot);d.empenhado_liquido_centavos+=liquid;d.saldo_empenhos_centavos+=saldo;d.empenhos++;
+  const d=ensureDot(dot);origemDot(dot,r.get('Dotacao'));
+  d.empenhado_liquido_centavos+=liquid;d.saldo_empenhos_centavos+=saldo;d.empenhos++;
  }
  const seenContinuous=Object.create(null);
  for(const r of continuos){
@@ -298,12 +304,18 @@ function sigV6Construir_(){
    valor_homologado_centavos:sigV6Reais_(r.get('Valor_Final_Homologado'))});
  }
  const dotacoes=Object.values(byDot).map(d=>({
-  ...d,nao_destinado_teorico_centavos:d.cotas_centavos-d.ripc_centavos,
+  ...d,dotacao_exibicao:sigV6DotInfo_(d.dotacao).exibicao,
+  tipo_dotacao:sigV6DotInfo_(d.dotacao).tipo,
+  conta_controle:sigV6DotInfo_(d.dotacao).conta,
+  nao_destinado_teorico_centavos:d.cotas_centavos-d.ripc_centavos,
   criterio:'Cota líquida menos RIPC na mesma dotação; NÃO representa saldo oficial disponível para empenhar.',
   observacao_empenhos:'Empenhos agrupados apenas por dotação; vínculo direto a documento de repasse NÃO foi comprovado.'
  })).sort((a,b)=>a.dotacao.localeCompare(b.dotacao));
  const rawCotas=repasses.filter(x=>x.credito_liquido_centavos!==null);
  const summary={repasses:repasses.length,dotacoes:dotacoes.length,ripcs:Object.keys(byRipc).length,
+   regra_dotacao_global_v2:true,
+   dotacoes_globais:dotacoes.filter(x=>x.tipo_dotacao==='GLOBAL'&&x.documentos>0).length,
+   cota_global_centavos:dotacoes.filter(x=>x.tipo_dotacao==='GLOBAL').reduce((a,b)=>a+b.cotas_centavos,0),
    itens:Object.keys(itemSeen).length,empenhos:empenhos.length,continuos:continuosOut.length,
    processos:processosOut.length,empenhos_com_dotacao_de_cota:empenhosComCota,empenhos_dotacao_normalizada:empenhosNormalizados,
    cota_liquida_centavos:rawCotas.reduce((n,x)=>n+x.credito_liquido_centavos,0),
@@ -323,9 +335,11 @@ function sigV6Construir_(){
    'Diferenças negativas por documento são alertas para conferência, não prova de irregularidade.',
    'Posição financeira por dotação não identifica qual documento de repasse financiou cada empenho.',
    'Códigos compactos de empenho só recebem zero à esquerda se houver correspondência EXATA de uma dotação de cota; casos restantes não são relacionados por aproximação.',
+   'Elemento sem item: código BO 00EE é interpretado como EE00 na chave numérica e EEXX na exibição, conforme orientação CSA-TIC. Original preservado.',
+   'Recursos globais (conta 998020301) e específicos (conta 998020302) não são conciliados automaticamente entre si ou com um documento de repasse.',
    'Disponibilidade para empenhar, reforço de contrato e classificação de serviço contínuo exigem conferência oficial.'
   ]};
- report.assinatura_geral=sigV6Sha_(JSON.stringify({repasses:repasses.map(x=>[x.chave,x.credito_liquido_centavos,x.valor_ripc_centavos]),
+ report.assinatura_geral=sigV6Sha_(JSON.stringify({regra_dotacao_global_v2:true,repasses:repasses.map(x=>[x.chave,x.credito_liquido_centavos,x.valor_ripc_centavos]),
    empenhos:empenhos.map(x=>[x.chave_empenho,x.empenhado_liquido_centavos,x.saldo_informado_centavos]),
    continuos:continuosOut.map(x=>[x.chave_empenho,x.reforco_sugerido_centavos])}));
  return report;
