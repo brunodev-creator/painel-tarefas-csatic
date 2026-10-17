@@ -121,3 +121,20 @@
 .v7-vault-warning{background:#f4f7fa;border:1px solid #dce6ef;border-radius:12px;padding:14px 16px;color:#475e72;font-size:13px;line-height:1.65;margin:14px 0 18px}
 .head-actions{flex-wrap:wrap;gap:8px}
 @media(max-width:690px){.head-actions{display:flex;flex-direction:column;align-items:stretch}.head-actions .btn{white-space:normal}}
+
+
+/* Auditoria V7 — modalidade, homologação e conferência do RIPC */
+.v7-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin:18px 0}
+.v7-metrics .v5-metric strong{font-size:clamp(19px,2.5vw,28px)}
+.v7-source-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.v7-source-grid>div{background:#f4f7fa;border:1px solid #dce6ee;border-radius:12px;padding:15px;display:flex;flex-direction:column;gap:8px}
+.v7-source-grid strong{font-size:13px;color:#244056}
+.v7-source-grid small{font-size:12px;line-height:1.5;color:#718197}
+.v7-searchbar{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:12px 0}
+.v7-searchbar .v6-search{flex:1 1 290px;margin-top:0;width:auto}
+.v7-flag{display:inline-flex;border-radius:10px;padding:6px 8px;font-size:10px;line-height:1.35;font-weight:700;overflow-wrap:anywhere}
+.v7-flag-muted{background:#eaf0f5;color:#4d6176}
+.v7-flag-warn{background:#fff5e7;color:#906025}
+.v7-flag-danger{background:#fff0f0;color:#9b3636}
+@media(max-width:960px){.v7-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.v7-source-grid{grid-template-columns:1fr}}
+@media(max-width:600px){.v7-metrics{gap:9px}.v7-metrics .v5-metric{padding:13px}.v7-searchbar .v6-search{flex-basis:100%}.v7-searchbar .btn{flex:1}}
