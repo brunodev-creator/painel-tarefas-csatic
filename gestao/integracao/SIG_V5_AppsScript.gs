@@ -99,7 +99,7 @@ function sigV5BaixarPrevia() {
 function sigV5BuildReport_(){
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   const result={sig_version:SIGV5.versao,tipo:'PREVIA_LOCAL',gerado_em:new Date().toISOString(),
-    origem:'Google Sheets: '+ss.getName(),total_registros:0,resumo:[],alertas:[],bloqueios:[],comparacao:null,
+    origem:'Google Sheets: '+ss.getName(),total_registros:0,resumo:[],alertas:[],bloqueios:[],comparacao:null,agrupamentos:[],
     notas:['Valores são os exibidos nas abas de origem; não constituem confirmação oficial.',
      'Relatórios de execução podem conter posições cumulativas; não somar como movimentos sem regra específica.',
      'Saldo não destinado em RIPC não significa saldo disponível para empenho.'],
@@ -120,14 +120,15 @@ function sigV5BuildReport_(){
     headers.forEach((h,j)=>{if(h&&!Object.prototype.hasOwnProperty.call(headIdx,h))headIdx[h]=j;});
     const missing=spec.required.filter(h=>!Object.prototype.hasOwnProperty.call(headIdx,sigV5Header_(h)));
     if(missing.length){issue('BLOQUEIO',spec.name,1,'Cabeçalhos ausentes: '+missing.join(', '));return;}
-    const recs=[],seen={},amountTotal={},skipped=[];
+    const recs=[],seen=Object.create(null),amountTotal=Object.create(null),grouped=Object.create(null);
+    let movementsGrouped=0;
     for(let i=1;i<rowLimit;i++){
       const row=display[i];if(!row||!row.some(v=>String(v||'').trim()))continue;
       const f=(name)=>{const j=headIdx[sigV5Header_(name)];return j===undefined?'':String(row[j]===undefined?'':row[j]).trim();};
       const errors=spec.required.filter(name=>!f(name));
       if(errors.length){issue('AVISO',spec.name,i+1,'Campos obrigatórios vazios: '+errors.join(', '));continue;}
       const money={},invalid=[];
-      spec.money.forEach(name=>{const x=f(name);if(!x)return;const cents=sigV5MoneyCents_(x);if(cents===null)invalid.push(name);else{money[name]=cents;amountTotal[name]=(amountTotal[name]||0)+cents;}});
+      spec.money.forEach(name=>{const x=f(name);if(!x)return;const cents=sigV5MoneyCents_(x);if(cents===null)invalid.push(name);else money[name]=cents;});
       if(invalid.length){issue('BLOQUEIO',spec.name,i+1,'Valor inválido: '+invalid.join(', '));continue;}
       const volateis=new Set(['dataimportacao','arquivoorigem','messageid','statusextracao','linhaoriginal','dataatualizacao','responsavelatualizacao']);
       const significativos=headers.map((h,j)=>[h,String(row[j]||'')]).filter(item=>item[0]&&!volateis.has(item[0]));
@@ -137,15 +138,42 @@ function sigV5BuildReport_(){
       else key='LINHA_SHA256:'+sigV5Hash_(JSON.stringify(significativos));
       if(!key){issue('BLOQUEIO',spec.name,i+1,'Não foi possível identificar chave do registro');continue;}
       if(spec.kind==='cotas'&&!/^\d{4}\|[^|]+\|\d+$/.test(key)){issue('BLOQUEIO',spec.name,i+1,'Chave Ano|Documento|Dotação inválida');continue;}
-      if(seen[key])issue(spec.kind==='execucao'?'AVISO':'BLOQUEIO',spec.name,i+1,'Chave repetida (primeira linha '+seen[key]+'): '+key);
-      else seen[key]=i+1;
       const hash=sigV5Hash_(JSON.stringify(significativos));
       const principal=spec.money[0],value=Object.prototype.hasOwnProperty.call(money,principal)?money[principal]:'';
-      recs.push({sheet:spec.name,key,hash,valor_centavos:value});
+      if(spec.kind==='cotas'){
+        if(!Object.prototype.hasOwnProperty.call(grouped,key))
+          grouped[key]={key,hashes:[],fingerprints:Object.create(null),linhas:[],valor_centavos:0};
+        const group=grouped[key];
+        if(Object.prototype.hasOwnProperty.call(group.fingerprints,hash)){
+          issue('BLOQUEIO',spec.name,i+1,'Movimentação exatamente igual à linha '+group.fingerprints[hash]+
+            ' para a mesma chave. Conferir a fonte antes de somar.');
+        }else group.fingerprints[hash]=i+1;
+        group.hashes.push(hash);group.linhas.push(i+1);group.valor_centavos+=value;
+        if(group.linhas.length>1)movementsGrouped++;
+      }else{
+        if(Object.prototype.hasOwnProperty.call(seen,key))
+          issue(spec.kind==='execucao'?'AVISO':'BLOQUEIO',spec.name,i+1,
+            'Chave repetida (primeira linha '+seen[key]+'): '+key);
+        else seen[key]=i+1;
+        recs.push({sheet:spec.name,key,hash,valor_centavos:value});
+      }
+      Object.keys(money).forEach(name=>{amountTotal[name]=(amountTotal[name]||0)+money[name];});
     }
-    result.total_registros+=recs.length;
+    if(spec.kind==='cotas'){
+      Object.keys(grouped).forEach(key=>{
+        const group=grouped[key];
+        recs.push({sheet:spec.name,key,hash:sigV5Hash_(group.hashes.sort().join('|')),
+          valor_centavos:group.valor_centavos});
+        if(group.linhas.length>1&&result.agrupamentos.length<50)
+          result.agrupamentos.push({aba:spec.name,chave:key,linhas:group.linhas,
+            movimentos:group.linhas.length,valor_liquido_centavos:group.valor_centavos});
+      });
+    }
+    const physicalRows=spec.kind==='cotas'?recs.length+movementsGrouped:recs.length;
+    result.total_registros+=physicalRows;
     result._index.push(...recs);
-    result.resumo.push({aba:spec.name,tipo:spec.kind,registros:recs.length,linhas_lidas:rowLimit-1,
+    result.resumo.push({aba:spec.name,tipo:spec.kind,registros:physicalRows,chaves_unicas:recs.length,
+      movimentacoes_agrupadas:movementsGrouped,linhas_lidas:rowLimit-1,
       total_centavos:amountTotal,assinatura:sigV5Hash_(recs.map(r=>r.key+'='+r.hash).sort().join('\n'))});
   });
   // Chaves somente para análise; nunca fazer sum(arquivoAnterior+arquivoAtual).
@@ -166,6 +194,8 @@ function sigV5WritePreview_(report){
     ['Origem',report.origem],
     ['Assinatura SHA-256',report.assinatura_geral],
     ['Total de registros interpretados',report.total_registros],
+    ['Posições únicas no histórico',report._index.length],
+    ['Movimentações consolidadas em cotas',report.agrupamentos.reduce((n,g)=>n+g.movimentos-1,0)],
     ['Bloqueios',report.bloqueios.length],
     ['Avisos e bloqueios',report.alertas.length],
     ['',''],
@@ -174,6 +204,7 @@ function sigV5WritePreview_(report){
   report.resumo.forEach(x=>rows.push([x.aba,x.registros]));
   rows.push(['',''],['ALERTAS (prévia)','']);
   report.alertas.forEach(a=>rows.push([a.gravidade+' | '+a.aba+' | linha '+a.linha,a.motivo]));
+  if(report.agrupamentos.length){rows.push(['',''],['MOVIMENTAÇÕES CONSOLIDADAS','']);report.agrupamentos.forEach(g=>rows.push([g.chave,'Linhas '+g.linhas.join(', ')+' | Valor líquido: '+(g.valor_liquido_centavos/100).toFixed(2)+' BRL']));}
   if(report.comparacao)rows.push(['Comparação','Novos '+report.comparacao.novos+'; alterados '+report.comparacao.alterados+'; ausentes '+report.comparacao.ausentes]);
   sheet.clearContents();sigV5Write_(sheet,rows);
   sheet.setFrozenRows(1);sheet.setColumnWidth(1,325);sheet.setColumnWidth(2,680);
