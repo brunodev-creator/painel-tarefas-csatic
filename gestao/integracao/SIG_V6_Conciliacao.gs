@@ -9,7 +9,7 @@ const SIGV6 = Object.freeze({
  names:{
   cotas:'IMPORT_SALDOS_BO',ripc:'DESTINACAO_REPASSES',itens:'ITENS_AQUISICAO',
   empenhos:'INDICE_EMPENHOS',continuos:'CONTROLE_SERVICOS_CONTINUOS',
-  processos:'CONTROLE_PROCESSOS_COMPRA'},
+  processos:'CONTROLE_PROCESSOS_COMPRA',correcoes:'SIG_V6_CORRECOES_APROVADAS'},
  outputs:{resumo:'SIG_V6_RESUMO',repasses:'SIG_V6_REPASSES',dotacoes:'SIG_V6_DOTACOES',
  empenhos:'SIG_V6_EMPENHOS',continuos:'SIG_V6_CONTINUOS',alertas:'SIG_V6_ALERTAS',
  abatimentos:'SIG_V6_ABATIMENTOS'}
@@ -184,33 +184,41 @@ function sigV6DotEmpenhoParaAbate_(emp, cotasConhecidas) {
  }
  return raw;
 }
-/* Apenas os dois casos expressamente validados: a funcional programática de 16 dígitos
- * foi recebida como número no Excel/Sheets e terminou em 0000, enquanto a cota
- * correspondente mantém 0001. A fonte original permanece intocada.
- * Qualquer outro código com 0000 NÃO é corrigido automaticamente.
+/* Correções históricas autorizadas são armazenadas EXCLUSIVAMENTE na aba privada
+ * SIG_V6_CORRECOES_APROVADAS. Não publicar números de empenho/dotação reais no GitHub.
+ * Os originais e a justificativa permanecem nessa aba para rastreabilidade.
  */
-const SIGV6_CORRECOES_APROVADAS=Object.freeze({
- '2026|1250071|18':Object.freeze({
-  original:'12511030213520600000339040046020',
-  correto:'12511030213520600001339040046020'}),
- '2026|1250071|56':Object.freeze({
-  original:'12511030213520600000339040026020',
-  correto:'12511030213520600001339040026020'})
-});
 const SIGV6_UE_COTAS='1250070';
-function sigV6CorrigirFuncionalHistorica_(chave,dotOrigem,dotacoesCotas){
- const regra=SIGV6_CORRECOES_APROVADAS[chave],origem=sigV6Dot_(dotOrigem);
- if(!regra)return {dotacao:origem,normalizacao:'',detalhe:''};
- if(origem!==regra.original){
-  return {dotacao:origem,normalizacao:'',
-   detalhe:'Regra aprovada não aplicada: dotação original difere do registro histórico validado.'};
+function sigV6ValidarCorrecoes_(registros,cotasConhecidas,alert){
+ const aprovadas=Object.create(null);
+ for(const r of registros){
+  const id=r.get('Chave_Empenho'),status=r.get('Status').toUpperCase();
+  if(status!=='APROVADO')continue;
+  const origem=sigV6Dot_(r.get('Dotacao_Original'));
+  const destino=sigV6Dot_(r.get('Dotacao_Corrigida'));
+  const antiga=sigV6DotFromDigits_(origem),nova=sigV6DotFromDigits_(destino);
+  const correta=antiga&&nova&&antiga[5]==='0000'&&nova[5]==='0001'&&
+   antiga.every((v,i)=>i===5||v===nova[i])&&
+   cotasConhecidas.has(destino)&&!cotasConhecidas.has(origem);
+  if(!id||!correta||aprovadas[id]){
+   alert('ATENCAO','CORRECAO_HISTORICA_NAO_VALIDADA',SIGV6.names.correcoes,r.linha,
+    'Correção não aplicada: '+(id||'identificador ausente')+
+    '. Conferir código original, alteração exclusiva de 0000 para 0001, duplicidade ou existência de cota.');
+   continue;
+  }
+  aprovadas[id]={original:origem,correto:destino,justificativa:r.get('Justificativa')};
  }
- if(dotacoesCotas.has(origem)||!dotacoesCotas.has(regra.correto)){
+ return aprovadas;
+}
+function sigV6CorrigirFuncionalHistorica_(chave,dotOrigem,dotacoesCotas,aprovadas){
+ const origem=sigV6Dot_(dotOrigem),regra=aprovadas[chave];
+ if(!regra)return {dotacao:origem,normalizacao:'',detalhe:''};
+ if(origem!==regra.original||!dotacoesCotas.has(regra.correto)){
   return {dotacao:origem,normalizacao:'',
-   detalhe:'Regra aprovada não aplicada: não há correspondência única com a cota correta.'};
+   detalhe:'Correção aprovada não aplicada porque o valor original ou a cota já não corresponde ao registro autorizado.'};
  }
  return {dotacao:regra.correto,normalizacao:'FUNCIONAL_0000_PARA_0001_APROVADA',
-  detalhe:'Apenas para '+chave+': último dígito da funcional programática preservado como 1, validado na cota. Original preservado.'};
+  detalhe:'Correção histórica validada na aba privada. '+(regra.justificativa||'Código original preservado.')};
 }
 
 function sigV6DataISO_(raw){
@@ -301,6 +309,10 @@ function sigV6Construir_(){
  const emps=sigV6Ler_(SIGV6.names.empenhos,['Chave_Empenho','Dotacao','Total_Empenhado_Liquido','Saldo_Atual_Empenho'],alert);
  const continuos=sigV6Ler_(SIGV6.names.continuos,['Chave_Empenho','Saldo_Atual_Empenho'],alert);
  const processos=sigV6Ler_(SIGV6.names.processos,['ID_Processo','Processo_Compra','Status_Processo'],alert);
+ // Aba privada opcional: nenhuma correção é inferida nem publicada no código público.
+ const correcaoSheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SIGV6.names.correcoes);
+ const registrosCorrecao=correcaoSheet?
+  sigV6Ler_(SIGV6.names.correcoes,['Chave_Empenho','Dotacao_Original','Dotacao_Corrigida','Status','Justificativa'],alert):[];
  const byCota=Object.create(null),byRipc=Object.create(null),byDot=Object.create(null),byEmp=Object.create(null);
  const itemByRipc=Object.create(null),continuosOut=[],processosOut=[];const dotacaoCotasConhecidas=new Set();let empenhosNormalizados=0,empenhosComCota=0;
  const ensureDot=(key)=>byDot[key]||(byDot[key]={dotacao:key,cotas_centavos:0,ripc_centavos:0,empenhado_liquido_centavos:0,
@@ -370,6 +382,7 @@ function sigV6Construir_(){
    credito_liquido_centavos:null,valor_ripc_centavos:total,quantidade_movimentos:0,quantidade_ripc:rows.length,
    diferenca_nao_destinada_centavos:null,situacao:'SEM_COTA_CORRESPONDENTE',linhas:[]});
  });
+ const correcoesAprovadas=sigV6ValidarCorrecoes_(registrosCorrecao,dotacaoCotasConhecidas,alert);
  const empSeen=Object.create(null),empenhos=[];
  for(const r of emps){
   const id=r.get('Chave_Empenho'),dotOrigem=sigV6Dot_(r.get('Dotacao'));
@@ -377,13 +390,13 @@ function sigV6Construir_(){
   const unidade=sigV6Digits_(r.get('Unidade_Contabil_Executora'));
   const ehTdco=r.get('Eh_TDCO').trim().toUpperCase()==='SIM'||tipoExecucao.trim().toUpperCase()==='TDCO';
   const foraUE=!!unidade&&unidade!==SIGV6_UE_COTAS;
-  const correção=sigV6CorrigirFuncionalHistorica_(id,dotOrigem,dotacaoCotasConhecidas);
-  let dot=correção.dotacao;
-  if(correção.normalizacao)empenhosNormalizados++;
-  if(correção.detalhe&&!correção.normalizacao)alert('ATENCAO','NORMALIZACAO_FUNCIONAL_PENDENTE',
-     SIGV6.names.empenhos,r.linha,'Empenho '+id+': '+correção.detalhe);
+  const correcao=sigV6CorrigirFuncionalHistorica_(id,dotOrigem,dotacaoCotasConhecidas,correcoesAprovadas);
+  let dot=correcao.dotacao;
+  if(correcao.normalizacao)empenhosNormalizados++;
+  if(correcao.detalhe&&!correcao.normalizacao)alert('ATENCAO','NORMALIZACAO_FUNCIONAL_PENDENTE',
+     SIGV6.names.empenhos,r.linha,'Empenho '+id+': '+correcao.detalhe);
   // O preenchimento em dotações compactas é mantido APENAS quando há cota idêntica.
-  if(!correção.normalizacao&&dot.length===31 && dot.startsWith('12516')){
+  if(!correcao.normalizacao&&dot.length===31 && dot.startsWith('12516')){
     const candidata=dot.slice(0,4)+'0'+dot.slice(4);
     if(dotacaoCotasConhecidas.has(candidata)){dot=candidata;empenhosNormalizados++;}
   }
@@ -394,8 +407,8 @@ function sigV6Construir_(){
   const liquid=sigV6Reais_(r.get('Total_Empenhado_Liquido')),saldo=sigV6Reais_(r.get('Saldo_Atual_Empenho'));
   if(liquid===null||saldo===null){alert('BLOQUEIO','EMPENHO_VALORES',SIGV6.names.empenhos,r.linha,'Montante empenhado ou saldo inválido');continue;}
   const e={chave_empenho:id,processo:r.get('Processo_Compra'),dotacao:dot,dotacao_orig:dotOrigem,
-    dotacao_texto_fonte:r.get('Dotacao'),normalizacao_dotacao:correção.normalizacao,
-    detalhe_normalizacao:correção.detalhe,
+    dotacao_texto_fonte:r.get('Dotacao'),normalizacao_dotacao:correcao.normalizacao,
+    detalhe_normalizacao:correcao.detalhe,
     unidade_contabil_executora:unidade,eh_tdco:ehTdco,fora_unidade_cotas:foraUE,
     empenhado_liquido_centavos:liquid,saldo_informado_centavos:saldo,
     classificacao:tipoExecucao,historico:r.get('Data_Atualizacao')||''};
