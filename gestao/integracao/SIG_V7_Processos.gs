@@ -9,7 +9,7 @@ const SIGV7=Object.freeze({
  version:'7.0.0',maxRows:30000,maxAlerts:400,
  homologados:'IMPORT_PROCESSOS_HOMOLOGADOS',
  controle:'CONTROLE_PROCESSOS_COMPRA',
- ripc:'DESTINACAO_REPASSES',
+ ripc:'DESTINACAO_REPASSES',vinculos:'SIG_V7_VINCULOS_CONFERIDOS',
  sheets:{resumo:'SIG_V7_RESUMO',processos:'SIG_V7_PROCESSOS',ripc:'SIG_V7_RIPC',alertas:'SIG_V7_ALERTAS'}
 });
 function sigV7Menu(){
@@ -80,6 +80,43 @@ function sigV7Hash_(v){
  const a=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,v,Utilities.Charset.UTF_8);
  return a.map(n=>('0'+(n<0?n+256:n).toString(16)).slice(-2)).join('');
 }
+
+function sigV7CriarModeloVinculos_(){
+ const ss=SpreadsheetApp.getActiveSpreadsheet();
+ const columns=['ID_RIPC','Processo_Compra_Confirmado','Modalidade_Confirmada','Via_Aquisicao_Confirmada',
+   'Documento_Comprobatorio','Conferido_Por','Conferido_Em','Observacao'];
+ let sh=ss.getSheetByName(SIGV7.vinculos);
+ if(!sh){
+   sh=ss.insertSheet(SIGV7.vinculos);
+   sh.getRange(1,1,1,columns.length).setValues([columns]);
+   sh.getRange(1,1,1,columns.length).setBackground('#2e594d').setFontColor('#ffffff').setFontWeight('bold');
+   sh.setFrozenRows(1);sh.setColumnWidth(1,360);sh.setColumnWidth(2,215);sh.setColumnWidth(5,300);
+ }
+ return sh;
+}
+function sigV7Vinculos_(alert){
+ const ss=SpreadsheetApp.getActiveSpreadsheet(),sheet=ss.getSheetByName(SIGV7.vinculos);
+ if(!sheet||sheet.getLastRow()<2)return Object.create(null);
+ const rows=sigV7Ler_(SIGV7.vinculos,
+ ['ID_RIPC','Processo_Compra_Confirmado','Modalidade_Confirmada','Via_Aquisicao_Confirmada','Documento_Comprobatorio','Conferido_Por','Conferido_Em'],alert);
+ const index=Object.create(null);
+ for(const row of rows){
+  const ripcId=row.get('ID_RIPC'),process=sigV7Processo_(row.get('Processo_Compra_Confirmado')),doc=row.get('Documento_Comprobatorio');
+  if(!ripcId||!process||!doc||doc.length<6||!row.get('Conferido_Por')||!row.get('Conferido_Em')){
+   alert('PENDENCIA','VINCULO_INCOMPLETO',ripcId,SIGV7.vinculos,row.linha,
+     'Falta número formal, referência comprobatória, autor ou data da conferência. O vínculo não foi utilizado.');
+   continue;
+  }
+  if(index[ripcId]){
+   alert('BLOQUEIO','VINCULO_REPETIDO',ripcId,SIGV7.vinculos,row.linha,'RIPC repetido no cadastro de vínculos conferidos.');
+   delete index[ripcId];continue;
+  }
+  index[ripcId]={processo:process,modalidade:row.get('Modalidade_Confirmada'),
+   via:row.get('Via_Aquisicao_Confirmada'),documento:doc,conferido_por:row.get('Conferido_Por'),conferido_em:row.get('Conferido_Em')};
+ }
+ return index;
+}
+
 function sigV7Construir_(){
  const issues=[],push=(gravidade,codigo,ref,source,linha,mensagem)=>{
   if(issues.length<SIGV7.maxAlerts)issues.push({gravidade,codigo,processo:ref,fonte:source,linha,mensagem});
@@ -87,6 +124,7 @@ function sigV7Construir_(){
  const arrH=sigV7Ler_(SIGV7.homologados,['Processo_Compra','Procedimento_Detalhamento','Valor_Referencia','Valor_Homologado'],push);
  const arrC=sigV7Ler_(SIGV7.controle,['Processo_Compra','Modalidade_Aquisicao','Valor_Referencia_Processo','Valor_Final_Homologado'],push);
  const arrR=sigV7Ler_(SIGV7.ripc,['ID_RIPC','Processo_Compra','Modalidade_Aquisicao','Valor_RIPC','Objeto_Geral'],push);
+ const vinculos=sigV7Vinculos_(push);
  const auto=Object.create(null),control=Object.create(null),ripcs=[],byProcess=Object.create(null),manualUnmatched=[];
  const counts={origem_automatica:arrH.length,cadastro_controle:arrC.length,ripc_manualmente_registrados:arrR.length};
  for(const row of arrH){
@@ -130,9 +168,13 @@ function sigV7Construir_(){
  }
  const ids=Object.create(null),modStats=Object.create(null),vias=Object.create(null);
  for(const row of arrR){
-  const ripcId=row.get('ID_RIPC'),raw=row.get('Processo_Compra'),id=sigV7Processo_(raw);
-  const declared=row.get('Modalidade_Aquisicao'),route=sigV7Via_(declared);
-  const manualCategory=sigV7Categoria_(declared),amount=sigV7Currency_(row.get('Valor_RIPC'));
+  const ripcId=row.get('ID_RIPC'),raw=row.get('Processo_Compra'),originalId=sigV7Processo_(raw);
+  const reviewed=vinculos[ripcId]||null;
+  if(originalId&&reviewed&&reviewed.processo!==originalId)
+   push('REVISAO','VINCULO_DIVERGE_RIPC',originalId,SIGV7.vinculos,0,'Número formal do RIPC diverge da relação conferida; não substituir ligação automaticamente.');
+  const id=originalId||reviewed?.processo||'';
+  const declared=row.get('Modalidade_Aquisicao'),route=reviewed?.via?sigV7Via_(reviewed.via):sigV7Via_(declared);
+  const manualCategory=sigV7Categoria_(reviewed?.modalidade||declared),amount=sigV7Currency_(row.get('Valor_RIPC'));
   modStats[declared||'Não informada']=(modStats[declared||'Não informada']||0)+1;
   vias[route]=(vias[route]||0)+1;
   if(!ripcId||amount===null){push('BLOQUEIO','RIPC_INVALIDO',raw,SIGV7.ripc,row.linha,'Identificador ou valor do RIPC inválido.');continue;}
@@ -141,7 +183,8 @@ function sigV7Construir_(){
   const mHom=sigV7Currency_(row.get('Valor_Final_Homologado'));
   const item={
    id_ripc:ripcId,processo_informado:raw,processo_oficial_confirmado:id||null,
-   vinculo:id?'IDENTIFICADOR_FORMAL_DECLARADO':'NAO_VINCULADO_IDENTIFICADOR_ABREVIADO',
+   vinculo:originalId?'IDENTIFICADOR_FORMAL_DECLARADO':reviewed?'VINCULO_MANUAL_COM_REFERENCIA':'NAO_VINCULADO_IDENTIFICADOR_ABREVIADO',
+   documento_comprobatorio:reviewed?.documento||null,modalidade_conferida:reviewed?.modalidade||null,
    modalidade_manual:declared,via_aquisicao:route,categoria_manual:manualCategory,
    objeto_ripc:row.get('Objeto_Geral'),valor_ripc_centavos:amount,
    homologado_manual_centavos:mHom,doc_repasse:row.get('Doc_Repasse'),dotacao:row.get('Dotacao'),
@@ -193,6 +236,7 @@ function sigV7Construir_(){
   ripc_total:ripcs.length,ripc_com_numero_formal:ripcs.filter(x=>!!x.processo_oficial_confirmado).length,
   ripc_sem_numero_formal:manualUnmatched.length,
   ripc_com_auto:ripcs.filter(x=>x.processo_oficial_confirmado&&!!auto[x.processo_oficial_confirmado]).length,
+  ripc_com_vinculo_documentado:ripcs.filter(x=>x.vinculo==='VINCULO_MANUAL_COM_REFERENCIA').length,
   homologados_com_ripc:processos.filter(x=>x.confianca_homologacao==='AUTOMATICA_IDENTIFICADA'&&x.quantidade_ripc_vinculados>0).length,
   processos_com_revisao:processos.filter(x=>x.exige_revisao).length,
   modalidade_ripc_divergente:issues.filter(x=>x.codigo==='MODALIDADE_RIPC_DIVERGENTE').length,
@@ -212,6 +256,7 @@ function sigV7Construir_(){
   'Ata de RP não comprova se a aquisição foi gerenciada pelo SIRP ou realizada por carona. Modalidade da licitação e forma de aquisição são atributos distintos.',
   'RIPC é cadastro manual: modalidade, vínculo de processo e valores devem ser comparados à fonte automática antes de serem aceitos.',
   'Processo_Compra abreviado no RIPC não é cruzado automaticamente com processo formal. Isso evita associação indevida.',
+  'Vínculos incluídos em SIG_V7_VINCULOS_CONFERIDOS são manuais e possuem referência documental. Essa referência não altera nem autentica a fonte automática.',
   'O total de RIPC por processo pode ser uma execução parcial ou uma aquisição distinta do escopo homologado; divergências exigem revisão, não cancelamento automático.',
   'Ausência de registro na importação automática não prova inexigibilidade, ausência de homologação nem erro no RIPC.'
   ]};
@@ -231,7 +276,8 @@ function sigV7Escrever_(r){
  sigV7NovaAba_(ss,SIGV7.sheets.resumo,['Indicador','Valor'],[
  ['Processos homologados (fonte automática)',sum.homologados_automaticos],['Processos no controle',sum.processos_no_controle],
  ['RIPC manuais',sum.ripc_total],['RIPC com processo formal',sum.ripc_com_numero_formal],
- ['RIPC com processo abreviado',sum.ripc_sem_numero_formal],['RIPC ligados à homologação automática',sum.ripc_com_auto],
+ ['RIPC com processo abreviado sem vínculo',sum.ripc_sem_numero_formal],['RIPC ligados à homologação automática',sum.ripc_com_auto],
+ ['RIPC vinculados por conferência documental',sum.ripc_com_vinculo_documentado],
  ['Modalidades do RIPC divergentes',sum.modalidade_ripc_divergente],['RIPC superior ao valor homologado',sum.ripc_acima_homologado],
  ['Divergências de valor homologado informado no RIPC',sum.diferenca_valor_homologado_ripc],
  ['Valor estimado (somatório dos processos automáticos)',cent(sum.valor_referencia_auto_centavos)],
@@ -245,9 +291,9 @@ function sigV7Escrever_(r){
  cent(x.valor_homologado_centavos),cent(x.economia_centavos),cent(x.total_ripc_vinculado_centavos),x.quantidade_ripc_vinculados,
  x.comparacao_ripc_homologado,x.confianca_homologacao,x.exige_revisao?'REVISAR':'SEM_ALERTA_DETECTADO']));
  sigV7NovaAba_(ss,SIGV7.sheets.ripc,
- ['RIPC','Processo informado manualmente','Número formal validado','Modalidade manual','Via de aquisição','Valor RIPC (R$)','Valor homologado anotado no RIPC (R$)','Fonte','Vinculação'],
+ ['RIPC','Processo informado manualmente','Número formal relacionado','Modalidade manual','Via de aquisição','Valor RIPC (R$)','Valor homologado anotado no RIPC (R$)','Fonte','Vinculação','Documento de conferência'],
  r.ripc.map(x=>[x.id_ripc,x.processo_informado,x.processo_oficial_confirmado,x.modalidade_manual,x.via_aquisicao,
- cent(x.valor_ripc_centavos),cent(x.homologado_manual_centavos),x.origem_dado,x.vinculo]));
+ cent(x.valor_ripc_centavos),cent(x.homologado_manual_centavos),x.origem_dado,x.vinculo,x.documento_comprobatorio]));
  sigV7NovaAba_(ss,SIGV7.sheets.alertas,['Gravidade','Código','Processo','Fonte','Linha','Motivo'],
  r.alertas.map(x=>[x.gravidade,x.codigo,x.processo,x.fonte,x.linha,x.mensagem]));
 }
@@ -255,14 +301,14 @@ function sigV7GerarAuditoria(){
  const lock=LockService.getDocumentLock();
  if(!lock.tryLock(20000))throw Error('Outra auditoria está em andamento.');
  try{
-  const r=sigV7Construir_();sigV7Escrever_(r);
+  sigV7CriarModeloVinculos_();const r=sigV7Construir_();sigV7Escrever_(r);
   SpreadsheetApp.getUi().alert('SIG V7: auditoria concluída. '+r.resumo.homologados_automaticos+
    ' homologações automáticas; '+r.resumo.ripc_total+' RIPC manuais; '+r.alertas.length+
    ' apontamentos. Nenhum dado foi enviado ao SIG externo.');
  }finally{lock.releaseLock();}
 }
 function sigV7BaixarRelatorio(){
- const r=sigV7Construir_(),json=JSON.stringify(r);
+ sigV7CriarModeloVinculos_();const r=sigV7Construir_(),json=JSON.stringify(r);
  if(json.length>4500000)throw Error('Relatório supera limite de exportação.');
  const encoded=Utilities.base64Encode(Utilities.newBlob(json,'application/json').getBytes());
  const html='<!doctype html><html><head><meta charset="utf-8"></head><body style="font:14px Arial;padding:22px"><h3>SIG V7 — Auditoria de compras</h3>'+
