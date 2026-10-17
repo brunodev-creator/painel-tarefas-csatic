@@ -35,8 +35,11 @@ function view(authorized){
   'Empenhos associados a dotações de cota: '+integer(summary.empenhos_com_dotacao_de_cota),
   'Alertas para conferência: '+integer(warnings.length)].map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'+
  '<p class="v5-guide">Assinatura da posição: <code>'+esc(r.assinatura_geral||'')+'</code>. O documento informa a posição das abas, não garante atualização até hoje.</p>');
- html+=panel('Filtrar por dotação','<p class="v5-guide">Informe os dígitos completos ou parte do código da dotação.</p>'+
- '<input class="v6-search" type="search" id="v6-filter" value="'+esc(search)+'" placeholder="Buscar dotação por código" autocomplete="off">');
+ html+=panel('Filtrar por dotação','<p class="v5-guide">Informe os dígitos completos ou parte do código da dotação e clique em Aplicar filtro (ou pressione Enter).</p>'+
+ '<div class="v6-filterbar"><input class="v6-search" type="search" id="v6-filter" value="'+esc(search)+'" placeholder="Buscar dotação por código" autocomplete="off">'+
+ '<button class="btn primary" data-action="v6ApplyFilter">Aplicar filtro</button><button class="btn" data-action="v6ClearFilter">Limpar filtro</button></div>'+
+ '<p class="v6-count">Exibindo '+integer(repasses.length)+' documento(s), '+integer(dotacoes.length)+' dotação(ões) e '+integer(empenhos.length)+' empenho(s).'+
+ (search? ' <strong>Filtro: '+esc(search)+'</strong>':' Sem filtro aplicado.')+'</p>');
  html+=panel('Documentos de repasse e RIPC',
  table(['Documento / Dotação','Cota líquida','Valor RIPC','Diferença','Situação'],repasses.slice(0,200).map(x=>
  '<tr><td><b>'+esc(x.ano)+' / '+esc(x.documento)+'</b><div class="cell-sub">'+esc(x.dotacao)+'</div></td>'+
