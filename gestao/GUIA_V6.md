@@ -45,6 +45,27 @@ As 149 movimentações originais analisadas continham 27 dotações distintas; 6
 
 **Aplicação:** atualize o conteúdo do arquivo SIG_V6_Conciliacao.gs no Apps Script da planilha com o código mais recente deste repositório; execute novamente "Gerar conciliação local"; baixe um novo JSON V6 e importe-o no navegador. A atualização do GitHub não altera automaticamente o código instalado no Apps Script. JSON anterior à correção será mostrado com aviso de posição desatualizada. O relatório mantém V6, sem novo módulo.
 
+## Regra mestre de abatimento (17/10/2026)
+
+**Escopo:** somente conciliação gerencial, demonstrada na aba `SIG_V6_ABATIMENTOS` e no painel V6; nenhuma alteração dos dados de origem ou do saldo oficial.
+
+Para cada empenho com valor líquido positivo, localizar na mesma posição importada: (1) cota da dotação completa específica e (2) cota global com mesmo elemento e todos os demais componentes iguais, mudando exclusivamente as duas posições do item para `00` (`XX` na exibição).
+
+- Se ambas existirem: alerta `ABATE_AMBIGUO`, sem abatimento automático.
+- Se só a específica existir: atribuir o valor líquido do empenho à específica.
+- Se só a global existir: atribuir à global.
+- Se nenhuma existir ou o código não puder ser normalizado com segurança: alerta, sem abatimento.
+- Valores zero ou negativos não são abatidos.
+
+Não se exige igualdade nem proximidade entre cota e empenho: uma cota pode financiar vários processos/RPs e empenhos por diferentes fornecedores. Cada empenho só pode ser abatido uma vez. RIPC não é debitado novamente como se fosse uma nova despesa. Não atribuir automaticamente um empenho a documento de cota individual.
+
+A diferença **cota líquida menos empenhos atribuídos** é valor gerencial, NÃO é saldo oficial do SIAFI. A regra não altera a classificação de serviços contínuos.
+
+**Data:** verificar a existência das dotações na posição importada, não na data de geração do relatório. Campo `referencia_cotas_data` registra a data mais recente em `Data_Importacao`. Se for diferente de hoje ou inexistente, emitir `POSICAO_HISTORICA_COTAS`: não é possível afirmar quais dotações existiam hoje. A posição disponível neste estudo é de 30/06/2026, não a de 17/10/2026.
+
+**Exemplo:** aquisição 14/2026, empenhos 116 e 123 em `5207`, relacionados à cota global `52XX` pela família orçamentária. Não há obrigação de valores idênticos. O RIPC e a cota do documento 62 apresentam diferença de R$ 10,00, que permanece sujeita a conferência.
+
+**Operacionalização:** atualizar manualmente o arquivo `SIG_V6_Conciliacao.gs` no editor Apps Script da planilha; executar Gerar conciliação local; revisar `SIG_V6_ABATIMENTOS`; gerar novo JSON e importar no SIG. Atualizar GitHub não atualiza automaticamente Apps Script.
 ## Regras de interpretação verificadas
 
 - **Cotas**: são movimentos, com créditos e anulações, e podem repetir `Ano|Doc_Repasse|Dotacao`. O saldo líquido é a soma algébrica.
