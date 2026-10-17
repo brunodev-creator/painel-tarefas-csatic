@@ -60,17 +60,27 @@ function view(authorized){
    return i.normalized.includes(q)||str.replace(/\D/g,'').includes(q);
  })):[];
  const repasses=filter(r.repasses),dotacoes=filter(r.dotacoes),empenhos=filter(r.empenhos);
- if(!summary.regra_dotacao_global_v2)html+='<div class="v5-notice"><b>JSON anterior à correção de dotações globais.</b> A leitura EEXX abaixo é apenas visual. Para reconciliar corretamente, atualize o Apps Script V6, gere novo relatório e importe o JSON atualizado.</div>';
+ if(!summary.regra_dotacao_global_v2)html+='<div class="v5-notice"><b>JSON anterior à correção de dotações globais.</b> Atualize o Apps Script V6, gere novo relatório e importe o JSON atualizado.</div>';
+ if(!summary.regra_mestre_abate_v1)html+='<div class="v5-notice"><b>JSON sem a regra mestre de abatimento.</b> O abatimento por dotação específica ou global somente será exibido após gerar um novo relatório no Apps Script V6 atualizado.</div>';
+ if(summary.regra_mestre_abate_v1&&!summary.posicao_cotas_atualizada_hoje)
+ html+='<div class="v5-notice"><b>Posição histórica.</b> Última importação de cotas: '+esc(summary.referencia_cotas_data||'não informada')+'. A conciliação não demonstra quais dotações estão disponíveis hoje. Consulte a posição atual antes de decidir operacionalmente.</div>';
  const kpi=(label,value,sub)=>'<div class="card v5-metric"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong><span>'+esc(sub)+'</span></div>';
  html+='<div class="v6-metrics">'+
  kpi('Cotas líquidas',amount(summary.cota_liquida_centavos),'Valor descentralizado, com anulações')+
  kpi('RIPC destinados',amount(summary.ripc_total_centavos),'Sem somar Valor_Total_Repasse repetido')+
  kpi('Diferença indicativa',amount(summary.diferenca_global_informativa_centavos),'Não é disponibilidade para empenhar')+
- kpi('Empenhos',integer(summary.empenhos),'Registros distintos no índice')+'</div>';
+ kpi('Empenhos',integer(summary.empenhos),'Registros distintos no índice')+
+ (summary.regra_mestre_abate_v1?
+ kpi('Abatimento gerencial',amount(summary.valor_abatido_gerencial_centavos),'Soma dos empenhos atribuídos uma vez, NÃO baixa contábil')+
+ kpi('Empenhos atribuídos',integer(summary.empenhos_abatidos),'Específica ou global, sem comparação de valores'):'')+'</div>';
  html+=panel('Origem e consistência','<p class="v6-data-info"><b>Origem:</b> '+esc(r.origem)+' · <b>Gerado em:</b> '+esc(r.gerado_em)+' · <b>Versão:</b> '+esc(r.sig_version)+'</p>'+
  '<div class="v6-counters">'+[
   'Documentos: '+integer(summary.repasses),'RIPC: '+integer(summary.ripcs),'Itens: '+integer(summary.itens),
   'Dotações: '+integer(summary.dotacoes),'Serviços prováveis: '+integer(summary.continuos),
+  ...(summary.regra_mestre_abate_v1?['Empenhos na global: '+integer(summary.empenhos_abatidos_globais),
+     'Empenhos na específica: '+integer(summary.empenhos_abatidos_especificos),
+     'Empenhos ambíguos: '+integer(summary.empenhos_ambiguos),
+     'Empenhos sem cota: '+integer(summary.empenhos_sem_cota)]:[]),
   'Empenhos associados a dotações de cota: '+integer(summary.empenhos_com_dotacao_de_cota),
   'Alertas para conferência: '+integer(warnings.length)].map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>'+
  '<p class="v5-guide">Assinatura da posição: <code>'+esc(r.assinatura_geral||'')+'</code>. O documento informa a posição das abas, não garante atualização até hoje.</p>');
@@ -85,11 +95,30 @@ function view(authorized){
  '<td>'+amount(x.credito_liquido_centavos)+'</td><td>'+amount(x.valor_ripc_centavos)+'</td>'+
  '<td>'+amount(x.diferenca_nao_destinada_centavos)+'</td><td><span class="v6-status">'+esc(x.situacao)+'</span></td></tr>')));
  html+=panel('Consolidação por dotação',
- '<p class="v5-guide">Global = elemento sem item, conta 998020301. Item definido = conta 998020302. Esses recursos não são automaticamente somados entre as contas, nem associados a um documento de repasse por dotação apenas.</p>'+
- table(['Dotação / Tipo e conta','Cota líquida','RIPC','Empenhado líquido','Saldo em empenhos','Empenhos'],dotacoes.slice(0,200).map(x=>
- '<tr><td>'+v6DotCell(x)+'</td><td>'+amount(x.cotas_centavos)+'</td><td>'+amount(x.ripc_centavos)+
- '</td><td>'+amount(x.empenhado_liquido_centavos)+'</td><td>'+amount(x.saldo_empenhos_centavos)+
- '</td><td>'+integer(x.empenhos)+'</td></tr>')));
+ '<p class="v5-guide">Abatimento gerencial: cada empenho positivo é descontado uma vez na cota específica ou, na ausência desta, na global do mesmo elemento e classificação. Se ambas existirem, há alerta e nenhum abatimento automático. A diferença calculada não é saldo oficial do SIAFI.</p>'+
+ table(['Dotação / Tipo e conta','Cota líquida','Abatido gerencial','Diferença NÃO OFICIAL','RIPC vinculado','Empenhado na mesma dotação','Saldo dos empenhos'],dotacoes.slice(0,200).map(x=>
+ '<tr><td>'+v6DotCell(x)+'</td><td>'+amount(x.cotas_centavos)+'</td>'+
+ '<td>'+amount(x.abatido_sig_centavos)+'</td><td>'+amount(x.diferenca_gerencial_centavos)+'</td>'+
+ '<td>'+amount(x.ripc_centavos)+'</td><td>'+amount(x.empenhado_liquido_centavos)+'</td>'+
+ '<td>'+amount(x.saldo_empenhos_centavos)+'</td></tr>')));
+ if(Array.isArray(r.abatimentos)){
+  const abatFilter=r.abatimentos.filter(x=>!q||[x.dotacao_empenho,x.dotacao_global_candidata,x.dotacao_de_abate,x.dotacao_empenho_original].some(v=>{
+   const raw=String(v||'');return raw.replace(/\D/g,'').includes(q)||v6DotLabel(raw).normalized.includes(q);
+  }));
+  const label={ABATIDO_ESPECIFICA:'Abatido na específica',ABATIDO_GLOBAL:'Abatido na global',
+   AMBIGUA_SEM_ABATE:'ALERTA — duas dotações',SEM_COTA:'ALERTA — sem cota',
+   CODIGO_INCOMPLETO:'ALERTA — código incompleto',VALOR_NEGATIVO_CONFERIR:'ALERTA — valor negativo',
+   SEM_VALOR_LIQUIDO:'Sem valor líquido'};
+  html+=panel('Regra mestre — abatimentos de empenhos',
+   '<p class="v5-guide">Não exige igualdade de valores entre cota e empenho. O abatimento é apenas uma conciliação gerencial sobre a posição importada, não uma operação no SIAFI nem uma vinculação a documento de repasse. Se houver global e específica, o SIG não escolhe automaticamente.</p>'+
+   table(['Empenho / Processo','Dotação do empenho','Dotação abatida','Valor líquido','Resultado'],
+    abatFilter.slice(0,300).map(x=>
+    '<tr><td><b>'+esc(x.chave_empenho)+'</b><div class="cell-sub">'+esc(x.processo||'')+'</div></td>'+
+    '<td>'+esc(v6DotLabel(x.dotacao_empenho).formatted)+'</td>'+
+    '<td>'+(x.dotacao_de_abate?esc(v6DotLabel(x.dotacao_de_abate).formatted):'—')+'</td>'+
+    '<td>'+amount(x.valor_empenhado_liquido_centavos)+'</td>'+
+    '<td><span class="v6-status">'+esc(label[x.status]||x.status)+'</span></td></tr>')));
+ }
  html+=panel('Empenhos identificados',
  table(['Chave','Processo','Dotação','Empenhado líquido','Saldo informado'],empenhos.slice(0,200).map(x=>
  '<tr><td>'+esc(x.chave_empenho)+'</td><td>'+esc(x.processo)+'</td><td>'+v6DotCell(x)+'</td><td>'+
@@ -97,14 +126,14 @@ function view(authorized){
  html+=panel('Ocorrências para conferência',warnings.length?
  table(['Nível','Código','Referência'],warnings.slice(0,300).map(x=>'<tr><td>'+esc(x.nivel)+'</td><td>'+esc(x.codigo)+'</td><td>'+esc(x.mensagem)+'</td></tr>')):
  '<div class="v5-clean">Nenhum alerta estrutural identificado.</div>');
- html+='<p class="v5-footer">Importante: recursos não destinados em RIPC, saldos em empenhos e disponibilidade orçamentária são conceitos diferentes. Os alertas não comprovam irregularidade.</p>';
+ html+='<p class="v5-footer">Importante: RIPC não é uma despesa adicional; não é subtraído novamente dos empenhos. Os abatimentos gerenciais dependem da posição da planilha, podem diferir do saldo oficial do SIAFI e não representam baixa contábil.</p>';
  return html;
 }
 function validate(o){
  if(o?.sig_version!=='6.0.0'||o.tipo!=='CONCILIACAO_LOCAL'||!o.resumo||
  !Array.isArray(o.repasses)||!Array.isArray(o.dotacoes)||!Array.isArray(o.empenhos)||!Array.isArray(o.alertas))
   throw Error('Arquivo não reconhecido como relatório de conciliação V6.');
- if(Math.max(o.repasses.length,o.dotacoes.length,o.empenhos.length,o.alertas.length)>30000)throw Error('Relatório acima do limite de linhas.');
+ if(Math.max(o.repasses.length,o.dotacoes.length,o.empenhos.length,o.alertas.length,Array.isArray(o.abatimentos)?o.abatimentos.length:0)>30000)throw Error('Relatório acima do limite de linhas.');
  return o;
 }
 function restore(data){report=validate(data);search='';}
@@ -133,13 +162,13 @@ function answer(question,authorized){
  const found=digits.length>=18?(report.dotacoes||[]).find(x=>digits.includes(x.dotacao)):null;
  if(found)return 'DOTAÇÃO '+found.dotacao+'\nCota líquida: '+amount(found.cotas_centavos)+
  '\nRIPC: '+amount(found.ripc_centavos)+'\nDiferença indicativa: '+amount(found.nao_destinado_teorico_centavos??(found.cotas_centavos-found.ripc_centavos))+
- '\nEmpenhado líquido: '+amount(found.empenhado_liquido_centavos)+'\nSaldo dos empenhos: '+amount(found.saldo_empenhos_centavos)+
+ '\nEmpenhado líquido: '+amount(found.empenhado_liquido_centavos)+'\nAbatido gerencial: '+amount(found.abatido_sig_centavos)+'\nDiferença gerencial (NÃO oficial): '+amount(found.diferenca_gerencial_centavos)+'\nSaldo dos empenhos: '+amount(found.saldo_empenhos_centavos)+
  '\nFonte: relatório V6 carregado localmente.\nA diferença NÃO comprova disponibilidade para empenhar.';
  if(/repass|ripc|dotac|saldo|cota|concilia/.test(l)){
   const s=report.resumo;
   return 'CONCILIAÇÃO LOCAL V6\nCotas líquidas: '+amount(s.cota_liquida_centavos)+
   '\nRIPC destinado: '+amount(s.ripc_total_centavos)+'\nDiferença informativa: '+amount(s.diferenca_global_informativa_centavos)+
-  '\nDocumentos: '+integer(s.repasses)+'; empenhos: '+integer(s.empenhos)+'\nAlertas: '+integer(report.alertas.length)+
+  '\nDocumentos: '+integer(s.repasses)+'; empenhos: '+integer(s.empenhos)+'\nAbatido gerencial: '+amount(s.valor_abatido_gerencial_centavos)+'\nEmpenhos atribuídos: '+integer(s.empenhos_abatidos)+'\nAlertas: '+integer(report.alertas.length)+
   '\nDados válidos somente para a posição da planilha analisada; não são o saldo oficial atual.';
  }
  return null;
