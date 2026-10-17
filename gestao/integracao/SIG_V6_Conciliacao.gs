@@ -127,7 +127,35 @@ function sigV6NormalHeader_(s){return String(s).normalize('NFD').replace(/[\u030
 function sigV6Digits_(v){return String(v||'').replace(/\D/g,'');}
 function sigV6Year_(v){const n=sigV6Digits_(v);return n.length===4?n:'';}
 function sigV6Doc_(v){const x=sigV6Digits_(v);return x?String(Number(x)):'';}
-function sigV6Dot_(v){return sigV6Digits_(v);}
+/* Global: OOEE (do BO) => EE00 para chave, EEXX para exibição.
+   Item definido EE01..EE99 permanece separado. Original sempre preservado. */
+const SIGV6_DOT_SIZES=[4,2,3,3,4,4,4,4,2,1,1];
+function sigV6DotFromDigits_(d){
+ if(!/^\d{32}$/.test(d))return null;const a=[];let p=0;
+ for(const n of SIGV6_DOT_SIZES){a.push(d.slice(p,p+n));p+=n;}
+ return a;
+}
+function sigV6Dot_(v){
+ const raw=String(v??'').trim().toUpperCase();if(!raw)return '';
+ const seg=raw.split('.');
+ if(seg.length===11){
+  if(!seg.every((x,i)=>new RegExp('^\\d{'+SIGV6_DOT_SIZES[i]+'}$').test(x)||(i===7&&/^\d{2}XX$/.test(x))))return '';
+  if(/^00\d{2}$/.test(seg[7]))seg[7]=seg[7].slice(2)+'00';
+  else if(/^\d{2}XX$/.test(seg[7]))seg[7]=seg[7].slice(0,2)+'00';
+  return seg.join('');
+ }
+ if(raw.includes('XX'))return ''; // XX sem delimitador: nunca remover posições
+ const digits=sigV6Digits_(raw),p=sigV6DotFromDigits_(digits);
+ if(p&&/^00\d{2}$/.test(p[7])){p[7]=p[7].slice(2)+'00';return p.join('');}
+ return digits;
+}
+function sigV6DotInfo_(v){
+ const code=sigV6Dot_(v),p=sigV6DotFromDigits_(code);
+ if(!p)return {codigo:code,exibicao:code,tipo:'FORMATO_A_CONFERIR',conta:''};
+ const el=p[7].slice(0,2),isGlobal=p[7].slice(2)==='00',view=p.slice();
+ if(isGlobal)view[7]=el+'XX';
+ return {codigo:code,exibicao:view.join('.'),tipo:isGlobal?'GLOBAL':'ITEM_DEFINIDO',conta:isGlobal?'998020301':'998020302'};
+}
 function sigV6Key_(year,doc,dot){return [sigV6Year_(year),sigV6Doc_(doc),sigV6Dot_(dot)].join('|');}
 function sigV6Reais_(value){
  if(typeof value==='number')return Number.isFinite(value)?Math.round(value*100):null;
