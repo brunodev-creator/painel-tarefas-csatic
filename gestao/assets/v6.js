@@ -8,14 +8,17 @@ const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 const amount=v=>typeof v==='number'&&Number.isFinite(v)?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v/100):'—';
 const integer=v=>new Intl.NumberFormat('pt-BR').format(Number(v)||0);
 const title=(name,sub)=>'<div class="pagehead"><div><div class="eyebrow">CONCILIAÇÃO ORÇAMENTÁRIA</div><h1>'+esc(name)+'</h1><div class="sub">'+esc(sub)+'</div></div>'+
- '<div class="head-actions"><button class="btn" data-action="v6Demo">Exemplo fictício</button>'+(report?'<button class="btn" data-action="v6Clear">Limpar prévia</button>':'')+'</div></div>';
+ '<div class="head-actions"><button class="btn" data-action="vaultRestore" data-kind="v6">Restaurar cópia protegida</button>'+
+ (report?'<button class="btn" data-action="vaultSave" data-kind="v6">Salvar cópia protegida</button>':'')+
+ '<button class="btn" data-action="vaultDelete" data-kind="v6">Apagar cópia local</button>'+
+ '<button class="btn" data-action="v6Demo">Exemplo fictício</button>'+(report?'<button class="btn" data-action="v6Clear">Limpar prévia</button>':'')+'</div></div>';
 const panel=(name,content)=>'<div class="card section"><div class="section-heading"><div><h2>'+esc(name)+'</h2></div></div>'+content+'</div>';
 const table=(heads,rows)=>'<div class="table-scroll"><table class="data-table"><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
  (rows.length?rows.join(''):'<tr><td colspan="'+heads.length+'">Nenhum registro encontrado.</td></tr>')+'</tbody></table></div>';
 function view(authorized){
  if(!authorized)return title('Acesso restrito','Disponível somente para SOFI, chefia e administração.');
  let html=title('Conciliação — V6','Analise cotas, RIPC, itens, empenhos e serviços continuados a partir da planilha.');
- html+='<div class="v5-notice"><b>Conferência local.</b> Nenhum registro financeiro deste JSON é enviado ao Supabase, ao GitHub ou a qualquer API de IA. Os números são históricos e exigem validação nas fontes oficiais.</div>';
+ html+='<div class="v5-notice"><b>Conferência local.</b> Nenhum registro financeiro deste JSON é enviado ao Supabase, ao GitHub ou a qualquer API de IA. Os números são históricos e exigem validação nas fontes oficiais. <b>Guardar cópia</b> é opcional e criptografa o relatório neste navegador; para restaurar após novo login você precisará da senha do cofre.</div>';
  html+='<div class="card v5-upload"><div><h2>Importar prévia da planilha</h2><p>Na planilha <b>saldos_2_0</b>, clique em <b>SIG V6 (conciliação) → Baixar JSON para SIG (local)</b>.</p></div><label class="btn primary v5-label" for="v6-upload">Selecionar relatório JSON</label><input id="v6-upload" type="file" accept=".json,application/json" class="v5-file"></div>';
  html+=panel('Instalação do Apps Script V6','<ol class="v5-steps"><li>Em <b>Extensões → Apps Script</b>, crie um arquivo separado chamado <code>SIG_V6_Conciliacao.gs</code>.</li><li>Cole o <a target="_blank" rel="noopener noreferrer" href="https://github.com/brunodev-creator/painel-tarefas-csatic/blob/main/gestao/integracao/SIG_V6_Conciliacao.gs">código V6 do GitHub ↗</a>.</li><li>Salve, execute <code>sigV6InstalarMenu</code> apenas uma vez e volte à planilha.</li><li>Execute <b>SIG V6 (conciliação) → Gerar conciliação local</b> e confira as abas <code>SIG_V6_*</code>.</li></ol>');
  if(!report)return html+panel('Relatório','<p class="v5-guide">Nenhum JSON selecionado. Use o botão de exemplo fictício para conhecer a interface.</p>');
@@ -61,16 +64,21 @@ function view(authorized){
  html+='<p class="v5-footer">Importante: recursos não destinados em RIPC, saldos em empenhos e disponibilidade orçamentária são conceitos diferentes. Os alertas não comprovam irregularidade.</p>';
  return html;
 }
-async function load(file){
- if(!file)return;
- if(file.size>5*1024*1024)throw Error('Arquivo ultrapassa 5 MB.');
- let o;try{o=JSON.parse(await file.text())}catch{throw Error('JSON inválido.')}
+function validate(o){
  if(o?.sig_version!=='6.0.0'||o.tipo!=='CONCILIACAO_LOCAL'||!o.resumo||
  !Array.isArray(o.repasses)||!Array.isArray(o.dotacoes)||!Array.isArray(o.empenhos)||!Array.isArray(o.alertas))
   throw Error('Arquivo não reconhecido como relatório de conciliação V6.');
  if(Math.max(o.repasses.length,o.dotacoes.length,o.empenhos.length,o.alertas.length)>30000)throw Error('Relatório acima do limite de linhas.');
- report=o;search='';
+ return o;
 }
+function restore(data){report=validate(data);search='';}
+async function load(file){
+ if(!file)return;
+ if(file.size>5*1024*1024)throw Error('Arquivo ultrapassa 5 MB.');
+ let o;try{o=JSON.parse(await file.text())}catch{throw Error('JSON inválido.')}
+ restore(o);
+}
+function getData(){return report;}
 function reset(){report=null;search='';}
 function filter(v){search=String(v||'').slice(0,100);}
 function demo(){
@@ -100,5 +108,5 @@ function answer(question,authorized){
  }
  return null;
 }
-window.SIG_V6={view,load,demo,reset,filter,answer};
+window.SIG_V6={view,load,demo,reset,filter,answer,getData,restore};
 })();
