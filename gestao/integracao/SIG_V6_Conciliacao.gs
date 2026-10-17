@@ -357,7 +357,9 @@ function sigV6Escrever_(r){
  const ss=SpreadsheetApp.getActiveSpreadsheet(),n=SIGV6.outputs,fmt=x=>x===null||x===undefined?'':x/100;
  sigV6CriarAba_(ss,n.resumo,['Indicador','Valor'],[
   ['Data da análise',r.gerado_em],['Documentos de repasse',r.resumo.repasses],
-  ['Dotações diferentes',r.resumo.dotacoes],['RIPC',r.resumo.ripcs],['Itens RIPC',r.resumo.itens],
+  ['Dotações diferentes',r.resumo.dotacoes],
+  ['Dotações globais (EEXX)',r.resumo.dotacoes_globais],
+  ['Cotas globais 998020301 (R$)',fmt(r.resumo.cota_global_centavos)],['RIPC',r.resumo.ripcs],['Itens RIPC',r.resumo.itens],
   ['Empenhos no índice',r.resumo.empenhos],['Empenhos em dotações presentes nas cotas',r.resumo.empenhos_com_dotacao_de_cota],
   ['Empenhos com código normalizado por fonte',r.resumo.empenhos_dotacao_normalizada],['Serviços prováveis',r.resumo.continuos],
   ['Cota líquida (R$)',fmt(r.resumo.cota_liquida_centavos)],
@@ -368,17 +370,19 @@ function sigV6Escrever_(r){
   ['Documentos RIPC maior que cota',r.resumo.repasses_superados],
   ['Alertas (até '+SIGV6.maxAlerts+')',r.alertas.length],['Assinatura SHA256',r.assinatura_geral],
   ['AVISO','Valores históricos/informados não são disponibilidade oficial para empenhar.']]);
- sigV6CriarAba_(ss,n.repasses,['Chave documento','Ano','Documento','Dotação','Cota líquida (R$)','RIPC (R$)','Diferença (R$)','Movimentos','RIPC associados','Situação'],r.repasses.map(x=>[
+ sigV6CriarAba_(ss,n.repasses,['Chave documento','Ano','Documento','Dotação','Cota líquida (R$)','RIPC (R$)','Diferença (R$)','Movimentos','RIPC associados','Situação','Leitura EEXX','Tipo','Conta','Código(s) BO'],r.repasses.map(x=>[
   x.chave,x.ano,x.documento,x.dotacao,fmt(x.credito_liquido_centavos),fmt(x.valor_ripc_centavos),
-  fmt(x.diferenca_nao_destinada_centavos),x.quantidade_movimentos,x.quantidade_ripc,x.situacao]));
+  fmt(x.diferenca_nao_destinada_centavos),x.quantidade_movimentos,x.quantidade_ripc,x.situacao,
+  sigV6DotInfo_(x.dotacao).exibicao,sigV6DotInfo_(x.dotacao).tipo,sigV6DotInfo_(x.dotacao).conta,(x.origens_bo||[]).join(' | ')]));
  sigV6CriarAba_(ss,n.dotacoes,['Dotação','Cota líquida (R$)','RIPC (R$)','Diferença informativa (R$)',
-  'Empenhado líquido informado (R$)','Saldo em empenhos (R$)','Documentos','Empenhos'],r.dotacoes.map(x=>[
+  'Empenhado líquido informado (R$)','Saldo em empenhos (R$)','Documentos','Empenhos','Leitura EEXX','Tipo','Conta','Código(s) BO'],r.dotacoes.map(x=>[
   x.dotacao,fmt(x.cotas_centavos),fmt(x.ripc_centavos),fmt(x.nao_destinado_teorico_centavos),
-  fmt(x.empenhado_liquido_centavos),fmt(x.saldo_empenhos_centavos),x.documentos,x.empenhos]));
+  fmt(x.empenhado_liquido_centavos),fmt(x.saldo_empenhos_centavos),x.documentos,x.empenhos,
+  x.dotacao_exibicao,x.tipo_dotacao,x.conta_controle,(x.origens_bo||[]).join(' | ')]));
  sigV6CriarAba_(ss,n.empenhos,['Chave Empenho','Processo','Dotação consolidada','Dotação original','Empenhado líquido (R$)',
-  'Saldo de empenho (R$)','Tipo de execução'],r.empenhos.map(x=>[
+  'Saldo de empenho (R$)','Tipo de execução','Leitura EEXX','Tipo','Conta'],r.empenhos.map(x=>[
   x.chave_empenho,x.processo,x.dotacao,x.dotacao_orig,fmt(x.empenhado_liquido_centavos),
-  fmt(x.saldo_informado_centavos),x.classificacao]));
+  fmt(x.saldo_informado_centavos),x.classificacao,sigV6DotInfo_(x.dotacao).exibicao,sigV6DotInfo_(x.dotacao).tipo,sigV6DotInfo_(x.dotacao).conta]));
  sigV6CriarAba_(ss,n.continuos,['Chave empenho','Processo','Dotação','Status',
   'Saldo informado (R$)','Reforço sugerido (R$)','Tipo execução','Observação'],r.continuos.map(x=>[
   x.chave_empenho,x.processo,x.dotacao,x.status,fmt(x.saldo_informado_centavos),
