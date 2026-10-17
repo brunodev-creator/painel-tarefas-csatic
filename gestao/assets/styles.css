@@ -116,3 +116,8 @@
 .v6-count{font-size:12px;color:#5a7085;margin-top:12px;line-height:1.6}
 .v6-count strong{color:#075f5a;overflow-wrap:anywhere}
 @media(max-width:600px){.v6-filterbar .v6-search{flex-basis:100%}.v6-filterbar .btn{flex:1}}
+
+/* Cofre financeiro local e opcional */
+.v7-vault-warning{background:#f4f7fa;border:1px solid #dce6ef;border-radius:12px;padding:14px 16px;color:#475e72;font-size:13px;line-height:1.65;margin:14px 0 18px}
+.head-actions{flex-wrap:wrap;gap:8px}
+@media(max-width:690px){.head-actions{display:flex;flex-direction:column;align-items:stretch}.head-actions .btn{white-space:normal}}
