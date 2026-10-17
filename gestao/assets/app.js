@@ -327,9 +327,13 @@ function v5Count(num){return new Intl.NumberFormat('pt-BR').format(Number(num)||
 function v5FormatCents(num){return Number.isFinite(Number(num))?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(num)/100):'—'}
 function v5View(){
  if(!canFinance())return heading('Acesso restrito','Motor de Dados','A conferência financeira é exclusiva de administradores, chefia e SOFI.');
- const actions='<button class="btn" data-action="v5Demo">Exemplo fictício</button>'+(v5Report?'<button class="btn" data-action="v5Clear">Limpar prévia</button>':'');
+ const actions='<button class="btn" data-action="vaultRestore" data-kind="v5">Restaurar cópia protegida</button>'+
+ (v5Report?'<button class="btn" data-action="vaultSave" data-kind="v5">Salvar cópia protegida</button>':'')+
+ '<button class="btn" data-action="vaultDelete" data-kind="v5">Apagar cópia local</button>'+
+ '<button class="btn" data-action="v5Demo">Exemplo fictício</button>'+
+ (v5Report?'<button class="btn" data-action="v5Clear">Limpar prévia</button>':'');
  let html=heading('Integração de planilhas','Motor de Dados — V5','Interpretação, validação, comparação e conferência dos arquivos produzidos pelo Apps Script.',actions);
- html+='<div class="v5-notice"><strong>Processamento somente no navegador.</strong> O relatório escolhido abaixo é lido localmente no seu dispositivo. Não é enviado ao GitHub, ao Supabase ou a qualquer API de IA. Ainda não há sincronização financeira automática.</div>';
+ html+='<div class="v5-notice"><strong>Processamento somente no navegador.</strong> O relatório escolhido abaixo é lido localmente no seu dispositivo. Não é enviado ao GitHub, ao Supabase ou a qualquer API de IA. Você pode guardar uma cópia criptografada neste navegador e recuperá-la com a senha do cofre após novo login. Ainda não há sincronização financeira automática.</div>';
  html+='<div class="card v5-upload"><div><h2>1. Analisar uma prévia do Google Sheets</h2><p>Na planilha saldos_2_0, execute <b>SIG V5 (prévia) → Baixar relatório JSON</b> e selecione o arquivo gerado.</p></div><label class="btn primary v5-label" for="v5-json-file">Selecionar SIG_V5_PREVIA.json</label><input type="file" id="v5-json-file" accept=".json,application/json" class="v5-file"></div>';
  html+='<div class="card section">'+cardTitle('2. Instalação do extrator','Executar uma única vez, sem alterar a importação existente')+
  '<ol class="v5-steps"><li>Abra <b>saldos_2_0 → Extensões → Apps Script</b>.</li><li>Crie um arquivo separado chamado <b>SIG_V5_AppsScript.gs</b> e cole o código fornecido no GitHub.</li><li>Salve e execute <code>sigV5InstalarMenu</code> uma vez; autorize apenas os escopos que o Google solicitar.</li><li>Use o menu <b>SIG V5 (prévia) → Gerar análise (sem envio)</b>.</li><li>Revise a nova aba <code>SIG_V5_PREVIA</code>. Se quiser registrar as diferenças dentro da própria planilha, escolha <b>Registrar versão conferida</b>.</li></ol>'+
@@ -370,6 +374,75 @@ async function v5ReadLocal(file){
  if(result?.sig_version!=='5.0.0'||result.tipo!=='PREVIA_LOCAL'||!Array.isArray(result.resumo)||!Array.isArray(result.alertas)||!Array.isArray(result.bloqueios))throw Error('Relatório não reconhecido como prévia SIG V5.');
  if(result.resumo.length>20||result.alertas.length>300)throw Error('Relatório excede limites estruturais de leitura.');
  v5Report=result;render();showToast('Prévia interpretada localmente. Nenhum dado foi transmitido.');
+}
+
+
+/* Cofre local de relatórios financeiros.
+ * Os dados continuam no navegador; somente cópia criptografada vai para IndexedDB.
+ * A chave NÃO é a senha de acesso ao SIG e não é guardada pelo site. */
+function vaultScope(){
+ if(!cloud()||!session?.user?.id||!canFinance())throw Error('Entre com seu usuário autorizado para guardar ou recuperar a cópia financeira.');
+ if(!window.SIG_VAULT?.supported())throw Error('O navegador não oferece criptografia e armazenamento local compatíveis.');
+ return {uid:session.user.id,project:config.url};
+}
+function vaultData(kind){return kind==='v5'?v5Report:window.SIG_V6.getData();}
+function vaultShow(kind,mode){
+ if(!['v5','v6'].includes(kind))return;
+ try{vaultScope()}catch(e){showToast(errMsg(e));return;}
+ if(mode==='delete'){
+  if(!window.confirm('Apagar a cópia protegida de '+kind.toUpperCase()+' armazenada NESTE navegador para esta conta? Os arquivos JSON originais não serão apagados.'))return;
+  vaultDelete(kind).catch(e=>showToast(errMsg(e)));return;
+ }
+ if(mode==='save'&&!vaultData(kind))return showToast('Importe primeiro o relatório JSON que deseja salvar.');
+ const isSave=mode==='save';
+ const textInfo=isSave
+  ?'Defina uma frase-senha diferente da senha de login do SIG (mínimo 12 caracteres). Ela não será armazenada e será necessária para recuperar a cópia. Salvar substituirá eventual cópia anterior desta versão neste dispositivo.'
+  :'Informe a frase-senha usada ao salvar o relatório neste dispositivo. Se o navegador foi limpo ou você está em outro aparelho, reimporte o JSON.';
+ const form='<div class="v7-vault-warning">'+esc(textInfo)+'</div>'+
+ '<form data-form="vault" data-kind="'+kind+'" data-mode="'+mode+'">'+
+ '<div class="form-grid">'+inputField('cofre_senha','Frase-senha do cofre','', 'password','required minlength="12" autocomplete="off"')+
+ (isSave?inputField('cofre_confirmacao','Repita a frase-senha','', 'password','required minlength="12" autocomplete="off"'):'')+'</div>'+
+ '<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button>'+
+ '<button class="btn primary" type="submit">'+(isSave?'Salvar cópia neste dispositivo':'Restaurar cópia')+'</button></div></form>';
+ openModal(isSave?'Guardar relatório protegido':'Recuperar relatório protegido',kind.toUpperCase()+' · navegador atual',form);
+}
+async function vaultSubmit(form){
+ if(busy)return;
+ const kind=form.dataset.kind,mode=form.dataset.mode;
+ if(!['v5','v6'].includes(kind)||!['save','restore'].includes(mode))return;
+ const {uid,project}=vaultScope();
+ const pass=form.elements.namedItem('cofre_senha')?.value||'';
+ if(pass.length<12)throw Error('Frase-senha com no mínimo 12 caracteres.');
+ if(mode==='save'&&pass!==form.elements.namedItem('cofre_confirmacao')?.value)throw Error('As frases-senha não coincidem.');
+ busy=true;
+ try{
+  if(mode==='save'){
+   const data=vaultData(kind);
+   if(!data)throw Error('Não existe relatório aberto para salvar.');
+   await window.SIG_VAULT.save(uid,project,kind,data,pass);
+   closeModal();showToast(kind.toUpperCase()+' armazenada com criptografia apenas neste dispositivo.');
+  }else{
+   const data=await window.SIG_VAULT.unlock(uid,project,kind,pass);
+   if(!session?.user?.id||session.user.id!==uid||config.url!==project||!canFinance())throw Error('A conta mudou enquanto a cópia era desbloqueada.');
+   if(kind==='v5'){
+    if(data.sig_version!=='5.0.0'||data.tipo!=='PREVIA_LOCAL'||!Array.isArray(data.resumo)||!Array.isArray(data.alertas)||!Array.isArray(data.bloqueios))
+      throw Error('Cópia V5 não reconhecida.');
+    v5Report=data;view='importacoes';
+   }else{
+    window.SIG_V6.restore(data);view='conciliacao';
+   }
+   closeModal();render();showToast('Cópia '+kind.toUpperCase()+' restaurada neste navegador.');
+  }
+ }finally{busy=false;}
+}
+async function vaultDelete(kind){
+ const {uid,project}=vaultScope();
+ await window.SIG_VAULT.remove(uid,project,kind);
+ showToast('Cópia protegida '+kind.toUpperCase()+' apagada deste navegador.');
+}
+function vaultClearOpenReports(){
+ v5Report=null;
+ window.SIG_V6.reset();
 }
 
 function dashboardView(){
@@ -559,7 +632,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(busy)return;
- const type=form.dataset.form;if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -581,9 +654,9 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  closeModal();if(cloud())await fetchCloud();render();showToast(`${type==='process'?'Processo':type==='task'?'Tarefa':type==='contract'?'Contrato':type==='repasse'?'Repasse':'Empenho'} salvo com sucesso.`);
  }catch(ex){busy=false;showToast('Não foi possível salvar: '+errMsg(ex))}
 }
-async function signIn({email,password}){if(!cloud())return;busy=true;try{const r=await rest('/auth/v1/token?grant_type=password','POST',{email,password},null);session={access_token:r.access_token,refresh_token:r.refresh_token,user:r.user,expires_at:Date.now()+r.expires_in*1000};sessionStorage.setItem(KEYS.session,JSON.stringify(session));await fetchCloud();closeModal();showToast('Sessão iniciada.')}catch(e){showToast('Falha no acesso: '+errMsg(e))}finally{busy=false}}
-async function signOut(){try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
-function saveSettings({url,key}){url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(config));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
+async function signIn({email,password}){if(!cloud())return;busy=true;try{const r=await rest('/auth/v1/token?grant_type=password','POST',{email,password},null);vaultClearOpenReports();session={access_token:r.access_token,refresh_token:r.refresh_token,user:r.user,expires_at:Date.now()+r.expires_in*1000};sessionStorage.setItem(KEYS.session,JSON.stringify(session));await fetchCloud();closeModal();showToast('Sessão iniciada.')}catch(e){showToast('Falha no acesso: '+errMsg(e))}finally{busy=false}}
+async function signOut(){try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
+function saveSettings({url,key}){url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(config));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
 function assistantAnswer(question){const q=String(question||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const respostaV6=window.SIG_V6.answer(question,canFinance());if(respostaV6)return respostaV6;
 
@@ -615,6 +688,9 @@ function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de re
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}if(btn.dataset.view){navigate(btn.dataset.view);return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'vaultSave':vaultShow(btn.dataset.kind,'save');break;
+ case 'vaultRestore':vaultShow(btn.dataset.kind,'restore');break;
+ case 'vaultDelete':vaultShow(btn.dataset.kind,'delete');break;
  case 'v6ApplyFilter':{const value=document.getElementById('v6-filter')?.value||'';window.SIG_V6.filter(value);render();break;}
  case 'v6ClearFilter':window.SIG_V6.filter('');render();break;
  case 'v6Demo':window.SIG_V6.demo();render();break;
