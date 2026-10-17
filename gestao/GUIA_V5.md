@@ -13,9 +13,21 @@
 7. Se a prévia não contiver bloqueios e você desejar estabelecer o ponto de comparação, clique **Registrar versão conferida**. Isso cria/atualiza **SIG_V5_ESTADO** e acrescenta eventos em **SIG_V5_HISTORICO** dentro da mesma planilha.
 8. Após uma nova importação do BO, clique **Baixar relatório JSON**. O relatório contém métricas, assinatura e alertas, não as linhas originais. No site do SIG, abra **Motor de Dados** e selecione `SIG_V5_PREVIA.json`.
 
+## Correção de consolidação de cotas — 17/10/2026
+
+A chave `Ano|Doc_Repasse|Dotacao` identifica uma **posição financeira consolidada**, não uma movimentação isolada. A aba `IMPORT_SALDOS_BO` pode conter créditos e anulações para a mesma chave. A versão anterior gerava bloqueio incorreto.
+
+A versão atual preserva **todas as linhas de movimentação** na contagem, soma os valores com sinal para construir o líquido e registra uma posição por chave no histórico. Exemplo verificado: +R$ 5.000,00 e −R$ 2.030,00 = **R$ 2.970,00**. Não apague uma das linhas.
+
+A assinatura das movimentações inclui a `Linha_Original` da cota, que preserva a data da operação. Movimentos iguais em datas distintas não são tratados como duplicação. Se houver duas linhas exatamente idênticas, a V5 mantém um bloqueio preventivo para revisão, sem apagar o dado.
+
+A prévia passa a mostrar **registros físicos**, **posições únicas** e **movimentações consolidadas**, além de uma tabela com chaves, linhas de origem e valores líquidos. O JSON também exibe os agrupamentos localmente.
+
+**Atualização:** substitua apenas o conteúdo do arquivo `SIG_V5_AppsScript.gs` pelo código atualizado no GitHub, salve e rode novamente *Gerar análise (sem envio)*. Não é necessário executar `sigV5InstalarMenu` novamente nem editar `Código.gs`.
+
 ## O que o extrator interpreta
 
-- `IMPORT_SALDOS_BO`: cota, ano, documento de repasse e dotação, com chave `Ano|Doc_Repasse|Dotacao`.
+- `IMPORT_SALDOS_BO`: cota, ano, documento de repasse e dotação, com chave `Ano|Doc_Repasse|Dotacao`, que pode conter múltiplas movimentações assinadas e um valor líquido consolidado.
 - `DESTINACAO_REPASSES`: registros RIPC identificados por `ID_RIPC`.
 - `IMPORT_EXECUCAO_DESPESA_BO`: linhas da execução identificadas por assinatura de conteúdo; a primeira versão **não contabiliza automaticamente** movimentos nem os trata como fluxo incremental.
 - `IMPORT_PROCESSOS_HOMOLOGADOS` e `CONTROLE_PROCESSOS_COMPRA`: processos e situação.
