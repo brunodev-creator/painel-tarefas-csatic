@@ -24,8 +24,66 @@ function sigV6Menu(){
  SpreadsheetApp.getUi().createMenu('SIG V6 (conciliação)')
    .addItem('1. Gerar conciliação local','sigV6GerarRelatorio')
    .addItem('2. Baixar JSON para SIG (local)','sigV6BaixarRelatorio')
+   .addSeparator()
+   .addItem('3. Ativar análise automática diária','sigV6AtivarRotinaDiaria')
+   .addItem('4. Desativar análise automática','sigV6DesativarRotina')
    .addToUi();
 }
+/**
+ * Ativação EXPLÍCITA pela pessoa com permissão de editar o Apps Script.
+ * O acionador é aproximado (janela horária do Apps Script) e não intercepta
+ * o e-mail nem os gatilhos já instalados da planilha.
+ */
+function sigV6AtivarRotinaDiaria(){
+ const ui=SpreadsheetApp.getUi(),tz=SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+ const prompt=ui.prompt('Programar conferência diária','Informe uma hora inteira entre 0 e 23 (fuso da planilha: '+tz+
+   '). Escolha uma hora posterior à importação automática do Armazém. Exemplo: 10.',ui.ButtonSet.OK_CANCEL);
+ if(prompt.getSelectedButton()!==ui.Button.OK)return;
+ const raw=prompt.getResponseText().trim();
+ if(!/^\d{1,2}$/.test(raw)||Number(raw)>23){ui.alert('Hora inválida. Informe apenas 0 a 23.');return;}
+ const hour=Number(raw);
+ const existing=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sigV6Agendado');
+ const agree=ui.alert('Confirmar horário','A conferência rodará uma vez ao dia por volta das '+hour+
+  'h. Atualiza SOMENTE as novas abas SIG_V6_*. Nenhum dado será transmitido ao SIG remoto. Continuar?',ui.ButtonSet.YES_NO);
+ if(agree!==ui.Button.YES)return;
+ existing.forEach(t=>ScriptApp.deleteTrigger(t));
+ ScriptApp.newTrigger('sigV6Agendado').timeBased().atHour(hour).everyDays(1).create();
+ ui.alert('Agendamento ativo: aproximadamente '+hour+'h, conforme horário do projeto Apps Script. '+
+   'A execução depende de quotas e das permissões do Google.');
+}
+function sigV6DesativarRotina(){
+ const triggers=ScriptApp.getProjectTriggers().filter(t=>t.getHandlerFunction()==='sigV6Agendado');
+ triggers.forEach(t=>ScriptApp.deleteTrigger(t));
+ SpreadsheetApp.getUi().alert('Foram removidos '+triggers.length+' acionadores de conferência automática V6.');
+}
+function sigV6Agendado(){
+ const lock=LockService.getDocumentLock();
+ if(!lock.tryLock(20000))return;
+ const props=PropertiesService.getScriptProperties(),k='SIG_V6_ASSINATURA_ULTIMA_CONCILIACAO';
+ let state='SEM_ALTERACOES',hash='',totals='';
+ try{
+  const result=sigV6Construir_();hash=result.assinatura_geral;
+  if(result.alertas.some(x=>x.nivel==='BLOQUEIO'))state='BLOQUEADO_REVISAO';
+  else if(props.getProperty(k)!==hash){
+   sigV6Escrever_(result);
+   props.setProperty(k,hash);
+   state='CONCILIACAO_ATUALIZADA';
+  }
+  totals='Cotas='+result.resumo.cota_liquida_centavos+';RIPC='+result.resumo.ripc_total_centavos+
+   ';Alertas='+result.alertas.length;
+ }catch(err){
+  state='ERRO_EXECUCAO';totals=String(err).slice(0,350);
+  throw err;
+ }finally{
+  try{
+   const sh=SpreadsheetApp.getActiveSpreadsheet(),name='SIG_V6_LOG_AUTOMATICO';
+   const log=sh.getSheetByName(name)||sh.insertSheet(name);
+   if(log.getLastRow()===0)log.appendRow(['Data ISO','Resultado','Assinatura','Diagnóstico']);
+   log.appendRow([new Date().toISOString(),state,hash,totals]);
+  }finally{lock.releaseLock();}
+ }
+}
+
 function sigV6GerarRelatorio(){
  const lock=LockService.getDocumentLock();
  if(!lock.tryLock(20000))throw Error('Outra análise está em andamento.');
