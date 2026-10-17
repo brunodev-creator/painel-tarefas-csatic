@@ -3,7 +3,7 @@
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
-const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['conciliacao','▥','Conciliação V6'],['auditoria','shield-check','Auditoria de Compras'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 const SECTORS=['Compras','Licitação','SOFI'];
 const STATUSES=['Em andamento','Aguardando providência','Aguardando documentação','Aguardando empenho','Bloqueado','Concluído','Cancelado'];
 const TASK_STATUSES=['Pendente','Em andamento','Aguardando terceiro','Concluída'];
