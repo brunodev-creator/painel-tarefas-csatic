@@ -27,6 +27,24 @@ O menu solicitará uma **hora entre 0 e 23**, no fuso definido pela planilha. Es
 
 Não configure a execução automática para registrar versões "conferidas" da V5: isso continuaria exigindo conferência humana, justamente para evitar aprovação automática de dados incorretos.
 
+## Regra de interpretação de dotações globais (validada pela CSA-TIC em 17/10/2026)
+
+Na extração BO, o código de 4 posições antes da fonte representa elemento + item. Quando aparecer 00EE, considera-se elemento EE sem item individualizado:
+
+| Origem BO | Chave numérica usada | Exibição no SIG | Conta |
+|---|---|---|---|
+| 0015 | 1500 | 15XX | 998020301 |
+| 0030 | 3000 | 30XX | 998020301 |
+| 0040 | 4000 | 40XX | 998020301 |
+| 0052 | 5200 | 52XX | 998020301 |
+| 4002, 5206, 5207 etc. | inalterada | item definido | 998020302 |
+
+O código original permanece registrado em campos de origem para auditoria. A representação XX nunca é simplesmente apagada: é convertida em 00 SOMENTE nas duas posições do item. As dotações de elemento global e elemento-item específico permanecem separadas: a coincidência de elemento/ação/fonte não permite imputar empenhos do item a documento de cota global sem vínculo contábil explícito.
+
+As 149 movimentações originais analisadas continham 27 dotações distintas; 66 movimentos em 11 dotações eram do tipo 00EE. O total líquido dos repasses deve continuar R$ 68.135.366,09 na mesma posição de origem, sendo R$ 56.806.291,71 em recursos globais conforme essa regra.
+
+**Aplicação:** atualize o conteúdo do arquivo SIG_V6_Conciliacao.gs no Apps Script da planilha com o código mais recente deste repositório; execute novamente "Gerar conciliação local"; baixe um novo JSON V6 e importe-o no navegador. A atualização do GitHub não altera automaticamente o código instalado no Apps Script. JSON anterior à correção será mostrado com aviso de posição desatualizada. O relatório mantém V6, sem novo módulo.
+
 ## Regras de interpretação verificadas
 
 - **Cotas**: são movimentos, com créditos e anulações, e podem repetir `Ano|Doc_Repasse|Dotacao`. O saldo líquido é a soma algébrica.
