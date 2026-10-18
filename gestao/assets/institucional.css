@@ -182,3 +182,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .sig-preview-return{background:#fff;border-color:#bda06a;color:#5e492c;white-space:normal}
 @media(max-width:850px){.sig-preview-trigger{font-size:11px;padding:8px 10px;max-width:180px;background:#f6f1e7;color:#5d4a2b}}
 @media(max-width:510px){.sig-preview-trigger{padding:8px 9px}.sig-preview-trigger span{display:none}.sig-preview-grid{grid-template-columns:1fr}.sig-preview-banner{padding:12px;align-items:stretch}.sig-preview-return{width:100%}}
+
+/* Proteção visual adicional: nunca exibir menus fora do perfil ativo. */
+body[data-sig-visible-role="compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefia"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="compras"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
