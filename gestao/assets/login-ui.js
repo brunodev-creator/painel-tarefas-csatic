@@ -10,6 +10,29 @@
  var content = document.getElementById('content');
  if (!content) return;
  var applying = false;
+
+ function fitToViewport() {
+  var card = content.querySelector('.sig-auth-card');
+  var panel = content.querySelector('.sig-auth-blue');
+  if (!card || !panel || !document.body.classList.contains('sig-auth-mode')) return;
+  // scrollHeight é independente de transform: calcula a altura real do formulário.
+  var viewport = window.visualViewport;
+  var height = viewport && viewport.height ? viewport.height : window.innerHeight;
+  var availableHeight = Math.max(100, height - 20);
+  var availableWidth = Math.max(180, panel.clientWidth - 22);
+  var intrinsicHeight = Math.max(1, card.scrollHeight);
+  var intrinsicWidth = Math.max(1, card.offsetWidth);
+  var scale = Math.min(1, availableHeight / intrinsicHeight, availableWidth / intrinsicWidth);
+  card.style.setProperty('--sig-auth-scale', String(Math.max(0.3, scale)));
+ }
+ function scheduleFit() {
+  if (typeof window.requestAnimationFrame === 'function') {
+   window.requestAnimationFrame(fitToViewport);
+  } else { fitToViewport(); }
+ }
+ window.addEventListener('resize', scheduleFit, {passive:true});
+ if (window.visualViewport) window.visualViewport.addEventListener('resize', scheduleFit, {passive:true});
+
  function escapeText(value) {
   return String(value || '').replace(/[&<>"']/g, function (c) {
    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
@@ -110,6 +133,7 @@
     panel.innerHTML = '<h2>Recuperar acesso</h2><p>Solicite o link de redefinição para o e-mail da sua conta.</p>';
     panel.appendChild(recoveryForm);
    }
+   scheduleFit();
   } finally { applying = false; }
  }
  content.addEventListener('click',function(event) {
@@ -127,7 +151,7 @@
   var toggle = event.target.closest('[data-sig-login-action="recover"]');
   if(toggle) {
    var panel = content.querySelector('.sig-auth-recovery');
-   if(panel) { panel.hidden=!panel.hidden; toggle.setAttribute('aria-expanded',String(!panel.hidden)); if(!panel.hidden) panel.querySelector('input')?.focus(); }
+   if(panel) { panel.hidden=!panel.hidden; toggle.setAttribute('aria-expanded',String(!panel.hidden)); if(!panel.hidden) panel.querySelector('input')?.focus(); scheduleFit(); }
   }
  });
  var observer = new MutationObserver(mount);
