@@ -402,3 +402,54 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .sig-aipc-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .sig-aipc-actions button{min-height:40px}
 @media(max-width:640px){.sig-aipc-statebar{flex-direction:column;align-items:flex-start}.sig-aipc-actions button{flex:1;min-width:125px}}
+
+
+/* AIPC: visualizador intersetorial em formato de folha A4 e impressão limpa. */
+.sig-aipc-document-view{display:flex;flex-direction:column;gap:14px;max-width:100%}
+.sig-aipc-view-actions{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.sig-aipc-view-actions>a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.sig-aipc-no-sei{font-size:11px;color:#71808a;flex:1;line-height:1.4}
+.sig-aipc-paper{width:min(100%,210mm);box-sizing:border-box;padding:20mm 17mm;background:#fff;color:#1f2226;border:1px solid #dedede;border-radius:2px;margin:0 auto;box-shadow:0 3px 22px #152c3918;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.sig-aipc-paper-head{padding-bottom:12px;border-bottom:1px solid #dadada;margin-bottom:17px}
+.sig-aipc-paper-government{display:flex;flex-direction:column;gap:3px;font-size:11px;text-align:left}
+.sig-aipc-paper-government strong{font-size:11px;letter-spacing:.02em}
+.sig-aipc-paper-government span{font-size:11px}
+.sig-aipc-paper-meta{font-size:10px;color:#515862;margin-top:9px}
+.sig-aipc-paper h2{text-align:center;font-size:14px;font-weight:800;line-height:1.45;letter-spacing:.01em;margin:14px 0 24px;color:#171a20}
+.sig-aipc-doc-section{margin:0 0 23px;break-inside:auto}
+.sig-aipc-doc-section h3{font-size:12px;letter-spacing:.035em;background:#e9e9e9;border:0;color:#191919;padding:5px 9px;margin:0 0 12px;font-weight:800;break-after:avoid}
+.sig-aipc-doc-field{display:block;margin:5px 0;line-height:1.65;white-space:normal}
+.sig-aipc-doc-field strong{font-weight:800}
+.sig-aipc-doc-field span{white-space:pre-line}
+.sig-aipc-doc-table{width:100%;border-collapse:collapse;table-layout:fixed;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#171a20;line-height:1.45}
+.sig-aipc-doc-table th,.sig-aipc-doc-table td{border:1px solid #555;padding:7px 5px;text-align:center;vertical-align:middle;overflow-wrap:anywhere}
+.sig-aipc-doc-table th{background:#f1f1f1;font-size:9px;font-weight:800}
+.sig-aipc-doc-table th:nth-child(1){width:7%}
+.sig-aipc-doc-table th:nth-child(2){width:8%}
+.sig-aipc-doc-table th:nth-child(3){width:14%}
+.sig-aipc-doc-table th:nth-child(4){width:37%}
+.sig-aipc-doc-table th:nth-child(5){width:16%}
+.sig-aipc-doc-table th:nth-child(6){width:18%}
+.sig-aipc-doc-table td.sig-aipc-desc{text-align:left}
+.sig-aipc-doc-table tr{break-inside:avoid;page-break-inside:avoid}
+.sig-aipc-doc-table thead{display:table-header-group}
+.sig-aipc-doc-empty{font-size:11px;color:#6e7680;font-style:italic;margin:5px 0}
+.sig-aipc-paper-foot{font-size:10px;border-top:1px solid #d7d7d7;padding-top:10px;color:#596069;margin-top:25px}
+@media(max-width:700px){
+ .sig-aipc-paper{padding:20px 15px;font-size:11px}
+ .sig-aipc-doc-table{font-size:9px}
+ .sig-aipc-doc-table th,.sig-aipc-doc-table td{padding:5px 3px}
+ .sig-aipc-view-actions .btn{flex:1;justify-content:center}
+}
+@media print {
+ @page{size:A4 portrait;margin:13mm}
+ body.sig-aipc-printing{background:#fff!important}
+ body.sig-aipc-printing #app,body.sig-aipc-printing #toast-root{display:none!important}
+ body.sig-aipc-printing #modal-root{display:block!important;position:static!important}
+ body.sig-aipc-printing .modal-backdrop{position:static!important;display:block!important;background:#fff!important;padding:0!important;overflow:visible!important}
+ body.sig-aipc-printing .modal{position:static!important;display:block!important;max-height:none!important;max-width:none!important;min-height:0!important;width:100%!important;padding:0!important;margin:0!important;overflow:visible!important;border:0!important;box-shadow:none!important;transform:none!important}
+ body.sig-aipc-printing .modal-header,body.sig-aipc-printing .sig-aipc-view-actions,body.sig-aipc-printing .sig-aipc-document-view>.info-note{display:none!important}
+ body.sig-aipc-printing .sig-aipc-document-view{display:block!important;overflow:visible!important}
+ body.sig-aipc-printing .sig-aipc-paper{width:100%!important;max-width:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important;overflow:visible!important}
+ body.sig-aipc-printing .sig-aipc-doc-section h3{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
