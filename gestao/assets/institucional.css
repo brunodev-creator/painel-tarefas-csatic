@@ -453,3 +453,22 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
  body.sig-aipc-printing .sig-aipc-paper{width:100%!important;max-width:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important;overflow:visible!important}
  body.sig-aipc-printing .sig-aipc-doc-section h3{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+
+/* Consulta detalhada de tarefas, incluindo etapas já encaminhadas */
+.sig-task-detail{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sig-task-detail-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.sig-task-detail-fields>div{background:#f5f6f6;border:1px solid #edf0f0;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:5px}
+.sig-task-detail-fields small{font-size:11px;color:#6d7985}
+.sig-task-detail-fields strong{font-size:12px;color:#2a3c4c;line-height:1.5;overflow-wrap:anywhere}
+.sig-task-detail-current{display:flex;flex-direction:column;gap:6px;border-left:3px solid #7b9479;background:#f3f7f4;padding:12px 14px;border-radius:3px 9px 9px 3px}
+.sig-task-detail-current strong{font-size:13px;color:#304f3b}
+.sig-task-detail-current span{font-size:12px;color:#52695d;line-height:1.45}
+.sig-task-detail section h3{font-size:13px;color:#304358;margin:0 0 9px}
+.sig-task-detail section p{font-size:13px;line-height:1.6;color:#455366;white-space:pre-line;margin:0}
+.sig-task-detail-move{padding:10px 2px;border-bottom:1px solid #e7eced;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.sig-task-detail-move strong{color:#364d65}
+.sig-task-detail-move span{color:#72828d;font-size:11px}
+.sig-task-detail-actions{flex-wrap:wrap;align-items:center}
+.sig-task-doc-missing{font-size:11px;color:#667783;line-height:1.5}
+@media(max-width:700px){.sig-task-detail-fields{grid-template-columns:1fr}.sig-task-detail-move{flex-direction:column;align-items:flex-start}.sig-task-detail-actions .btn{flex:1}}
