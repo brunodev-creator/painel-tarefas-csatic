@@ -4,6 +4,20 @@
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+// Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
+const SIG_ROLE_MENUS=Object.freeze({
+ compras:['notificacoes','tarefas','compras','cotas','processos','assistente'],
+ licitacao:['notificacoes','tarefas','licitacao','cotas','processos','assistente'],
+ sofi:['notificacoes','tarefas','sofi','cotas','processos','assistente'],
+ chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','cotas','processos','assistente'],
+ leitura:['notificacoes','tarefas','processos','assistente']
+});
+function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
+function currentMenus(){return menusForRole(effectiveRole());}
+function canVisitMenu(id){return currentMenus().includes(id);}
+function firstRoleView(){return effectiveRole()==='admin'?'dashboard':'tarefas';}
+// Visões que usam somente as tabelas carregadas na etapa rápida do login.
+const SIG_FAST_VIEWS=['dashboard','tarefas','compras','licitacao','processos'];
 const SECTORS=['Compras','Licitação','SOFI'];
 const STATUSES=['Em andamento','Aguardando providência','Aguardando documentação','Aguardando empenho','Bloqueado','Concluído','Cancelado'];
 const TASK_STATUSES=['Pendente','Em andamento','Aguardando terceiro','Concluída'];
@@ -100,7 +114,7 @@ function previewProfileModal(){
 function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
- previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||'dashboard';
+ previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();
  taskScope='all';receiptScope=role==='chefia'?'all':'sector';filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
@@ -114,6 +128,7 @@ if(cloud()&&session){db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:
 function saveLocal(){if(!cloud())localStorage.setItem(KEYS.data,JSON.stringify(db))}
 function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;return ['admin','chefia'].includes(effectiveRole())||effectiveRole()===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
 function canFinance(){return !cloud()||['admin','chefia','sofi'].includes(effectiveRole())}
+function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao'].includes(effectiveRole())}
 function isAdmin(){return !previewRole&&profile.role==='admin'&&(!cloud()||!!session)}
 function currentAuthId(){return session?.user?.id||'demo-admin'}
 function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[effectiveRole()]||profile.setor||'Compras'}
@@ -135,7 +150,7 @@ function periodNotice(){return cloud()?`<div class="info-note">Dados consultados
 function updateChrome(){
  const personalTaskCount=db.tarefas.filter(t=>t.status!=='Concluída'&&assignedToMe(t)).length;
  const unread=v3Unread();
- document.getElementById('nav').innerHTML=NAV.filter(([v])=>(v!=='usuarios'||isAdmin())&&(v!=='importacoes'||canFinance())&&(v!=='conciliacao'||canFinance())&&(v!=='cotas'||canFinance())&&(v!=='auditoria'||canFinance())&&(v!=='chefia'||['admin','chefia'].includes(effectiveRole()))).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
+ document.getElementById('nav').innerHTML=currentMenus().map(id=>NAV.find(([key])=>key===id)).filter(Boolean).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
  document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';
  const indicator=document.getElementById('sync-indicator');
  indicator.classList.toggle('online',cloud()&&!!session);
@@ -151,7 +166,15 @@ function updateChrome(){
  const bell=document.getElementById('v3-bell');
  if(bell){bell.style.display=session||!cloud()?'inline-flex':'none';const count=document.getElementById('v3-count');count.textContent=unread;count.style.display=unread?'inline-flex':'none'}
 }
-function navigate(v){if(v==='auditoria'&&!canFinance())return showToast('Auditoria financeira restrita aos perfis autorizados.');if(v==='conciliacao'&&!canFinance())return showToast('Conciliação restrita à SOFI e chefia.');if(v==='cotas'&&!canFinance())return showToast('Cotas orçamentárias restritas à SOFI e chefia.');if(v==='importacoes'&&!canFinance())return showToast('Somente SOFI e chefia podem conferir importações.');if(v==='chefia'&&!['admin','chefia'].includes(effectiveRole()))return showToast('Visão gerencial restrita à chefia.');if(v==='usuarios'&&!isAdmin())return showToast('Somente o administrador pode gerenciar usuários.');view=v;filters={q:'',setor:'Todos',status:'Todos'};updateChrome();render();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');window.scrollTo(0,0);if(v==='usuarios'&&cloud())loadAdminUsers().catch(e=>showToast(errMsg(e)))}
+function navigate(v){
+ if(!canVisitMenu(v))return showToast('Este módulo não está disponível para o seu perfil.');
+ view=v;filters={q:'',setor:'Todos',status:'Todos'};
+ updateChrome();render();
+ document.getElementById('sidebar').classList.remove('open');
+ document.getElementById('shade').classList.remove('visible');
+ window.scrollTo(0,0);
+ if(v==='usuarios'&&cloud())loadAdminUsers().catch(e=>showToast(errMsg(e)));
+}
 
 function v3MyNotifications(){if(previewRole)return [];return (db.notificacoes||[]).filter(n=>n.destinatario_auth_id===currentAuthId()).sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em))}
 function v3Unread(){return v3MyNotifications().filter(n=>!n.lida_em).length}
@@ -595,8 +618,8 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
-function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
- if(cloud()&&session&&(!cloudDataReady||(cloudExtraState!=='ready'&&view!=='dashboard'))){
+function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canVisitMenu(view))view=firstRoleView();updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
+ if(cloud()&&session&&(!cloudDataReady||(cloudExtraState!=='ready'&&!SIG_FAST_VIEWS.includes(view)))){
   // Durante o primeiro login, preserve a paisagem e o formulário já visível
   // até confirmar o perfil e os dados principais, evitando troca brusca de tela.
   if(!cloudDataReady&&!cloudLoadError&&content.querySelector('.sig-auth-shell')){
@@ -607,7 +630,7 @@ function render(){updateChrome();const content=document.getElementById('content'
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
- let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canFinance());break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
+ let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
  if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
@@ -732,7 +755,7 @@ async function fetchCloud(options={}){
    profile=identity[0];if(profile.role!=='admin')previewRole=null;
    db=Object.fromEntries(TABLES.map(t=>[t,[]]));
    SIG_FAST_TABLES.forEach((k,i)=>db[k]=mainRows[i]||[]);
-   cloudDataReady=true;cloudExtraState='loading';cloudLoadError='';view='dashboard';render();
+   cloudDataReady=true;cloudExtraState='loading';cloudLoadError='';view=firstRoleView();render();
    void extraReq.then(result=>{
     if(session?.user?.id!==userId)return;
     if(!result.ok){cloudExtraState='error';cloudLoadError=errMsg(result.error);render();showToast('Falha na sincronização complementar. Tente novamente.');return;}
@@ -841,7 +864,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'previewProfiles':previewProfileModal();break;
  case 'setRolePreview':setRolePreview(btn.dataset.role);break;
  case 'exitRolePreview':exitRolePreview();break;
- case 'cotaDetail':if(!canFinance())return showToast('Acesso financeiro restrito.');openModal('Detalhes da dotação','Posição orçamentária importada do SIG V6.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
+ case 'cotaDetail':if(!canViewCota())return showToast('Cota orçamentária indisponível para o seu perfil.');openModal('Detalhes da dotação','Posição orçamentária importada do SIG V6.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
  case 'cotaExport':if(!canFinance())return showToast('Acesso financeiro restrito.');window.SIG_COTAS.exportCSV();break;
  case 'cotaClearFilters':window.SIG_COTAS.clear();break;
  case 'v7Demo':window.SIG_V7.demo();render();break;
