@@ -103,7 +103,7 @@ const SIG_PREVIEW_ROLES=[
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
-let purchaseFilter='all';
+let purchaseFilter='all',purchaseLimit=12;
 const effectiveRole=()=>previewRole||profile.role;
 function canPreviewRole(){return cloud()&&!!session?.user?.id&&cloudDataReady&&cloudExtraState==='ready'&&profile.ativo===true&&profile.role==='admin';}
 function previewProfileModal(){
@@ -116,7 +116,7 @@ function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
  previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();purchaseFilter='all';
- taskScope='all';receiptScope=role==='chefia'?'all':'sector';filters={q:'',setor:'Todos',status:'Todos'};
+ taskScope='all';receiptScope=role==='chefia'?'all':'sector';purchaseLimit=12;filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
 function exitRolePreview(){
@@ -172,7 +172,7 @@ function updateChrome(){
 }
 function navigate(v){
  if(!canVisitMenu(v))return showToast('Este módulo não está disponível para o seu perfil.');
- view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras')purchaseFilter='all';
+ view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras'){purchaseFilter='all';purchaseLimit=12;}
  updateChrome();render();
  document.getElementById('sidebar').classList.remove('open');
  document.getElementById('shade').classList.remove('visible');
@@ -587,14 +587,15 @@ function purchaseView(){
    '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Responsável: <b>'+esc(p.responsavel||'Não definido')+'</b></span><span class="'+(issue?'sig-buy-deadline-urgent':'')+'">'+esc(deadline)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span></div>'+
    '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn primary" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+'</div></div></article>';
  };
- const list=visible.length?visible.map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
+ const list=visible.length?visible.slice(0,purchaseLimit).map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
  const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&t.status!=='Concluída'&&assignedToMe(t)).length;
  const headingHtml='<div class="sig-buy-head"><div><div class="eyebrow">Fluxo de aquisições</div><h1>Central de Compras</h1><p>Encontre rapidamente as demandas que precisam de providência.</p></div><div class="sig-buy-head-actions">'+
   '<button type="button" class="btn" data-view="tarefas">Minhas tarefas'+(taskCount?' · '+taskCount+' no setor':'')+'</button>'+
   (canEdit?'<button type="button" class="btn primary" data-action="newProcess" data-sector="Compras">+ Nova demanda</button>':'')+
   '</div></div>';
  const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+all.length+' processo(s)</span></div>';
- return '<section class="sig-buy-page">'+headingHtml+metrics+top+'<div class="sig-buy-list">'+list+'</div><p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
+ const more=visible.length>purchaseLimit?'<div class="sig-buy-more"><span>Exibindo '+Math.min(visible.length,purchaseLimit)+' de '+visible.length+' processos filtrados</span><button type="button" class="btn" data-action="buyMore">Ver mais processos ↓</button></div>':'';
+ return '<section class="sig-buy-page">'+headingHtml+metrics+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
 }
 function processView(sector){if(sector==='Compras')return purchaseView();
  const all=sector?db.processos.filter(p=>p.setor===sector):db.processos;
@@ -890,7 +891,7 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  const record=normalizeProcess({...old,...d,id:old?.id||uuid(),updated_at:nowIso()});if(type==='task'&&cloud()&&d.responsavel_auth_id!==undefined){const who=db.usuarios.find(u=>u.auth_id===d.responsavel_auth_id);record.responsavel=who?.nome||'Fila da '+d.setor;record.responsavel_auth_id=d.responsavel_auth_id||null;}
  try{busy=true;await persist(oldType,record,!!old);busy=false;
  if(type==='process'&&!cloud())await addEvent(record.id,old?'Alteração de processo':'Abertura de processo',old?`Atualização registrada. Setor: ${old.setor} → ${record.setor}; status: ${old.status} → ${record.status}; responsável: ${old.responsavel} → ${record.responsavel}; próxima ação: ${record.proxima_acao||'não informada'}.`:`Processo cadastrado em ${record.setor} para ${record.responsavel}.`,profile.nome);
- closeModal();if(cloud())await fetchCloud();render();showToast(`${type==='process'?'Processo':type==='task'?'Tarefa':type==='contract'?'Contrato':type==='repasse'?'Repasse':'Empenho'} salvo com sucesso.`);
+ closeModal();if(cloud()&&!((type==='process'||type==='task')&&record.setor==='Compras'))await fetchCloud();render();showToast(`${type==='process'?'Processo':type==='task'?'Tarefa':type==='contract'?'Contrato':type==='repasse'?'Repasse':'Empenho'} salvo com sucesso.`);
  }catch(ex){busy=false;showToast('Não foi possível salvar: '+errMsg(ex))}
 }
 async function signIn({email,password}){if(!cloud()||busy)return;
@@ -941,12 +942,13 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
- if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
- case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;render();break;
+ case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
+ case 'buyMore':purchaseLimit+=12;render();break;
  case 'previewProfiles':previewProfileModal();break;
  case 'setRolePreview':setRolePreview(btn.dataset.role);break;
  case 'exitRolePreview':exitRolePreview();break;
