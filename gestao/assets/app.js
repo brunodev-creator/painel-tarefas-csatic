@@ -782,7 +782,7 @@ async function loadSharedProcesses(){
   if(session?.user?.id!==uid)return;
   sharedProcessRows=Array.isArray(rows)?rows:[];
   sharedProcessHistory=Array.isArray(history)?history:[];
-  sharedLoadError='';if(view==='processos')render();
+  sharedLoadError='';if(view==='processos'||(view==='tarefas'&&!document.querySelector('#modal-root form')))render();
  }catch(e){
   sharedLoadError=errMsg(e);
   if(view==='processos'){render();showToast('Acompanhamento compartilhado indisponível: '+sharedLoadError);}
@@ -840,7 +840,53 @@ function processView(sector){if(sector==='Compras')return purchaseView();
  return heading(sector?'Fluxo setorial':'Acompanhamento',''+title,`${arr.length} registro(s) exibido(s) · processos e responsáveis atualizados pelos usuários.`,actions)+periodNotice()+toolbar+`<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo / Objeto</th><th>Setor / Etapa</th><th>Responsável</th><th>Próxima ação</th><th>Prazo</th><th>Status</th><th></th></tr></thead><tbody>${arr.map(p=>`<tr><td><button class="link-button cell-main" data-action="detail" data-id="${esc(p.id)}">${esc(p.numero)}</button><div class="cell-sub">${esc(p.objeto)}</div></td><td><div class="cell-main">${esc(p.setor)}</div><div class="cell-sub">${esc(p.etapa)}</div></td><td>${esc(p.responsavel||'Não atribuído')}</td><td>${esc(p.proxima_acao||'Não definida')}</td><td><span class="${daysLeft(p.prazo)<0&&activeProcess(p)?'badge-inline':''}">${fmtDate(p.prazo)}</span></td><td>${iconBadge(p.status)}</td><td><button class="btn small" data-action="detail" data-id="${esc(p.id)}">Abrir →</button></td></tr>`).join('')||'<tr><td colspan="7" class="table-empty">Nenhum processo corresponde aos filtros.</td></tr>'}</tbody></table></div></div><div class="filter-summary">Exibindo ${arr.length} de ${all.length} processos.</div>`;
 }
 function taskIsCurrentStage(t){
- return !t.processo_id||db.processos.some(p=>p.id===t.processo_id&&p.setor===t.setor);
+ if(!t?.processo_id)return true;
+ const p=aipcProcess(t.processo_id);
+ return !!p&&p.setor===t.setor;
+}
+function taskProcessSummary(t){return t?.processo_id?aipcProcess(t.processo_id):null}
+function taskIsPriorStage(t){
+ const p=taskProcessSummary(t);
+ return !!p&&p.setor!==t.setor;
+}
+function taskReadDetail(id){
+ const t=db.tarefas.find(x=>x.id===id);
+ if(!t)return showToast('Tarefa não disponível para consulta.');
+ if(profile.role!=='admin'&&t.setor!==setorUsuario()&&!assignedToMe(t))
+  return showToast('Somente militares da seção podem consultar esta tarefa.');
+ const process=taskProcessSummary(t),past=taskIsPriorStage(t),editable=canManageTask(t);
+ const doc=t.processo_id?getAipc(t.processo_id):null;
+ const history=t.processo_id?(cloud()?sharedProcessHistory:db.tramites)
+  .filter(x=>x.processo_id===t.processo_id)
+  .sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em)):[];
+ const warning=past?'<div class="info-note warning-note">Esta tarefa pertence a uma etapa anterior. O processo já está na seção '+
+  esc(process.setor)+'. Você pode consultar os dados e a AIPC, mas não modificar a etapa já encaminhada.</div>':
+  !editable?'<div class="info-note">Consulta disponível. Uma tarefa ativa só pode ser editada pelo responsável ou pela chefia da seção.</div>':'';
+ const fields=[
+  ['Responsável',t.responsavel||'Não atribuído'],['Seção da tarefa',t.setor],
+  ['Situação registrada',t.status],['Prazo',fmtDate(t.prazo)],
+  ['Prioridade',t.prioridade||'—']
+ ].map(([a,b])=>'<div><small>'+esc(a)+'</small><strong>'+esc(b)+'</strong></div>').join('');
+ const current=process?'<div class="sig-task-detail-current"><strong>Processo '+esc(process.numero)+'</strong>'+
+  '<span>Seção atual: '+esc(process.setor)+' · '+esc(process.status)+'</span>'+
+  (process.proxima_acao?'<span>Próxima providência: '+esc(process.proxima_acao)+'</span>':'')+'</div>':
+  t.processo_id?'<div class="info-note">Processo vinculado, aguardando consulta intersetorial.</div>':
+  '<div class="info-note">Tarefa independente, sem processo vinculado.</div>';
+ const movements=history.length?history.map(x=>'<div class="sig-task-detail-move"><strong>'+
+  esc(x.origem)+' → '+esc(x.destino)+'</strong><span>'+esc(x.tipo||'Encaminhamento')+
+  ' · '+new Date(x.criado_em).toLocaleString('pt-BR')+'</span></div>').join(''):
+  '<p class="sub">Ainda não há encaminhamentos registrados.</p>';
+ const actions=(doc?'<button type="button" class="btn primary" data-action="aipcView" data-id="'+esc(t.processo_id)+'">Visualizar AIPC</button>':
+  t.processo_id?'<span class="sig-task-doc-missing">AIPC não cadastrada neste processo.</span>':'')+
+  (process?'<button type="button" class="btn" data-action="sharedDetail" data-id="'+esc(process.id)+'">Acompanhar processo</button>':'')+
+  (editable?'<button type="button" class="btn" data-action="editTask" data-id="'+esc(id)+'">Editar tarefa</button>':'')+
+  '<button type="button" class="btn" data-action="closeModal">Fechar</button>';
+ openModal('Visualizar tarefa',t.titulo,
+  '<div class="sig-task-detail">'+warning+current+
+  '<div class="sig-task-detail-fields">'+fields+'</div>'+
+  '<section><h3>Descrição e providências</h3><p>'+esc(t.descricao||'Não informadas.')+'</p></section>'+
+  '<section><h3>Tramitações do processo</h3>'+movements+'</section>'+
+  '<div class="modal-footer sig-task-detail-actions">'+actions+'</div></div>',true);
 }
 function queueClaimable(t){
  return !!t&&t.status==='Pendente'&&!t.responsavel_auth_id&&taskIsCurrentStage(t);
@@ -1195,7 +1241,7 @@ function tasksView(){
   taskScope==='sector'?t.setor===setor:true);
  const arr=list.filter(t=>filters.setor==='Todos'||t.setor===filters.setor)
   .filter(t=>filters.status==='Todos'||t.status===filters.status)
-  .filter(t=>searchText(t.titulo,t.responsavel,t.descricao,findProcess(t.processo_id)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR')))
+  .filter(t=>searchText(t.titulo,t.responsavel,t.descricao,taskProcessSummary(t)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR')))
   .sort((a,b)=>(!isOpenTask(a))-(!isOpenTask(b))||daysLeft(a.prazo)-daysLeft(b.prazo));
  const actions='<div class="sig-task-tabs">'+[
   ['mine','Minhas tarefas'],['queue','Fila disponível'],['sector','Toda a seção']
@@ -1204,20 +1250,23 @@ function tasksView(){
  const rows=arr.map(t=>{
   const available=t.setor===setor&&queueClaimable(t)&&!previewRole;
   const managed=canManageTask(t);
-  const link=findProcess(t.processo_id);
+  const link=taskProcessSummary(t),past=taskIsPriorStage(t);
   return '<tr><td><strong>'+esc(t.titulo)+'</strong><div class="cell-sub">'+esc(t.descricao||'—')+'</div></td>'+
-   '<td>'+(link?'<button class="link-button" data-action="detail" data-id="'+esc(link.id)+'">'+esc(link.numero)+'</button>':'—')+'</td>'+
+   '<td>'+(link?'<button class="link-button" data-action="sharedDetail" data-id="'+esc(link.id)+'">'+esc(link.numero)+'</button>':
+    t.processo_id?'<span class="cell-sub">Sincronizando…</span>':'—')+'</td>'+
    '<td>'+esc(t.setor)+'</td><td>'+esc(t.responsavel||'Fila da seção')+'</td>'+
    '<td>'+fmtDate(t.prazo)+(isOverdue(t)?'<div class="cell-sub" style="color:#b85243">Atrasada</div>':'')+'</td>'+
-   '<td>'+iconBadge(t.status)+'</td><td><div class="sig-task-actions">'+
+   '<td>'+iconBadge(past?'Encaminhada':t.status)+(past?'<div class="cell-sub">Etapa anterior</div>':'')+
+   '</td><td><div class="sig-task-actions">'+
+    '<button class="btn small" data-action="taskReadDetail" data-id="'+esc(t.id)+'">Ver tarefa</button>'+
     (available?'<button class="btn small primary" data-action="claimTask" data-id="'+esc(t.id)+'">Assumir</button>':'')+
     (managed?'<button class="btn small" data-action="editTask" data-id="'+esc(t.id)+'">Editar</button>':'')+
-    (link&&(canEditAipc()||getAipc(link.id))?
-      '<button class="btn small sig-aipc-action" data-action="'+(canEditAipc()?'aipc':'aipcView')+'" data-id="'+esc(link.id)+'">'+
-       (canEditAipc()?esc(aipcStatusText(link.id)):getAipc(link.id)?'Visualizar AIPC':'AIPC não iniciada')+'</button>':'')+
+    (t.processo_id&&getAipc(t.processo_id)?
+      '<button class="btn small sig-aipc-action" data-action="aipcView" data-id="'+esc(t.processo_id)+'">Visualizar AIPC</button>':
+     t.processo_id&&canEditAipc()?'<button class="btn small sig-aipc-action" data-action="aipc" data-id="'+esc(t.processo_id)+'">Preencher AIPC</button>':'')+
     (managed&&t.processo_id&&link&&link.setor===t.setor?'<button class="btn small" data-action="transfer" data-id="'+esc(t.processo_id)+'" data-task="'+esc(t.id)+'">Encaminhar</button>':'')+
     (managed?'<button class="btn small" data-action="v4FinishTask" data-id="'+esc(t.id)+'">Concluir</button>':'')+
-    (!managed&&!available?'<span class="cell-sub">Acompanhamento</span>':'')+
+    (!managed&&!available?'<span class="cell-sub">'+(past?'Histórico':'Somente consulta')+'</span>':'')+
    '</div></td></tr>';
  }).join('');
  return heading('Execução descentralizada','Tarefas da seção','Cada militar pode criar tarefas próprias, assumir a fila e encaminhar demandas. A chefia distribui e redistribui.',actions)+
@@ -1724,11 +1773,12 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
- if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','taskReadDetail','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'taskReadDetail':taskReadDetail(id);break;
  case 'aipc':if(canEditAipc())aipcForm(id);else aipcVisualizar(id);break;
  case 'aipcView':aipcVisualizar(id);break;
  case 'aipcEdit':if(canEditAipc())aipcForm(id);else showToast('Somente Compras edita a AIPC.');break;
