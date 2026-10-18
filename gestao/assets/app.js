@@ -123,7 +123,30 @@ const SIG_PREVIEW_ROLES=[
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
-let purchaseFilter='all',purchaseLimit=12;
+let purchaseFilter='all',purchaseLimit=12,serviceFilter='Todos';
+let sharedProcessRows=[],sharedProcessHistory=[],sharedLoadError='';
+const PURCHASE_SERVICES=[
+ {id:'Registro de Preço',short:'Registro de Preço',icon:'▣',desc:'Aquisição por ata existente'},
+ {id:'COTEP',short:'COTEP',icon:'▤',desc:'Cotação eletrônica e contratação direta'},
+ {id:'Pregão',short:'Pregão',icon:'⚖',desc:'Aquisição mediante pregão'},
+ {id:'Elaboração de ARP',short:'Elaboração de ARP',icon:'◈',desc:'Planejamento e formação de ata'}
+];
+const SERVICE_FIELDS={
+ 'Registro de Preço':[['numero_ata','Número da ata','text'],['orgao_gerenciador','Órgão gerenciador','text'],['vigencia_ata','Vigência da ata','date'],['saldo_ata','Saldo ou quantitativo','text']],
+ COTEP:[['numero_cotep','Número da COTEP','text'],['data_publicacao','Data da publicação','date'],['prazo_propostas','Fim das propostas','date'],['resultado','Resultado ou situação','text']],
+ 'Pregão':[['numero_pregao','Número do pregão','text'],['data_sessao','Sessão prevista','date'],['fase_certame','Fase atual','text'],['resultado','Resultado','text']],
+ 'Elaboração de ARP':[['numero_planejamento','Identificador do planejamento','text'],['orgao_gerenciador','Órgão gerenciador','text'],['participantes','Participantes','text'],['fase_ata','Fase de elaboração','text']]
+};
+function categoryFromProcess(p){
+ return PURCHASE_SERVICES.some(k=>k.id===p.tipo_servico)?p.tipo_servico:
+ (p.modalidade==='Pregão'?'Pregão':p.modalidade==='COTEP'?'COTEP':
+ /ARP|ata/i.test(p.modalidade||'')?'Registro de Preço':'COTEP');
+}
+function serviceDetailFields(category,values={}){
+ return (SERVICE_FIELDS[category]||[]).map(([key,label,type])=>
+  '<div class="form-row"><label for="fs-'+key+'">'+esc(label)+'</label><input id="fs-'+key+'" name="servico__'+esc(key)+'" type="'+type+'" value="'+esc(values[key]||'')+'"></div>').join('');
+}
+
 let chiefSectorFilter='Todos',chiefTaskFilter='active',chiefMemberFilter='Todos';
 const effectiveRole=()=>previewRole||profile.role;
 function canPreviewRole(){return cloud()&&!!session?.user?.id&&cloudDataReady&&cloudExtraState==='ready'&&profile.ativo===true&&profile.role==='admin';}
@@ -742,6 +765,64 @@ function purchaseView(){
  const more=visible.length>purchaseLimit?'<div class="sig-buy-more"><span>Exibindo '+Math.min(visible.length,purchaseLimit)+' de '+visible.length+' processos filtrados</span><button type="button" class="btn" data-action="buyMore">Ver mais processos ↓</button></div>':'';
  return '<section class="sig-buy-page">'+headingHtml+metrics+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
 }
+async function loadSharedProcesses(){
+ if(!cloud()||!session?.user?.id)return;
+ const uid=session.user.id;
+ try{
+  const [rows,history]=await Promise.all([
+   rest('/rest/v1/rpc/listar_processos_compartilhados','POST',{}),
+   rest('/rest/v1/rpc/historico_processos_compartilhados','POST',{})
+  ]);
+  if(session?.user?.id!==uid)return;
+  sharedProcessRows=Array.isArray(rows)?rows:[];
+  sharedProcessHistory=Array.isArray(history)?history:[];
+  sharedLoadError='';if(view==='processos')render();
+ }catch(e){
+  sharedLoadError=errMsg(e);
+  if(view==='processos'){render();showToast('Acompanhamento compartilhado indisponível: '+sharedLoadError);}
+ }
+}
+function sharedProcessDetail(id){
+ const p=sharedProcessRows.find(x=>x.id===id)||db.processos.find(x=>x.id===id);
+ if(!p)return showToast('Processo compartilhado indisponível.');
+ const hist=(cloud()?sharedProcessHistory:db.tramites).filter(t=>t.processo_id===p.id)
+  .sort((a,b)=>new Date(b.criado_em)-new Date(a.criado_em));
+ const historyHtml=hist.length?hist.map(t=>
+  '<div class="sig-flow-history-row"><strong>'+esc(t.origem)+' → '+esc(t.destino)+'</strong>'+
+  '<span>'+esc(t.tipo||'Encaminhamento')+' · '+new Date(t.criado_em).toLocaleString('pt-BR')+'</span></div>').join(''):
+  '<p class="sub">Ainda não há tramitações registradas para este processo.</p>';
+ const own=db.processos.some(x=>x.id===id);
+ const actions=own?'<button class="btn primary" type="button" data-action="detail" data-id="'+esc(id)+'">Abrir dados da minha seção</button>':'';
+ const html='<div class="sig-flow-shared-detail"><div class="info-note">Acompanhamento compartilhado: tarefas individuais e documentos internos das outras seções não são exibidos.</div>'+
+  '<div class="sig-flow-detail-grid"><div><small>Setor atual</small><strong>'+esc(p.setor)+'</strong></div>'+
+  '<div><small>Situação</small><strong>'+esc(p.status)+'</strong></div>'+
+  '<div><small>Etapa</small><strong>'+esc(p.etapa)+'</strong></div>'+
+  '<div><small>Prazo</small><strong>'+fmtDate(p.prazo)+'</strong></div></div>'+
+  '<div class="sig-flow-next"><small>Próxima providência</small><strong>'+esc(p.proxima_acao||'A definir')+'</strong></div>'+
+  '<h3>Histórico entre as seções</h3>'+historyHtml+
+  '<div class="modal-footer">'+actions+'<button type="button" class="btn" data-action="closeModal">Fechar</button></div></div>';
+ openModal('Processo '+p.numero,p.objeto,html,true);
+}
+function sharedProcessesView(){
+ const records=cloud()?sharedProcessRows:db.processos;
+ const arr=records.filter(p=>filters.setor==='Todos'||p.setor===filters.setor)
+  .filter(p=>filters.status==='Todos'||p.status===filters.status)
+  .filter(p=>searchText(p.numero,p.objeto,p.setor,p.etapa,p.proxima_acao,p.tipo_servico).includes(filters.q.toLocaleLowerCase('pt-BR')))
+  .sort((a,b)=>new Date(b.updated_at||0)-new Date(a.updated_at||0));
+ const toolbar='<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar processo ou objeto..." value="'+esc(filters.q)+'"></label>'+
+  '<select data-filter="setor">'+optionsWithAll(SECTORS,'Todas as seções')+'</select>'+
+  '<select data-filter="status">'+optionsWithAll(STATUSES,'Todas as situações')+'</select></div>';
+ const rows=arr.map(p=>'<tr><td><button class="link-button cell-main" data-action="sharedDetail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><div class="cell-sub">'+esc(p.objeto)+'</div></td>'+
+  '<td>'+esc(p.tipo_servico||p.modalidade||'—')+'</td><td>'+esc(p.setor)+'</td><td>'+esc(p.etapa)+'</td>'+
+  '<td>'+iconBadge(p.status)+'</td><td>'+fmtDate(p.prazo)+'</td><td><button class="btn small" data-action="sharedDetail" data-id="'+esc(p.id)+'">Acompanhar</button></td></tr>').join('');
+ return heading('Acompanhamento intersetorial','Processos de aquisição','Consulta compartilhada entre Compras, Licitação e SOFI. Tarefas internas permanecem restritas.')+
+  (sharedLoadError?'<div class="info-note warning-note">Falha de sincronização: '+esc(sharedLoadError)+'. <button class="btn small" data-action="refreshShared">Tentar novamente</button></div>':'')+
+  '<div class="info-note">Cada processo mantém um único número e seu histórico, mesmo quando é devolvido ou encaminhado entre seções.</div>'+
+  toolbar+'<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo</th><th>Modalidade</th><th>Seção atual</th><th>Etapa</th><th>Situação</th><th>Prazo</th><th></th></tr></thead><tbody>'+
+  (rows||'<tr><td class="table-empty" colspan="7">'+(cloud()&&!sharedLoadError?'Sincronizando acompanhamento compartilhado...':'Nenhum processo encontrado.')+'</td></tr>')+
+  '</tbody></table></div></div>';
+}
+
 function processView(sector){if(sector==='Compras')return purchaseView();
  const all=sector?db.processos.filter(p=>p.setor===sector):db.processos;
  const arr=all.filter(p=>filters.setor==='Todos'||p.setor===filters.setor).filter(p=>filters.status==='Todos'||p.status===filters.status).filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.dotacao,p.proxima_acao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort((a,b)=>(a.status==='Concluído')-(b.status==='Concluído')||daysLeft(a.prazo)-daysLeft(b.prazo));
@@ -842,7 +923,7 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
- let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=processView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
+ let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
  if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
@@ -1018,6 +1099,7 @@ function limitCloudRowsForChief(data,role,sector,userId){
  };
 }
 function onCloudReady(){
+ void loadSharedProcesses();
  lastLoad=nowIso();
  if(v3NotificationsReady&&v3Unread()>v3UnreadSeen)showToast('Você recebeu '+(v3Unread()-v3UnreadSeen)+' novo(s) aviso(s).');
  v3UnreadSeen=v3Unread();v3NotificationsReady=true;render();
@@ -1119,7 +1201,7 @@ async function signIn({email,password}){if(!cloud()||busy)return;
  }catch(e){showToast('Falha no acesso: '+errMsg(e))}
  finally{busy=false;if(button?.isConnected){button.disabled=false;button.innerHTML='Entrar <span class="sig-auth-arrow" aria-hidden="true">→</span>';}}
 }
-async function signOut(){previewRole=null;chat=[];v5Report=null;try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
+async function signOut(){previewRole=null;chat=[];v5Report=null;sharedProcessRows=[];sharedProcessHistory=[];sharedLoadError='';try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
 function saveSettings({url,key}){previewRole=null;url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(cloud()?config:{...config,mode:'demo'}));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
 function assistantAnswer(question){const q=String(question||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const respostaV7=window.SIG_V7.answer(question,canFinance());if(respostaV7)return respostaV7;
@@ -1156,6 +1238,8 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'sharedDetail':sharedProcessDetail(id);break;
+ case 'refreshShared':await loadSharedProcesses();break;
  case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
  case 'buyMore':purchaseLimit+=12;render();break;
  case 'chiefMember':chiefMemberFilter=chiefMemberFilter===btn.dataset.member?'Todos':btn.dataset.member;render();break;
