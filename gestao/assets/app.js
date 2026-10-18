@@ -103,6 +103,7 @@ const SIG_PREVIEW_ROLES=[
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
+let purchaseFilter='all';
 const effectiveRole=()=>previewRole||profile.role;
 function canPreviewRole(){return cloud()&&!!session?.user?.id&&cloudDataReady&&cloudExtraState==='ready'&&profile.ativo===true&&profile.role==='admin';}
 function previewProfileModal(){
@@ -114,7 +115,7 @@ function previewProfileModal(){
 function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
- previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();
+ previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();purchaseFilter='all';
  taskScope='all';receiptScope=role==='chefia'?'all':'sector';filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
@@ -171,7 +172,7 @@ function updateChrome(){
 }
 function navigate(v){
  if(!canVisitMenu(v))return showToast('Este módulo não está disponível para o seu perfil.');
- view=v;filters={q:'',setor:'Todos',status:'Todos'};
+ view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras')purchaseFilter='all';
  updateChrome();render();
  document.getElementById('sidebar').classList.remove('open');
  document.getElementById('shade').classList.remove('visible');
@@ -546,7 +547,56 @@ function dashboardView(){
  <div><div class="card section">${cardTitle('Tarefas prioritárias','Ordenadas por vencimento',`<button class="btn small" data-view="tarefas">Minhas tarefas →</button>`)}${db.tarefas.filter(t=>t.status!=='Concluída').sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo)).slice(0,6).map(t=>`<div class="row-item"><div><div class="item-title">${esc(t.titulo)}</div><div class="item-meta">${esc(t.setor)} · ${esc(t.responsavel)} · ${fmtDate(t.prazo)}</div></div><span class="flag ${isOverdue(t)?'red':'amber'}">${isOverdue(t)?'Atrasada':esc(t.prioridade)}</span></div>`).join('')||empty('Nenhuma tarefa pendente')}</div>
  <div class="card section">${cardTitle('Contratos sob atenção','Cobertura inferior à meta configurada',`<button class="btn small" data-view="contratos">Contratos →</button>`)}${coverage.slice(0,4).map(c=>`<div class="row-item"><div><div class="item-title">${esc(c.numero)}</div><div class="item-meta">${esc(c.objeto)}</div></div><span class="flag amber">${(digits(c.saldo_empenho)/digits(c.custo_mensal)).toLocaleString('pt-BR',{maximumFractionDigits:1})} mês(es)</span></div>`).join('')||empty('Nenhum alerta de cobertura')}</div></div></div>`;
 }
-function processView(sector){
+/* Área de Compras — primeiro ciclo de UX, sem novas tabelas ou APIs. */
+function purchaseIssue(p){
+ const due=daysLeft(p.prazo);
+ return activeProcess(p)&&(p.status==='Bloqueado'||p.status==='Aguardando providência'||due<0);
+}
+function purchaseDueSoon(p){
+ const due=daysLeft(p.prazo);
+ return activeProcess(p)&&Number.isFinite(due)&&due>=0&&due<=7;
+}
+function purchaseSort(a,b){
+ const score=p=>purchaseIssue(p)?0:purchaseDueSoon(p)?1:activeProcess(p)?2:3;
+ const x=score(a)-score(b);if(x!==0)return x;
+ const da=daysLeft(a.prazo),dbb=daysLeft(b.prazo);
+ return da-dbb||String(a.numero).localeCompare(String(b.numero),'pt-BR',{numeric:true});
+}
+function purchaseView(){
+ const all=db.processos.filter(p=>p.setor==='Compras');
+ const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,done:all.filter(p=>p.status==='Concluído').length};
+ const visible=all.filter(p=>purchaseFilter==='attention'?purchaseIssue(p):purchaseFilter==='week'?purchaseDueSoon(p):purchaseFilter==='done'?p.status==='Concluído':true)
+  .filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.proxima_acao,p.referencia_sei,p.dotacao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort(purchaseSort);
+ const tabs=[
+  {id:'all',label:'Todos os processos',help:'Registro completo',value:counts.all,icon:'▤'},
+  {id:'attention',label:'Exigem atenção',help:'Atrasados, bloqueados ou aguardando ação',value:counts.attention,icon:'!'},
+  {id:'week',label:'Próximos 7 dias',help:'Prazos que estão chegando',value:counts.week,icon:'◷'},
+  {id:'done',label:'Concluídos',help:'Histórico finalizado',value:counts.done,icon:'✓'}
+ ];
+ const canEdit=!previewRole&&canWrite('Compras');
+ const metrics='<div class="sig-buy-metrics" aria-label="Filtrar processos de compras">'+tabs.map(t=>
+  '<button type="button" class="sig-buy-metric'+(purchaseFilter===t.id?' active':'')+'" data-action="buyFilter" data-filter="'+t.id+'" aria-pressed="'+String(purchaseFilter===t.id)+'"><span class="sig-buy-metric-top"><span>'+esc(t.label)+'</span><span class="sig-buy-metric-icon" aria-hidden="true">'+t.icon+'</span></span><strong>'+t.value+'</strong><small>'+esc(t.help)+'</small></button>'
+ ).join('')+'</div>';
+ const card=p=>{
+  const due=daysLeft(p.prazo),issue=purchaseIssue(p);
+  const deadline=!p.prazo?'Prazo não definido':due<0?'Atrasado há '+Math.abs(due)+' dia(s)':due===0?'Vence hoje':due<=7?'Vence em '+due+' dia(s)':'Prazo '+fmtDate(p.prazo);
+  const urgency=issue?' urgent':purchaseDueSoon(p)?' near':'';
+  return '<article class="sig-buy-item'+urgency+'">'+
+   '<div class="sig-buy-item-head"><div class="sig-buy-item-heading"><button type="button" class="sig-buy-process-link" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><h3>'+esc(p.objeto||'Objeto não informado')+'</h3></div><div class="sig-buy-tags">'+iconBadge(p.status)+(p.prioridade==='Alta'?'<span class="sig-buy-high">Alta prioridade</span>':'')+'</div></div>'+
+   '<div class="sig-buy-next"><span>Próxima providência</span><strong>'+esc(p.proxima_acao||'Definir a próxima providência')+'</strong></div>'+
+   '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Responsável: <b>'+esc(p.responsavel||'Não definido')+'</b></span><span class="'+(issue?'sig-buy-deadline-urgent':'')+'">'+esc(deadline)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span></div>'+
+   '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn primary" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+'</div></div></article>';
+ };
+ const list=visible.length?visible.map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
+ const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&t.status!=='Concluída').length;
+ const headingHtml='<div class="sig-buy-head"><div><div class="eyebrow">Fluxo de aquisições</div><h1>Central de Compras</h1><p>Encontre rapidamente as demandas que precisam de providência.</p></div><div class="sig-buy-head-actions">'+
+  '<button type="button" class="btn" data-view="tarefas">Minhas tarefas'+(taskCount?' · '+taskCount+' no setor':'')+'</button>'+
+  (canEdit?'<button type="button" class="btn primary" data-action="newProcess" data-sector="Compras">+ Nova demanda</button>':'')+
+  '</div></div>';
+ const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+all.length+' processo(s)</span></div>';
+ return '<section class="sig-buy-page">'+headingHtml+metrics+top+'<div class="sig-buy-list">'+list+'</div><p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
+}
+function processView(sector){if(sector==='Compras')return purchaseView();
  const all=sector?db.processos.filter(p=>p.setor===sector):db.processos;
  const arr=all.filter(p=>filters.setor==='Todos'||p.setor===filters.setor).filter(p=>filters.status==='Todos'||p.status===filters.status).filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.dotacao,p.proxima_acao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort((a,b)=>(a.status==='Concluído')-(b.status==='Concluído')||daysLeft(a.prazo)-daysLeft(b.prazo));
  const title=sector?sector:'Central de processos';const can=canWrite(sector||'Compras')||canWrite('Licitação')||canWrite('SOFI');
@@ -859,11 +909,12 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
- if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','taskScope','receiptScope','chiefSector','cotaDetail','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;render();break;
  case 'previewProfiles':previewProfileModal();break;
  case 'setRolePreview':setRolePreview(btn.dataset.role);break;
  case 'exitRolePreview':exitRolePreview();break;
