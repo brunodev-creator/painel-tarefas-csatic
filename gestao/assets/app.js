@@ -837,14 +837,20 @@ function processView(sector){if(sector==='Compras')return purchaseView();
  const toolbar=`<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar número, objeto, responsável ou dotação..." value="${esc(filters.q)}"></label>${!sector?`<select data-filter="setor" class="field-select">${optionsWithAll(SECTORS)}</select>`:''}<select data-filter="status" class="field-select">${optionsWithAll(STATUSES)}</select></div>`;
  return heading(sector?'Fluxo setorial':'Acompanhamento',''+title,`${arr.length} registro(s) exibido(s) · processos e responsáveis atualizados pelos usuários.`,actions)+periodNotice()+toolbar+`<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo / Objeto</th><th>Setor / Etapa</th><th>Responsável</th><th>Próxima ação</th><th>Prazo</th><th>Status</th><th></th></tr></thead><tbody>${arr.map(p=>`<tr><td><button class="link-button cell-main" data-action="detail" data-id="${esc(p.id)}">${esc(p.numero)}</button><div class="cell-sub">${esc(p.objeto)}</div></td><td><div class="cell-main">${esc(p.setor)}</div><div class="cell-sub">${esc(p.etapa)}</div></td><td>${esc(p.responsavel||'Não atribuído')}</td><td>${esc(p.proxima_acao||'Não definida')}</td><td><span class="${daysLeft(p.prazo)<0&&activeProcess(p)?'badge-inline':''}">${fmtDate(p.prazo)}</span></td><td>${iconBadge(p.status)}</td><td><button class="btn small" data-action="detail" data-id="${esc(p.id)}">Abrir →</button></td></tr>`).join('')||'<tr><td colspan="7" class="table-empty">Nenhum processo corresponde aos filtros.</td></tr>'}</tbody></table></div></div><div class="filter-summary">Exibindo ${arr.length} de ${all.length} processos.</div>`;
 }
+function taskIsCurrentStage(t){
+ return !t.processo_id||db.processos.some(p=>p.id===t.processo_id&&p.setor===t.setor);
+}
+function queueClaimable(t){
+ return !!t&&t.status==='Pendente'&&!t.responsavel_auth_id&&taskIsCurrentStage(t);
+}
 function canManageTask(t){
- if(!t||previewRole||!canWrite(t.setor)||!isOpenTask(t))return false;
+ if(!t||previewRole||!canWrite(t.setor)||!isOpenTask(t)||!taskIsCurrentStage(t))return false;
  return profile.role==='admin'||isSectionChiefRole(profile.role)||assignedToMe(t);
 }
 async function claimQueueTask(id){
  if(previewRole)throw Error('Prévia somente de leitura');
  const t=db.tarefas.find(x=>x.id===id);
- if(!t||t.responsavel_auth_id||t.status!=='Pendente'||!canWrite(t.setor))throw Error('Tarefa indisponível para assumir');
+ if(!queueClaimable(t)||!canWrite(t.setor))throw Error('Tarefa indisponível para assumir');
  busy=true;
  try{
   if(cloud()){
@@ -858,7 +864,7 @@ function tasksView(){
  const setor=setorUsuario();
  const list=db.tarefas.filter(t=>
   taskScope==='mine'?assignedToMe(t):
-  taskScope==='queue'?t.setor===setor&&t.status==='Pendente'&&!t.responsavel_auth_id:
+  taskScope==='queue'?t.setor===setor&&queueClaimable(t):
   taskScope==='sector'?t.setor===setor:true);
  const arr=list.filter(t=>filters.setor==='Todos'||t.setor===filters.setor)
   .filter(t=>filters.status==='Todos'||t.status===filters.status)
@@ -869,7 +875,7 @@ function tasksView(){
  ].map(([key,label])=>'<button type="button" class="btn small'+(taskScope===key?' primary':'')+'" data-action="taskScope" data-scope="'+key+'">'+label+'</button>').join('')+
   (!previewRole&&canWrite(setor)?'<button type="button" class="btn primary" data-action="newTask" data-sector="'+esc(setor)+'">+ Criar tarefa</button>':'')+'</div>';
  const rows=arr.map(t=>{
-  const available=t.setor===setor&&!t.responsavel_auth_id&&t.status==='Pendente'&&!previewRole;
+  const available=t.setor===setor&&queueClaimable(t)&&!previewRole;
   const managed=canManageTask(t);
   const link=findProcess(t.processo_id);
   return '<tr><td><strong>'+esc(t.titulo)+'</strong><div class="cell-sub">'+esc(t.descricao||'—')+'</div></td>'+
