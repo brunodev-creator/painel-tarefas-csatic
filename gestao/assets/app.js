@@ -588,7 +588,7 @@ function purchaseView(){
    '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn primary" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+'</div></div></article>';
  };
  const list=visible.length?visible.map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
- const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&t.status!=='Concluída').length;
+ const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&t.status!=='Concluída'&&assignedToMe(t)).length;
  const headingHtml='<div class="sig-buy-head"><div><div class="eyebrow">Fluxo de aquisições</div><h1>Central de Compras</h1><p>Encontre rapidamente as demandas que precisam de providência.</p></div><div class="sig-buy-head-actions">'+
   '<button type="button" class="btn" data-view="tarefas">Minhas tarefas'+(taskCount?' · '+taskCount+' no setor':'')+'</button>'+
   (canEdit?'<button type="button" class="btn primary" data-action="newProcess" data-sector="Compras">+ Nova demanda</button>':'')+
@@ -693,6 +693,38 @@ function openModal(title,sub,content,large=false){document.getElementById('modal
 function closeModal(){document.getElementById('modal-root').innerHTML=''}
 function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero:'',objeto:'',modalidade:'COTEP',setor:sector||'Compras',etapa:'Triagem da demanda',status:'Em andamento',responsavel:'',prioridade:'Média',data_entrada:today(),prazo:dayOffset(7),valor_estimado:0,valor_homologado:0,dotacao:'',proxima_acao:'',bloqueio_motivo:'',referencia_sei:''};
  if(!canWrite(p.setor))return showToast('Sem permissão de edição neste setor.');
+ if(p.setor==='Compras'){
+  // Cadastro enxuto; todos os campos existentes continuam editáveis em "Mais detalhes".
+  const primary=
+   '<div class="sig-buy-form-lead">Comece pelos dados necessários para identificar e acompanhar a demanda. Outros detalhes podem ser preenchidos agora ou depois.</div>'+
+   '<div class="form-grid">'+
+    inputField('numero','Número / identificador do processo',p.numero,'text','required maxlength="80" placeholder="Ex.: 123/2026"')+
+    selectField('modalidade','Modalidade',['COTEP','Pregão','Dispensa','Inexigibilidade','Adesão ARP','Outro'],p.modalidade)+
+    '<div class="form-row full"><label for="f-objeto">Objeto da aquisição *</label><textarea id="f-objeto" name="objeto" rows="3" required placeholder="Descreva de forma objetiva o que será adquirido">'+esc(p.objeto)+'</textarea></div>'+
+    (id&&cloud()?'<div class="form-row"><label>Responsável atual</label><div class="sig-buy-readonly">'+esc(p.responsavel||'Não atribuído')+'<small>Para alterar o setor ou responsável, use Encaminhar no processo.</small></div></div>':inputField('responsavel','Responsável pela demanda',p.responsavel,'text','required placeholder="Nome ou equipe responsável"'))+
+    inputField('prazo','Prazo da próxima etapa',p.prazo,'date')+
+    '<div class="form-row full"><label for="f-proxima_acao">Próxima providência</label><textarea id="f-proxima_acao" name="proxima_acao" rows="2" placeholder="Qual é a próxima ação para avançar?">'+esc(p.proxima_acao||'')+'</textarea></div>'+
+   '</div>';
+  const secondary=
+   '<details class="sig-buy-extra"><summary>Mais detalhes do processo <span>Etapa, status, prioridade, valores e referências</span></summary>'+
+   '<div class="form-grid">'+
+    (id&&cloud()?'<div class="form-row"><label>Setor responsável</label><div class="sig-buy-readonly">'+esc(p.setor)+'</div></div>':'<input type="hidden" name="setor" value="Compras">')+
+    inputField('etapa','Etapa atual',p.etapa,'text','required')+
+    selectField('status','Situação',STATUSES,p.status)+
+    selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)+
+    inputField('data_entrada','Data de entrada',p.data_entrada,'date')+
+    inputField('valor_estimado','Valor estimado (R$)',p.valor_estimado,'number','step="0.01" min="0"')+
+    inputField('valor_homologado','Valor homologado (R$)',p.valor_homologado,'number','step="0.01" min="0"')+
+    inputField('dotacao','Dotação orçamentária',p.dotacao)+
+    inputField('referencia_sei','Referência / link SEI',p.referencia_sei)+
+    textareaField('bloqueio_motivo','Motivo do impedimento (se houver)',p.bloqueio_motivo)+
+   '</div></details>';
+  const html='<form class="sig-buy-process-form" data-form="process" data-id="'+esc(id||'')+'">'+primary+secondary+
+    '<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">'+(id?'Salvar atualizações':'Cadastrar demanda')+'</button></div></form>';
+  openModal(id?'Atualizar demanda de Compras':'Nova demanda de Compras',
+   id?'Atualize a próxima providência e o prazo sem perder o histórico.':'Cadastro rápido para iniciar o acompanhamento.',html,true);
+  return;
+ }
  const html=`<form data-form="process" data-id="${esc(id||'')}"><div class="form-grid">${inputField('numero','Número do processo',p.numero,'text','required maxlength="80"')}${id&&cloud()?`<div class="form-row"><label>Setor responsável</label><div class="info-note">${esc(p.setor)} · use Encaminhar para transferir</div></div>`:selectField('setor','Setor responsável',SECTORS,p.setor)}${textareaField('objeto','Objeto da aquisição',p.objeto)}${selectField('modalidade','Modalidade',['COTEP','Pregão','Dispensa','Inexigibilidade','Adesão ARP','Outro'],p.modalidade)}${inputField('etapa','Etapa atual',p.etapa,'text','required')}${selectField('status','Situação',STATUSES,p.status)}${id&&cloud()?`<div class="form-row"><label>Responsável</label><div class="info-note">${esc(p.responsavel)} · use Encaminhar para redistribuir</div></div>`:inputField('responsavel','Responsável / equipe',p.responsavel,'text','required')}${selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)}${inputField('data_entrada','Data de entrada',p.data_entrada,'date')}${inputField('prazo','Prazo da etapa',p.prazo,'date')}${inputField('valor_estimado','Valor estimado (R$)',p.valor_estimado,'number','step="0.01" min="0"')}${inputField('valor_homologado','Valor homologado (R$)',p.valor_homologado,'number','step="0.01" min="0"')}${inputField('dotacao','Dotação',p.dotacao)}${inputField('referencia_sei','Referência / link SEI',p.referencia_sei)}${textareaField('proxima_acao','Próxima providência',p.proxima_acao)}${textareaField('bloqueio_motivo','Motivo do impedimento (se houver)',p.bloqueio_motivo)}</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">${id?'Salvar alterações':'Cadastrar processo'}</button></div></form>`;
  openModal(id?'Editar processo':'Cadastrar novo processo','Cada processo tem um responsável, situação e próxima providência.',html,true);
 }
