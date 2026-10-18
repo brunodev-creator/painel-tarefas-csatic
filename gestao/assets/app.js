@@ -781,7 +781,7 @@ function recebimentosView(){
 }
 function usuariosView(){if(!isAdmin())return heading('Acesso','Não autorizado','Somente administradores podem gerenciar usuários.');
  if(!cloud())return heading('Controle de acesso','Gestão de usuários','Na demonstração, as contas são apenas fictícias.')+`<div class="info-note">Conecte-se ao banco compartilhado para enviar convites e habilitar usuários.</div>`;
- return heading('Administração','Gestão de usuários','Convide usuários, escolha seus setores e controle permissões. Nenhuma senha é visível ao administrador.',`<button class="btn" data-action="reloadUsers">↻ Atualizar</button><button class="btn primary" data-action="inviteUser">+ Convidar usuário</button>`)+`<div class="info-note warning-note">Convites dependem do serviço de e-mail do Supabase e da configuração de URLs de redirecionamento. No plano gratuito existem limites de envio.</div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Nome / E-mail</th><th>Perfil</th><th>Setor</th><th>Acesso</th><th>Último login</th><th></th></tr></thead><tbody>${!adminLoaded?'<tr><td colspan="6" class="table-empty">Carregando usuários…</td></tr>':adminUsers.map(u=>`<tr><td><div class="cell-main">${esc(u.nome)}</div><div class="cell-sub">${esc(u.email)}</div></td><td>${esc(u.role)}</td><td>${esc(u.setor||'—')}</td><td>${iconBadge(u.ativo?'Ativo':'Inativo')}</td><td>${u.ultimo_acesso?new Date(u.ultimo_acesso).toLocaleString('pt-BR'):'Nunca'}</td><td>${u.role!=='admin'?`<button class="btn small" data-action="editUser" data-id="${esc(u.auth_id)}">Gerenciar</button>`:'<span class="cell-sub">Administrador</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="table-empty">Nenhum perfil encontrado.</td></tr>'}</tbody></table></div></div>`;
+ return heading('Administração','Gestão de usuários','Convide usuários, escolha seus setores e controle permissões. Nenhuma senha é visível ao administrador.',`<button class="btn" data-action="reloadUsers">↻ Atualizar</button><button class="btn primary" data-action="inviteUser">+ Convidar usuário</button>`)+`<div class="info-note warning-note">Convites dependem do serviço de e-mail do Supabase e da configuração de URLs de redirecionamento. No plano gratuito existem limites de envio.</div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Nome / E-mail</th><th>Perfil</th><th>Setor</th><th>Acesso</th><th>Último login</th><th></th></tr></thead><tbody>${!adminLoaded?'<tr><td colspan="6" class="table-empty">Carregando usuários…</td></tr>':adminUsers.map(u=>`<tr><td><div class="cell-main">${esc(u.nome)}</div><div class="cell-sub">${esc(u.email)}</div></td><td>${esc(labelRole(u.role))}</td><td>${esc(u.setor||'—')}</td><td>${iconBadge(u.ativo?'Ativo':'Inativo')}</td><td>${u.ultimo_acesso?new Date(u.ultimo_acesso).toLocaleString('pt-BR'):'Nunca'}</td><td>${u.role!=='admin'?`<button class="btn small" data-action="editUser" data-id="${esc(u.auth_id)}">Gerenciar</button>`:'<span class="cell-sub">Administrador</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="table-empty">Nenhum perfil encontrado.</td></tr>'}</tbody></table></div></div>`;
 }
 function setorOptionsUsers(sector,selected){return `<option value="">Fila do setor (não atribuído)</option>`+userCandidates(sector).map(u=>`<option value="${esc(u.auth_id)}" ${u.auth_id===selected?'selected':''}>${esc(u.nome)} · ${esc(u.role)}</option>`).join('')}
 function transferForm(id){const p=findProcess(id);if(!p||!canWrite(p.setor)||!activeProcess(p))return showToast('Processo indisponível para encaminhamento.');
@@ -789,10 +789,20 @@ function transferForm(id){const p=findProcess(id);if(!p||!canWrite(p.setor)||!ac
  const html=`<div class="info-note"><strong>${esc(p.numero)}</strong> · origem: ${esc(p.setor)} · último responsável: ${esc(p.responsavel)}</div><form data-form="transfer" data-id="${esc(id)}"><div class="form-grid">${selectField('destino','Setor de destino',SECTORS,dest)}<div class="form-row"><label for="f-destinatario_auth_id">Destinatário autorizado</label><select name="destinatario_auth_id" id="f-destinatario_auth_id">${setorOptionsUsers(dest,'')}</select></div>${selectField('status','Situação ao receber',['Aguardando providência','Aguardando documentação','Aguardando empenho','Em andamento','Bloqueado'],dest==='SOFI'?'Aguardando empenho':'Aguardando providência')}${inputField('prazo','Prazo da próxima ação',dayOffset(3),'date')}${textareaField('motivo','Motivo do encaminhamento (obrigatório)','')}${textareaField('proxima_acao','Próxima providência do destino','')}</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Confirmar encaminhamento</button></div></form>`;
  openModal('Encaminhar processo',`${p.numero} · a transferência ficará registrada na linha do tempo.`,html,true);
 }
-function userForm(id){if(!isAdmin()||!cloud())return showToast('É necessário ser administrador conectado.');
+function userForm(id){
+ if(!isAdmin()||!cloud())return showToast('É necessário ser administrador conectado.');
  const u=adminUsers.find(x=>x.auth_id===id),existing=!!u;
- const html=`<form data-form="${existing?'updateUser':'inviteUser'}" data-id="${esc(id||'')}"><div class="form-grid">${inputField('nome','Nome completo',u?.nome||'','text','required minlength="3" maxlength="100"')}${inputField('email','E-mail',u?.email||'','email',existing?'disabled':'required')}${selectField('role','Perfil',['compras','licitacao','sofi','chefia','leitura'],u?.role||'compras')}${selectField('setor','Setor',['Compras','Licitação','SOFI'],u?.setor||'Compras')}${existing?`<div class="form-row"><label for="f-ativo">Situação de acesso</label><select name="ativo" id="f-ativo"><option value="true" ${u.ativo?'selected':''}>Ativo</option><option value="false" ${!u.ativo?'selected':''}>Desativado</option></select></div>`:''}</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">${existing?'Salvar permissões':'Enviar convite'}</button></div></form>`;
+ const roleChoices=SIG_ROLE_CHOICES.map(([key,label])=>'<option value="'+esc(key)+'"'+(key===(u?.role||'compras')?' selected':'')+'>'+esc(label)+'</option>').join('');
+ const roleField='<div class="form-row"><label for="f-role">Perfil de acesso</label><select id="f-role" name="role">'+roleChoices+'</select><small class="helper">Os perfis de chefia setorial ficam limitados ao respectivo setor.</small></div>';
+ const html='<form data-form="'+(existing?'updateUser':'inviteUser')+'" data-id="'+esc(id||'')+'"><div class="form-grid">'+
+  inputField('nome','Nome completo',u?.nome||'','text','required minlength="3" maxlength="100"')+
+  inputField('email','E-mail',u?.email||'','email',existing?'disabled':'required')+
+  roleField+selectField('setor','Setor',['Compras','Licitação','SOFI'],u?.setor||'Compras')+
+  '<input id="sig-fixed-sector" type="hidden" value="">'+
+  (existing?'<div class="form-row"><label for="f-ativo">Situação de acesso</label><select name="ativo" id="f-ativo"><option value="true"'+(u.ativo?' selected':'')+'>Ativo</option><option value="false"'+(!u.ativo?' selected':'')+'>Desativado</option></select></div>':'')+
+  '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">'+(existing?'Salvar permissões':'Enviar convite')+'</button></div></form>';
  openModal(existing?'Gerenciar usuário':'Convidar usuário',existing?'Alteração auditada pelo backend.':'O usuário recebe convite do Supabase para definir o acesso.',html,true);
+ syncUserRoleSetor();
 }
 async function adminApi(acao,payload={}){if(!cloud()||!session||!isAdmin())throw Error('Acesso administrativo não autorizado');
  const r=await rest('/functions/v1/gerenciar-usuarios','POST',{acao,...payload});if(r?.erro)throw Error(r.erro);return r;
@@ -814,6 +824,9 @@ async function submitTransfer(form){const d=gather(form),p=findProcess(form.data
  }catch(e){busy=false;showToast('Encaminhamento não realizado: '+errMsg(e))}
 }
 async function submitUser(form){const d=gather(form),existing=form.dataset.form==='updateUser';
+ const fixed=SIG_CHIEF_SECTIONS[d.role]||({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[d.role]||null;
+ if(fixed&&d.setor!==fixed)return showToast('O perfil selecionado deve pertencer ao setor '+fixed+'.');
+ if(!SIG_ROLE_CHOICES.some(([key])=>key===d.role))return showToast('Selecione um perfil válido.');
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
@@ -1169,6 +1182,9 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
    }else if(field==='status'&&['active','late','done','all'].includes(value))chiefTaskFilter=value;
    else if(field==='member'&&(value==='Todos'||chiefTeam(chiefScope()).some(u=>u.auth_id===value)))chiefMemberFilter=value;
    render();return;
+  }
+  if(e.target.id==='f-role'&&e.target.closest('form[data-form="inviteUser"],form[data-form="updateUser"]')){
+   syncUserRoleSetor();return;
   }
   if(e.target.id==='f-task-sector'&&e.target.closest('form[data-form="task"]')){
    const newSector=e.target.value;
