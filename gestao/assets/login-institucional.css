@@ -1,0 +1,104 @@
+/* Tela de acesso do SIG CSA-TIC, inspirada na composição visual aprovada.
+   Escopo deliberadamente restrito: somente quando body.sig-auth-mode. */
+body.sig-auth-mode { margin:0; overflow-x:hidden; background:#0d2a49; }
+body.sig-auth-mode .sidebar,
+body.sig-auth-mode .topbar,
+body.sig-auth-mode .demo-banner,
+body.sig-auth-mode .mobile-shade { display:none!important; }
+body.sig-auth-mode .main-shell { margin-left:0; width:100%; min-height:100vh; min-height:100dvh; background:transparent; }
+body.sig-auth-mode .content { max-width:none; width:100%; margin:0; padding:0!important; min-height:100vh; min-height:100dvh; }
+body.sig-auth-mode #modal-root { z-index:120; }
+.sig-auth-shell { width:100%; min-height:100vh; min-height:100dvh; display:grid; grid-template-columns:56.7% 43.3%; background:#0b2e50; overflow:hidden; isolation:isolate; font-family:'DM Sans',system-ui,Arial,sans-serif; }
+.sig-auth-landscape { position:relative; min-height:100vh; min-height:100dvh; background:
+ linear-gradient(90deg,rgba(9,17,29,.02) 60%,rgba(9,31,53,.18) 96%,rgba(8,29,50,.52) 100%),
+ url('./login-paisagem.svg?v=20261017-login-1') center center / cover no-repeat,
+ linear-gradient(180deg,#5e88b2 0%,#f3bd7a 34%,#f1af63 58%,#302a2b 100%); }
+.sig-auth-landscape:after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg,transparent 70%,rgba(7,18,30,.28) 100%); }
+.sig-auth-topography { position:absolute; left:-30px;bottom:-55px;width:350px;height:160px;border:1px solid rgba(222,185,98,.46);border-radius:35% 58% 0 0 / 45% 75% 0 0;transform:rotate(7deg);opacity:.48;box-shadow:0 0 0 20px rgba(229,202,144,.015),0 0 0 42px rgba(229,202,144,.028); }
+.sig-auth-blue { position:relative; min-width:0; display:flex; align-items:center;justify-content:center; padding:44px clamp(16px,3vw,42px);
+ background:
+ radial-gradient(circle at 91% 85%,rgba(206,164,98,.19) 0,transparent 45%),
+ radial-gradient(circle at 5% 4%,rgba(81,135,171,.27) 0,transparent 52%),
+ linear-gradient(135deg,#0e365a 0%,#143e64 35%,#12385e 53%,#0c2849 100%); }
+.sig-auth-blue:before { content:""; position:absolute;inset:0;opacity:.34;pointer-events:none;
+ background:repeating-radial-gradient(ellipse at 95% 106%,transparent 0 18px,rgba(221,213,194,.23) 19px 20px,transparent 21px 35px);
+ mask-image:linear-gradient(180deg,transparent 30%,black 85%); }
+.sig-auth-blue:after { content:"";position:absolute;z-index:0;left:-85px;bottom:-120px;width:550px;height:470px;opacity:.3;border:1px solid rgba(237,213,166,.5);border-radius:48% 50% 60% 38%;transform:rotate(-25deg);pointer-events:none; }
+.sig-auth-mark {position:absolute;pointer-events:none;right:-165px;top:90px;width:420px;height:390px;border:58px solid rgba(229,233,235,.12);border-left-color:transparent;border-bottom-color:transparent;border-radius:50%;transform:rotate(-20deg);}
+.sig-auth-card { width:min(555px,100%); position:relative; z-index:1; padding:39px clamp(28px,2.7vw,48px) 25px;
+ background:linear-gradient(145deg,rgba(250,250,248,.89),rgba(250,249,247,.74) 43%,rgba(243,241,239,.84));
+ border:2px solid #e6cb7a;border-radius:27px;
+ box-shadow:0 18px 68px rgba(0,16,35,.34),inset 0 0 0 1px rgba(255,255,255,.68);
+ backdrop-filter:blur(13px); -webkit-backdrop-filter:blur(13px);
+ color:#111d32; overflow:visible; }
+.sig-auth-crest { display:block; width:clamp(130px,10.3vw,192px); height:auto; max-height:236px; object-fit:contain; margin:0 auto 21px; filter:drop-shadow(0 7px 5px rgba(0,0,0,.08)); }
+.sig-auth-title {font-family:Manrope,Arial,sans-serif; font-size:clamp(25px,2.65vw,39px);font-weight:900;letter-spacing:-.95px;line-height:1.2;text-align:center;color:#0c204c;margin:0 0 8px;}
+.sig-auth-eyebrow {font:700 clamp(11px,1vw,15px)/1.6 Manrope,Arial,sans-serif;letter-spacing:clamp(3px,.54vw,9px);text-align:center;text-transform:uppercase;color:#0b224c;margin:0;}
+.sig-auth-gold-rule {width:74px;height:3px;background:#be9653;border-radius:10px;margin:22px auto 22px;}
+.sig-auth-form {display:block; margin:0!important;}
+.sig-auth-form .form-grid {display:grid;grid-template-columns:minmax(0,1fr);gap:13px;}
+.sig-auth-form .form-row {margin:0;}
+.sig-auth-form .form-row label {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+.sig-auth-field { position:relative!important; display:block!important; min-height:55px; }
+.sig-auth-field-icon {position:absolute;z-index:2;left:17px;top:50%;transform:translateY(-50%);width:22px;height:22px;display:flex;color:#3f454a;pointer-events:none;}
+.sig-auth-field-icon svg {width:22px;height:22px;}
+.sig-auth-form .sig-auth-field input {width:100%;height:56px;border:1px solid rgba(255,255,255,.97);border-radius:12px; background:rgba(255,255,255,.71);padding:0 15px 0 61px;font:500 16px/1 'DM Sans',Arial,sans-serif;color:#152540;outline:none;box-shadow:0 4px 18px rgba(22,38,65,.055);}
+.sig-auth-form .sig-auth-field input:focus {border-color:#c29a4b;box-shadow:0 0 0 3px rgba(201,161,81,.23),0 4px 18px rgba(22,38,65,.07);}
+.sig-auth-form .sig-auth-field input::placeholder {color:#686f77;opacity:1;}
+.sig-auth-form .sig-auth-field-pass input {padding-right:56px;}
+.sig-auth-eye {position:absolute;z-index:3;right:16px;top:50%;transform:translateY(-50%);border:0;background:transparent;padding:5px;width:32px;height:32px;color:#49505a;display:grid;place-items:center;}
+.sig-auth-eye svg {width:23px;height:23px;}
+.sig-auth-options {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:19px 0 16px;}
+.sig-auth-remember {font-size:14px;font-weight:500;color:#111d31;display:flex;align-items:center;gap:9px;cursor:pointer;}
+.sig-auth-remember input {width:19px;height:19px;accent-color:#162770;cursor:pointer;}
+.sig-auth-forgot {font-size:14px;font-weight:600;color:#11245c;padding:0;border:0;border-bottom:1px solid currentColor;background:transparent;white-space:nowrap;}
+.sig-auth-forgot:hover {color:#294ca3;}
+.sig-auth-submit-wrap {display:flex!important;margin:10px 0 0!important;width:100%;justify-content:stretch!important;}
+.sig-auth-submit-wrap button[data-action="settings"] {display:none!important;}
+.sig-auth-submit-wrap .sig-auth-submit {position:relative;display:flex;align-items:center;justify-content:center;gap:26px;width:100%;border-radius:13px;padding:13px 20px;min-height:62px;background:linear-gradient(120deg,#1c328d 0%,#0e2453 95%);border:2px solid #d9ac53;box-shadow:0 11px 19px rgba(24,44,94,.23);color:white;font:800 24px Manrope,Arial,sans-serif;letter-spacing:.15px;transition:filter .15s,transform .15s;}
+.sig-auth-submit:hover {filter:brightness(1.08);transform:translateY(-1px);}
+.sig-auth-submit:active {transform:translateY(0);}
+.sig-auth-arrow {font-size:26px;font-weight:400;line-height:1;}
+.sig-auth-recovery:not([hidden]) {margin-top:22px;border-top:1px solid rgba(65,67,81,.17);padding:17px 0 3px;}
+.sig-auth-recovery h2 {font-size:15px;color:#12204b;font-weight:800;letter-spacing:0;}
+.sig-auth-recovery p {margin:8px 0 14px;font-size:12px;color:#4f5d6b;line-height:1.5;}
+.sig-auth-recovery .form-grid {display:block;}
+.sig-auth-recovery .form-row {margin-bottom:10px;}
+.sig-auth-recovery .form-row label {display:block;font-size:12px;margin:0 0 6px;font-weight:700;color:#3b4660;}
+.sig-auth-recovery input {background:#fff;border-radius:9px;border:1px solid #c8cdd5;height:41px;font-size:14px;padding:0 11px;width:100%;}
+.sig-auth-recovery .modal-footer {display:flex;justify-content:flex-start;margin:8px 0 0;}
+.sig-auth-recovery .btn {color:#123468;border:1px solid #c9b477;background:#fff;white-space:normal;}
+.sig-auth-foot {margin-top:26px;display:flex;align-items:center;flex-direction:column;gap:11px;border-top:1px solid rgba(103,109,105,.14);padding-top:5px;color:#b89956;}
+.sig-auth-foot svg {width:98px;height:26px;}
+.sig-auth-foot span {font:700 clamp(9px,.8vw,11px)/1.5 Manrope,Arial,sans-serif;color:#293e61;letter-spacing:clamp(1.5px,.23vw,3px);text-align:center;}
+.sig-auth-settings {display:block;margin:11px auto 0;font-size:11px;color:#4f6487;background:transparent;border:0;opacity:.76;text-decoration:underline;text-underline-offset:2px;}
+.sig-auth-settings:hover {opacity:1;}
+.sig-auth-card:focus-within {outline:none;}
+@media(max-width:1170px){
+ .sig-auth-shell {grid-template-columns:45% 55%;}
+ .sig-auth-blue {padding:30px 19px;}
+ .sig-auth-card {padding:30px 28px 20px;}
+ .sig-auth-crest {width:142px;max-height:165px;margin-bottom:15px;}
+ .sig-auth-gold-rule{margin:15px auto;}
+ .sig-auth-foot {margin-top:18px;}
+}
+@media(max-width:750px){
+ .sig-auth-shell {display:flex;flex-direction:column;overflow:visible;min-height:100dvh;}
+ .sig-auth-landscape {min-height:35vh;max-height:37vh;flex:0 0 35vh;background-position:center 42%;}
+ .sig-auth-blue {min-height:65vh;display:block;padding:0 14px 32px;}
+ .sig-auth-blue:before {opacity:.2;}
+ .sig-auth-mark {right:-90px;top:20px;width:230px;height:230px;border-width:34px;}
+ .sig-auth-card {width:min(520px,100%);margin:-65px auto 0;border-radius:22px;padding:21px 21px 19px;}
+ .sig-auth-crest {width:113px;max-height:129px;margin-bottom:13px;}
+ .sig-auth-title {font-size:27px;}
+ .sig-auth-eyebrow{font-size:11px;letter-spacing:4px;}
+ .sig-auth-gold-rule {margin:13px auto 17px;}
+ .sig-auth-form .sig-auth-field input {height:53px;font-size:15px;}
+ .sig-auth-options {margin:15px 0 12px;}
+ .sig-auth-forgot,.sig-auth-remember {font-size:13px;}
+ .sig-auth-submit-wrap .sig-auth-submit {min-height:56px;font-size:21px;}
+ .sig-auth-foot {margin-top:19px;}
+ .sig-auth-foot span {letter-spacing:1.4px;font-size:9px;}
+}
+@media(max-width:380px){.sig-auth-options{gap:7px}.sig-auth-forgot,.sig-auth-remember{font-size:11.5px}.sig-auth-card{padding:18px 14px}.sig-auth-crest{width:97px}.sig-auth-title{font-size:24px}}
+@media(prefers-reduced-motion:reduce){.sig-auth-submit{transition:none}}
