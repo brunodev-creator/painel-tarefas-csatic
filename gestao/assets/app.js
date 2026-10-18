@@ -564,6 +564,13 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
 }
 function render(){updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
  if(cloud()&&session&&(!cloudDataReady||(cloudExtraState!=='ready'&&view!=='dashboard'))){
+  // Durante o primeiro login, preserve a paisagem e o formulário já visível
+  // até confirmar o perfil e os dados principais, evitando troca brusca de tela.
+  if(!cloudDataReady&&!cloudLoadError&&content.querySelector('.sig-auth-shell')){
+   const btn=content.querySelector('form[data-form="login"] button[type="submit"]');
+   if(btn){btn.disabled=true;btn.textContent='Preparando o painel…';}
+   return;
+  }
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
