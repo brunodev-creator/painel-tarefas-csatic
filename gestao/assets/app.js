@@ -15,7 +15,7 @@ const SIG_ROLE_MENUS=Object.freeze({
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
 function currentMenus(){return menusForRole(effectiveRole());}
 function canVisitMenu(id){return currentMenus().includes(id);}
-function firstRoleView(){return effectiveRole()==='admin'?'dashboard':'tarefas';}
+function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':role==='compras'?'compras':'tarefas';}
 // Visões que usam somente as tabelas carregadas na etapa rápida do login.
 const SIG_FAST_VIEWS=['dashboard','tarefas','compras','licitacao','processos'];
 const SECTORS=['Compras','Licitação','SOFI'];
