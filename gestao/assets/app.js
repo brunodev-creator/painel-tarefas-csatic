@@ -104,6 +104,7 @@ const SIG_PREVIEW_ROLES=[
 ];
 let previewRole=null;
 let purchaseFilter='all',purchaseLimit=12;
+let chiefSectorFilter='Todos',chiefTaskFilter='active',chiefMemberFilter='Todos';
 const effectiveRole=()=>previewRole||profile.role;
 function canPreviewRole(){return cloud()&&!!session?.user?.id&&cloudDataReady&&cloudExtraState==='ready'&&profile.ativo===true&&profile.role==='admin';}
 function previewProfileModal(){
@@ -115,7 +116,7 @@ function previewProfileModal(){
 function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
- previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();purchaseFilter='all';
+ previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();purchaseFilter='all';chiefSectorFilter=role==='chefia'?(SECTORS.includes(profile.setor)?profile.setor:'Compras'):'Todos';chiefTaskFilter='active';chiefMemberFilter='Todos';
  taskScope='all';receiptScope=role==='chefia'?'all':'sector';purchaseLimit=12;filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
@@ -127,14 +128,14 @@ function exitRolePreview(){
 let cloudDataReady=false,cloudExtraState='idle',cloudLoadError='';
 if(cloud()&&session){db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Verificando acesso',role:'leitura',setor:'',ativo:false};}
 function saveLocal(){if(!cloud())localStorage.setItem(KEYS.data,JSON.stringify(db))}
-function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;return ['admin','chefia'].includes(effectiveRole())||effectiveRole()===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
+function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;const role=effectiveRole();return role==='admin'||(role==='chefia'&&profile.setor===sector)||role===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
 function canFinance(){return !cloud()||['admin','chefia','sofi'].includes(effectiveRole())}
 function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao'].includes(effectiveRole())}
 function isAdmin(){return !previewRole&&profile.role==='admin'&&(!cloud()||!!session)}
 function currentAuthId(){return session?.user?.id||'demo-admin'}
 function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[effectiveRole()]||profile.setor||'Compras'}
 function assignedToMe(t){if(previewRole){const sector=({'compras':'Compras','licitacao':'Licitação','sofi':'SOFI'})[previewRole];return !!sector&&t.setor===sector;}return !!(t.responsavel_auth_id&&t.responsavel_auth_id===currentAuthId())||(!t.responsavel_auth_id&&String(t.responsavel).toLowerCase()===String(profile.nome).toLowerCase())}
-function userCandidates(setor){return db.usuarios.filter(u=>u.ativo&&(u.role==='admin'||u.role==='chefia'||({Compras:'compras','Licitação':'licitacao',SOFI:'sofi'}[setor]===u.role)))}
+function userCandidates(setor){return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&u.setor===setor&&['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[setor]].includes(u.role))}
 function iconBadge(status){const s=String(status||'');const cls=/Bloqueado|Vencido|Atrasad|Cancelad/.test(s)?'red':/Aguardando|Pendente|Baixa cobertura|Próximo vencimento/.test(s)?'amber':/Conclu|Vigente|Ativo/.test(s)?'teal':/andamento|prepara/i.test(s)?'blue':'gray';return `<span class="flag ${cls}">${esc(s)}</span>`}
 function showToast(msg){const root=document.getElementById('toast-root');root.innerHTML=`<div class="toast">${esc(msg)}</div>`;setTimeout(()=>root.querySelector('.toast')?.remove(),3500)}
 function errMsg(err){return err?.message||'Ocorreu um erro inesperado.'}
@@ -205,15 +206,128 @@ function v3AlertView(){
  html+=alerts.map(x=>'<tr><td><button class="link-button cell-main" data-action="detail" data-id="'+esc(x.p.id)+'">'+esc(x.p.numero)+'</button><div class="cell-sub">'+esc(x.p.objeto)+'</div></td><td>'+esc(x.p.setor)+'</td><td>'+esc(x.p.responsavel||'Não definido')+'</td><td>'+x.motivos.map(m=>'<span class="v3-chip">'+esc(m)+'</span>').join(' ')+'</td><td>'+v3LastMovement(x.p).toLocaleString('pt-BR')+'</td><td>'+fmtDate(x.p.prazo)+'</td><td><button class="btn small" data-action="detail" data-id="'+esc(x.p.id)+'">Ver processo</button></td></tr>').join('')||'<tr><td colspan="7" class="table-empty">Nenhum processo atende aos critérios de alerta.</td></tr>';
  return html+'</tbody></table></div></div><p class="v3-hint">Regra piloto: dias corridos, considerando alterações do processo, registros da linha do tempo e tramitações. Confirme a causa da espera antes de classificar como gargalo.</p>';
 }
-function v3ChiefView(){
- if(!['admin','chefia'].includes(effectiveRole()))return heading('Acesso restrito','Painel da chefia','Esta visão é destinada à chefia e à administração.');
- const opened=processOpen(),issues=opened.filter(p=>v3Reasons(p).length),tasks=db.tarefas.filter(t=>t.status!=='Concluída');
- let html=heading('Gestão gerencial','Painel da chefia','Visão consolidada dos três setores, responsáveis, prazos e gargalos.')+periodNotice();
- html+='<div class="v3-tiles">'+[{t:'Processos abertos',v:opened.length},{t:'Com alertas',v:issues.length},{t:'Tarefas vencidas',v:tasks.filter(isOverdue).length},{t:'Sem responsável individual',v:opened.filter(p=>v3Reasons(p).includes('Sem responsável individual')).length}].map(x=>'<div class="card v3-tile"><small>'+x.t+'</small><strong>'+x.v+'</strong></div>').join('')+'</div>';
- html+='<div class="v3-tiles">'+SECTORS.map(sector=>{const ps=opened.filter(p=>p.setor===sector),ts=tasks.filter(t=>t.setor===sector);return '<div class="card v3-dept"><h3>'+esc(sector)+'</h3><div>Processos em aberto: <strong>'+ps.length+'</strong></div><div>Com alertas: <strong>'+ps.filter(p=>v3Reasons(p).length).length+'</strong></div><div>Tarefas pendentes: <strong>'+ts.length+'</strong></div><div>Vencidas: <strong>'+ts.filter(isOverdue).length+'</strong></div><button class="btn small" data-action="chiefSector" data-sector="'+esc(sector)+'">Ver processos →</button></div>'}).join('')+'</div>';
- html+='<div class="card section">'+cardTitle('Principais pendências','Ordenadas pelo vencimento', '<button class="btn small" data-view="alertas">Todos os alertas →</button>')+(issues.sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo)).slice(0,12).map(p=>'<div class="row-item"><div><button class="link-button item-title" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+' · '+esc(p.objeto)+'</button><div class="item-meta">'+esc(p.setor)+' · '+esc(p.responsavel)+' · '+esc(v3Reasons(p).join('; '))+'</div></div>'+iconBadge(p.status)+'</div>').join('')||empty('Nenhum alerta no momento'))+'</div>';
- return html;
+function chiefScope(){
+ if(!['admin','chefia'].includes(effectiveRole()))return '__unauthorized__';
+ if(effectiveRole()==='chefia'){
+  if(previewRole==='chefia')return SECTORS.includes(chiefSectorFilter)?chiefSectorFilter:'__unauthorized__';
+  return SECTORS.includes(profile.setor)?profile.setor:'__unauthorized__';
+ }
+ return SECTORS.includes(chiefSectorFilter)?chiefSectorFilter:null;
 }
+function chiefTeam(sector){
+ return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&SECTORS.includes(u.setor)&&
+  (!sector||u.setor===sector)&&
+  ['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[u.setor]].includes(u.role));
+}
+function chiefTaskPoints(t){return ({Alta:3,'Média':2,Baixa:1})[t.prioridade]||2}
+function chiefWorkload(u,teamTasks){
+ const open=teamTasks.filter(t=>t.responsavel_auth_id===u.auth_id&&t.status!=='Concluída');
+ const points=open.reduce((n,t)=>n+chiefTaskPoints(t),0);
+ return {user:u,tasks:open,points,ratio:Math.round(points/12*100),late:open.filter(isOverdue).length};
+}
+function chiefCanManageTask(t){
+ if(!t||t.status==='Concluída'||previewRole)return false;
+ const sector=chiefScope();
+ if(sector==='__unauthorized__'||(sector&&t.setor!==sector))return false;
+ return !!session&&!!profile.ativo&&(profile.role==='admin'||(profile.role==='chefia'&&profile.setor===t.setor));
+}
+function chiefRedistributeForm(id,proposed){
+ const t=db.tarefas.find(x=>x.id===id);
+ if(!chiefCanManageTask(t))return showToast('Você não pode redistribuir esta tarefa.');
+ const members=chiefTeam(t.setor).filter(u=>u.auth_id!==t.responsavel_auth_id);
+ if(!members.length)return showToast('Não há outro militar ativo cadastrado nesta seção.');
+ const options=members.map(u=>{
+  const count=(db.tarefas||[]).filter(x=>x.status!=='Concluída'&&x.responsavel_auth_id===u.auth_id);
+  const points=count.reduce((n,x)=>n+chiefTaskPoints(x),0);
+  return '<option value="'+esc(u.auth_id)+'"'+(u.auth_id===proposed?' selected':'')+'>'+esc(u.nome)+' · '+count.length+' ativas · '+points+' pontos</option>';
+ }).join('');
+ const body='<div class="sig-chief-reassign-intro"><strong>'+esc(t.titulo)+'</strong><small>Setor: '+esc(t.setor)+' · Responsável atual: '+esc(t.responsavel||'Fila da seção')+'</small></div>'+
+ '<form data-form="chiefReassign" data-id="'+esc(t.id)+'"><div class="form-row"><label for="chief-new-member">Novo responsável (somente militares da seção)</label><select id="chief-new-member" name="member" required>'+options+'</select></div>'+
+ '<p class="helper">A tarefa permanece no setor. O novo responsável será notificado pelo SIG. Confirme a distribuição com a chefia e o militar.</p>'+
+ '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Confirmar redistribuição</button></div></form>';
+ openModal('Redistribuir tarefa','Confirmação obrigatória. Nenhuma sugestão é aplicada automaticamente.',body,true);
+}
+async function chiefReassignSubmit(form){
+ const t=db.tarefas.find(x=>x.id===form.dataset.id);
+ if(!chiefCanManageTask(t))throw Error('Você não tem permissão para redistribuir esta tarefa.');
+ const member=chiefTeam(t.setor).find(u=>u.auth_id===form.elements.member.value);
+ if(!member||member.auth_id===t.responsavel_auth_id)throw Error('Selecione outro militar ativo da mesma seção.');
+ const payload={responsavel_auth_id:member.auth_id,responsavel:member.nome};
+ busy=true;
+ try{
+  if(cloud()){
+   const where='?id=eq.'+encodeURIComponent(t.id)+'&setor=eq.'+encodeURIComponent(t.setor)+'&updated_at=eq.'+encodeURIComponent(t.updated_at);
+   const updated=await rest('/rest/v1/tarefas'+where,'PATCH',payload);
+   if(!Array.isArray(updated)||updated.length!==1)throw Error('A tarefa foi alterada. Atualize a tela antes de tentar novamente.');
+   await fetchCloud();
+  }else{
+   Object.assign(t,payload,{updated_at:nowIso()});saveLocal();
+  }
+  closeModal();render();showToast('Tarefa redistribuída para '+member.nome+'.');
+ }finally{busy=false;}
+}
+function v3ChiefView(){
+ if(!['admin','chefia'].includes(effectiveRole()))return heading('Acesso restrito','Painel da chefia','Apenas chefias e administração.');
+ const scope=chiefScope();
+ if(scope==='__unauthorized__')return heading('Seção não vinculada','Painel da chefia','Solicite ao administrador que associe sua conta a Compras, Licitação ou SOFI.');
+ const team=chiefTeam(scope),allTasks=(db.tarefas||[]).filter(t=>!scope||t.setor===scope),active=allTasks.filter(t=>t.status!=='Concluída');
+ const loads=team.map(u=>chiefWorkload(u,allTasks)).sort((a,b)=>b.points-a.points||a.user.nome.localeCompare(b.user.nome,'pt-BR'));
+ const overdue=active.filter(isOverdue),doneRecent=allTasks.filter(t=>t.status==='Concluída'&&t.concluida_em&&Date.now()-new Date(t.concluida_em).getTime()<=7*86400000);
+ const overloaded=loads.filter(x=>x.ratio>100),average=loads.length?Math.round(loads.reduce((n,x)=>n+x.ratio,0)/loads.length):0;
+ const writeAllowed=!previewRole&&!!session&&!!profile.ativo;
+ const sectionOptions=(effectiveRole()==='admin'?['Todos',...SECTORS]:SECTORS).map(v=>'<option value="'+esc(v)+'"'+(scope===v||(!scope&&v==='Todos')?' selected':'')+'>'+esc(v==='Todos'?'Todas as seções':v)+'</option>').join('');
+ const selects='<div class="sig-chief-filters">'+
+ (profile.role==='admin'?'<label>Seção<select id="chief-sector" data-chief-filter="sector">'+sectionOptions+'</select></label>':'<div class="sig-chief-fixed">Seção: <strong>'+esc(scope)+'</strong></div>')+
+ '<label>Situação<select data-chief-filter="status">'+[['active','Ativas'],['late','Atrasadas'],['done','Concluídas'],['all','Todas']].map(([k,v])=>'<option value="'+k+'"'+(chiefTaskFilter===k?' selected':'')+'>'+v+'</option>').join('')+'</select></label>'+
+ '<label>Militar<select data-chief-filter="member"><option value="Todos">Toda a equipe</option>'+team.map(u=>'<option value="'+esc(u.auth_id)+'"'+(u.auth_id===chiefMemberFilter?' selected':'')+'>'+esc(u.nome)+'</option>').join('')+'</select></label>'+
+ (writeAllowed?'<button type="button" class="btn primary" data-action="chiefNewTask" data-sector="'+esc(scope||profile.setor||'Compras')+'">+ Nova tarefa</button>':'')+
+ '</div>';
+ const stat=(txt,value,foot,cls='')=>'<div class="sig-chief-stat '+cls+'"><span>'+esc(txt)+'</span><strong>'+value+'</strong><small>'+esc(foot)+'</small></div>';
+ const stats='<div class="sig-chief-stats">'+
+ stat('Tarefas ativas',active.length,'Atribuídas e em andamento')+
+ stat('Atrasadas',overdue.length,'Requerem atenção','warning')+
+ stat('Militares com sobrecarga',overloaded.length,'Índice acima de 100%','warning')+
+ stat('Concluídas em 7 dias',doneRecent.length,'Conclusões registradas')+
+ stat('Carga relativa média',average+'%','Indicador estimado, não são horas')+'</div>';
+ const memberCards='<section class="sig-chief-panel"><div class="sig-chief-section-title"><h2>Carga de trabalho da equipe</h2><small>Alta = 3 pontos · Média = 2 · Baixa = 1. Referência: 12 pontos por militar.</small></div>'+
+ (loads.length?'<div class="sig-chief-team">'+loads.map(x=>{
+  const kind=x.ratio>100?'over':x.ratio>=75?'high':x.ratio<35?'light':'ok';
+  return '<button type="button" class="sig-chief-member '+kind+(chiefMemberFilter===x.user.auth_id?' selected':'')+'" data-action="chiefMember" data-member="'+esc(x.user.auth_id)+'">'+
+   '<span class="sig-chief-avatar">'+esc(x.user.nome.split(' ').map(z=>z[0]).slice(0,2).join('').toUpperCase())+'</span>'+
+   '<strong>'+esc(x.user.nome)+'</strong><span>'+x.tasks.length+' tarefa(s) ativas · '+x.late+' atrasada(s)</span>'+
+   '<b>'+x.ratio+'% · '+(kind==='over'?'Atenção: sobrecarga':kind==='high'?'Carga alta':kind==='light'?'Carga baixa':'Carga equilibrada')+'</b>'+
+   '<span class="sig-chief-progress"><i style="width:'+Math.min(100,x.ratio)+'%"></i></span></button>';
+ }).join('')+'</div>':'<div class="sig-chief-empty">Nenhum militar ativo cadastrado para esta seção. O administrador deve cadastrar os integrantes e seus setores.</div>')+
+ '</section>';
+ const taskRows=allTasks.filter(t=>chiefTaskFilter==='active'?t.status!=='Concluída':chiefTaskFilter==='late'?isOverdue(t):chiefTaskFilter==='done'?t.status==='Concluída':true)
+ .filter(t=>chiefMemberFilter==='Todos'||t.responsavel_auth_id===chiefMemberFilter)
+ .sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||daysLeft(a.prazo)-daysLeft(b.prazo));
+ const rows=taskRows.slice(0,75).map(t=>
+  '<tr><td><strong>'+esc(t.responsavel||'Fila da seção')+'</strong><span class="sig-chief-row-sub">'+esc(t.setor)+'</span></td>'+
+  '<td>'+esc(t.titulo)+'</td><td>'+iconBadge(t.prioridade)+'</td><td>'+fmtDate(t.prazo)+'</td>'+
+  '<td>'+iconBadge(isOverdue(t)?'Atrasada':t.status)+'</td><td>'+
+  (chiefCanManageTask(t)?'<button class="btn small" data-action="chiefReassign" data-id="'+esc(t.id)+'">Redistribuir</button>':'<span class="tiny">'+(t.status==='Concluída'?'Concluída':'Consulta')+'</span>')+'</td></tr>').join('');
+ const taskPanel='<section class="sig-chief-panel"><div class="sig-chief-section-title"><h2>Tarefas distribuídas pela chefia</h2><small>'+taskRows.length+' registro(s)'+(taskRows.length>75?' · exibindo as primeiras 75':'')+'</small></div>'+
+ '<div class="table-scroll"><table class="data-table sig-chief-table"><thead><tr><th>Responsável</th><th>Tarefa</th><th>Prioridade</th><th>Prazo</th><th>Situação</th><th>Ação</th></tr></thead><tbody>'+
+ (rows||'<tr><td colspan="6" class="table-empty">Nenhuma tarefa corresponde aos filtros.</td></tr>')+'</tbody></table></div></section>';
+ const suggestions=[];
+ for(const source of loads.filter(x=>x.ratio>100)){
+  const recipient=loads.filter(x=>x.user.setor===source.user.setor&&x.user.auth_id!==source.user.auth_id&&x.ratio<75).sort((a,b)=>a.points-b.points)[0];
+  const possible=source.tasks.filter(t=>t.status!=='Concluída').sort((a,b)=>chiefTaskPoints(a)-chiefTaskPoints(b))[0];
+  if(recipient&&possible)suggestions.push({source:source.user,target:recipient.user,task:possible});
+ }
+ const suggestionsHtml='<section class="sig-chief-panel"><div class="sig-chief-section-title"><h2>Possíveis redistribuições</h2><small>Revisão manual da chefia</small></div>'+
+ (suggestions.length?suggestions.slice(0,3).map(x=>
+  '<article class="sig-chief-suggestion"><strong>'+esc(x.source.nome)+' → '+esc(x.target.nome)+'</strong>'+
+  '<p>'+esc(x.task.titulo)+'</p><small>Ambos da seção '+esc(x.task.setor)+'. Sugestão baseada em carga relativa; confira habilidades e disponibilidade.</small>'+
+  (writeAllowed?'<button class="btn small primary" type="button" data-action="chiefReassign" data-id="'+esc(x.task.id)+'" data-member="'+esc(x.target.auth_id)+'">Analisar redistribuição</button>':'')+
+  '</article>').join(''):'<div class="sig-chief-empty">Nenhuma sugestão automática no momento. Confira as barras da equipe antes de distribuir novas tarefas.</div>')+
+ '</section>';
+ const header='<div class="sig-chief-header"><div><span class="eyebrow">Gestão de equipes</span><h1>Painel do Chefe da Seção'+(scope?' · '+esc(scope):'')+'</h1><p>Acompanhe e distribua as tarefas da sua equipe com equilíbrio e clareza.</p></div></div>';
+ const footer='<p class="sig-chief-footnote">O índice de carga é uma estimativa baseada na quantidade e prioridade das tarefas. Não representa horas de trabalho, disponibilidade real ou produtividade individual. O chefe deve validar qualquer redistribuição.</p>';
+ return '<div class="sig-chief-page">'+header+stats+selects+memberCards+'<div class="sig-chief-grid">'+taskPanel+suggestionsHtml+'</div>'+footer+'</div>';
+}
+
 function v3NotificationsView(){
  let notes=v3MyNotifications();let html=heading('Avisos pessoais','Notificações','Avisos gerados automaticamente quando um processo ou tarefa é atribuído a você.',notes.some(n=>!n.lida_em)?'<button class="btn" data-action="readAllNotifications">Marcar todas como lidas</button>':'')+periodNotice();
  html+='<div class="card section"><div class="v3-notes">'+notes.map(n=>'<div class="v3-note '+(n.lida_em?'':'v3-unread')+'"><div><strong>'+esc(n.titulo)+'</strong><p>'+esc(n.mensagem)+'</p><small>'+new Date(n.criado_em).toLocaleString('pt-BR')+' · '+(n.lida_em?'Lida':'Não lida')+'</small></div><div class="v3-note-actions">'+(n.processo_id?'<button class="btn small" data-action="openNotification" data-id="'+esc(n.id)+'">Abrir processo</button>':'')+(!n.lida_em?'<button class="btn small" data-action="readNotification" data-id="'+esc(n.id)+'">Marcar como lida</button>':'')+'</div></div>').join('')+(notes.length?'':empty('Nenhuma notificação pessoal'))+'</div></div>';
