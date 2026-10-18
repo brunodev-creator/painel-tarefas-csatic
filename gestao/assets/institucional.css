@@ -358,3 +358,21 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 @media(max-width:1050px){.sig-buy-services{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.sig-buy-services{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sig-buy-service{padding:12px}.sig-flow-history-row{flex-direction:column;align-items:start}.sig-task-tabs{width:100%}.sig-task-tabs .btn{flex:1}}
 @media(max-width:370px){.sig-buy-services{grid-template-columns:1fr}.sig-flow-detail-grid{grid-template-columns:1fr}}
+
+
+/* AIPC - formulário administrativo com identificação obrigatória e seções opcionais */
+.sig-aipc-action{font-weight:750;border-color:#91a69b}
+.sig-aipc-form{display:flex;flex-direction:column;gap:14px}
+.sig-aipc-essential{padding:16px 17px;border:1px solid #9dbdac;background:#f3f9f5;border-radius:12px;display:flex;flex-direction:column;gap:9px}
+.sig-aipc-essential label{font-size:13px;color:#264d3c}
+.sig-aipc-essential input{display:block;width:100%;padding:12px 13px;border-radius:9px;border:1px solid #bacdc0;background:#fff;color:#192d3a;font-size:14px;box-sizing:border-box}
+.sig-aipc-essential small{font-size:11px;color:#637e6e;line-height:1.6}
+.sig-aipc-section{border:1px solid #e0e5e2;border-radius:12px;background:#fff;overflow:hidden}
+.sig-aipc-section>summary{display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer;padding:15px 16px;font-weight:750;color:#354c60;background:#f7f9f8}
+.sig-aipc-section>summary span{font-weight:500;color:#789085;font-size:11px}
+.sig-aipc-section>.form-grid{padding:16px}
+.sig-aipc-section .form-row input,.sig-aipc-section .form-row textarea{width:100%;box-sizing:border-box}
+.sig-aipc-item{margin:10px 13px;padding:12px;border:1px solid #e2e9e5;border-radius:9px}
+.sig-aipc-item>strong{display:block;font-size:12px;margin-bottom:10px;color:#395b4c}
+.sig-aipc-item>.form-grid{gap:10px}
+@media(max-width:650px){.sig-aipc-essential{padding:12px}.sig-aipc-section>.form-grid{padding:12px}.sig-aipc-item{margin:8px;padding:9px}}
