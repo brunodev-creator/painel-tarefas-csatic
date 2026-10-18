@@ -387,3 +387,18 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .sig-aipc-items{display:flex;flex-direction:column;gap:3px}
 .sig-aipc-item[hidden],.sig-aipc-item-warning[hidden]{display:none!important}
 @media(max-width:650px){.sig-aipc-item-picker{padding:13px}.sig-aipc-item-picker select{width:100%}}
+
+
+/* AIPC: rascunho salvo no servidor e finalização opcional ao final do formulário */
+.sig-aipc-statebar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:12px 14px;border:1px solid #dae6db;border-radius:10px;background:#f4f8f4}
+.sig-aipc-statebar [data-aipc-document-status]{font-weight:800;font-size:12px;color:#3a6848}
+.sig-aipc-statebar [data-aipc-save-status]{font-size:11px;color:#526e59;font-weight:600;line-height:1.5}
+.sig-aipc-statebar [data-aipc-save-status][data-state="saving"]{color:#455b70}
+.sig-aipc-statebar [data-aipc-save-status][data-state="dirty"]{color:#8a6530}
+.sig-aipc-statebar [data-aipc-save-status][data-state="error"]{color:#b44848}
+.sig-aipc-final-step{display:flex;flex-direction:column;gap:5px;padding-bottom:4px}
+.sig-aipc-final-step strong{font-size:14px;color:#2c4c3b}
+.sig-aipc-final-step small{font-size:12px;color:#607668}
+.sig-aipc-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.sig-aipc-actions button{min-height:40px}
+@media(max-width:640px){.sig-aipc-statebar{flex-direction:column;align-items:flex-start}.sig-aipc-actions button{flex:1;min-width:125px}}
