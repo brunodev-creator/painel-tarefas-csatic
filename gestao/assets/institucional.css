@@ -376,3 +376,14 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .sig-aipc-item>strong{display:block;font-size:12px;margin-bottom:10px;color:#395b4c}
 .sig-aipc-item>.form-grid{gap:10px}
 @media(max-width:650px){.sig-aipc-essential{padding:12px}.sig-aipc-section>.form-grid{padding:12px}.sig-aipc-item{margin:8px;padding:9px}}
+
+
+/* AIPC: quantidade de itens configurável (0 a 30), sem poluir o formulário. */
+.sig-aipc-item-picker{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:15px 16px;border-bottom:1px solid #e2e9e5;background:#fbfcfb}
+.sig-aipc-item-picker label{font-size:12px;color:#304a3e}
+.sig-aipc-item-picker select{width:min(100%,210px);padding:11px 13px;border:1px solid #b9c9c1;border-radius:9px;background:#fff;color:#284839;font-size:13px;font-weight:650}
+.sig-aipc-item-picker small{font-size:11px;color:#61786d;line-height:1.5}
+.sig-aipc-item-warning:not([hidden]){color:#a45a2a;font-weight:650}
+.sig-aipc-items{display:flex;flex-direction:column;gap:3px}
+.sig-aipc-item[hidden],.sig-aipc-item-warning[hidden]{display:none!important}
+@media(max-width:650px){.sig-aipc-item-picker{padding:13px}.sig-aipc-item-picker select{width:100%}}
