@@ -54,12 +54,13 @@ function refresh(){
  const count=document.getElementById('cotas-count');if(count)count.textContent=list.length+' de '+rows().length+' dotações';
 }
 const date=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||'')?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'não informada';
-function view(authorized){
- if(!authorized)return '<div class="card section"><h2>Acesso restrito</h2><p class="sub">Cotas orçamentárias disponíveis somente para SOFI, chefia e administração.</p></div>';
+function view(authorized,allowExport=false,allowImport=false){
+ if(!authorized)return '<div class="card section"><h2>Acesso restrito</h2><p class="sub">A consulta de cotas orçamentárias não está habilitada para este perfil.</p></div>';
  const report=data();
  if(!report)return '<div class="budget-page"><div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> Saldos por dotação</div>'+
- '<div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>Para visualizar dados reais, importe um relatório V6 no módulo de conciliação.</p>'+
- '<button type="button" class="btn primary" data-view="conciliacao">Abrir Conciliação V6</button><p class="budget-note">Não são exibidos dados fictícios sem um relatório válido.</p></div></div>';
+ '<div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>'+ (allowImport?'Para visualizar dados reais, importe um relatório V6 no módulo de conciliação.':'Nenhum relatório de cotas está disponível nesta sessão. A consulta exibirá os saldos quando houver um relatório V6 disponível neste navegador.') +'</p>'+
+ (allowImport?'<button type="button" class="btn primary" data-view="conciliacao">Abrir Conciliação V6</button>':'')+
+ '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
  const s=report.resumo||{},budget=num(s.cota_liquida_centavos),spent=num(s.valor_abatido_gerencial_centavos),balance=budget-spent;
  const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'. Consulte a posição atual do SIAFI-MG antes de decidir operacionalmente.</div></div>';
  const kpi=(type,ico,val)=>'<div class="card budget-card"><div class="budget-icon">'+ico+'</div><div><div class="budget-label">'+type+'</div><strong>'+fmt(val)+'</strong></div></div>';
@@ -72,7 +73,7 @@ function view(authorized){
  warning+
  '<div class="budget-hero">'+kpi('Orçamentário',icon1,budget)+kpi('Valor empenhado',icon2,spent)+kpi('Saldo atual',icon3,balance)+'</div>'+
  '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária</p></div>'+
- '<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button></div>'+
+ (allowExport?'<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button>':'')+'</div>'+
  '<div class="budget-toolbar">'+
  '<label class="budget-search"><span aria-hidden="true">⌕</span><input type="search" id="cotas-busca" placeholder="Buscar dotação, conta ou descrição..." value="'+esc(state.q)+'" aria-label="Buscar dotação ou conta"></label>'+
  '<label class="budget-filter">Tipo<select id="cotas-tipo">'+options(state.tipo,[['TODOS','Todos'],['Global','Global'],['Item definido','Item definido']])+'</select></label>'+
