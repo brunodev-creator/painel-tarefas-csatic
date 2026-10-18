@@ -66,7 +66,7 @@ ALTER POLICY contratos_leitura ON public.contratos
  USING (private.is_active() AND NOT private.is_section_chief());
 ALTER POLICY repasses_leitura ON public.repasses
  USING (private.is_active() AND NOT private.is_section_chief());
-ALTER POLICY competencias_contratuais_read ON public.competencias_contratuais
+ALTER POLICY competencias_read ON public.competencias_contratuais
  USING (private.can_finance() AND NOT private.is_section_chief());
 
 -- Empenhos/solicitacoes com processo vinculado: somente setor do processo.
