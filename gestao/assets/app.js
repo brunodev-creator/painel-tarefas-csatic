@@ -3,7 +3,7 @@
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
-const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI · Empenhos'],['contratos','▣','Contratos'],['assistente','✧','Assistente IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_ROLE_MENUS=Object.freeze({
  compras:['notificacoes','tarefas','compras','cotas','processos','assistente'],
