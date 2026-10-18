@@ -1028,7 +1028,7 @@ function aipcForm(id){
    '<input id="aipc-numero_processo_compras" name="numero_processo_compras" maxlength="120" value="'+esc(item?.numero_processo_compras||'')+'" placeholder="Preencher por último">'+
    '<small>O número não é obrigatório para salvar o rascunho.</small></div>'+
   '<div class="modal-footer sig-aipc-actions"><button type="button" class="btn" data-action="closeModal">Fechar</button>'+
-  '<button type="submit" class="btn" name="acao" value="rascunho">Salvar rascunho</button>'+
+  '<button type="submit" class="btn" name="acao" value="rascunho">'+(item?.status==='pronta'?'Salvar alterações':'Salvar rascunho')+'</button>'+
   '<button type="submit" class="btn primary" name="acao" value="finalizar">Finalizar AIPC</button></div></form>';
  openModal((item?'Editar':'Preencher')+' AIPC',p.numero+' · '+p.objeto,html,true);
  updateAipcItemCount(document.querySelector('#modal-root form[data-form="aipc"]'));
