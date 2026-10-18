@@ -141,7 +141,7 @@ const SERVICE_FIELDS={
 function categoryFromProcess(p){
  return PURCHASE_SERVICES.some(k=>k.id===p.tipo_servico)?p.tipo_servico:
  (p.modalidade==='Pregão'?'Pregão':p.modalidade==='COTEP'?'COTEP':
- /ARP|ata/i.test(p.modalidade||'')?'Registro de Preço':'COTEP');
+ /ARP|ata|Registro de Preço/i.test(p.modalidade||'')?'Registro de Preço':'Sem classificação');
 }
 function serviceDetailFields(category,values={}){
  return (SERVICE_FIELDS[category]||[]).map(([key,label,type])=>
@@ -1046,7 +1046,7 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
     possible.map(u=>'<option value="'+esc(u.auth_id)+'"'+(assigned===u.auth_id?' selected':'')+'>'+esc(u.nome)+'</option>').join('')+'</select><small>O chefe pode distribuir agora ou deixar na fila.</small></div>':
    '<div class="form-row"><label>Responsável inicial</label><div class="sig-buy-readonly">'+esc(profile.nome)+'<small>Você será o responsável inicial.</small></div><input type="hidden" name="responsavel_auth_id" value="'+esc(currentAuthId())+'"></div>'
   ):inputField('responsavel','Responsável pela demanda',p.responsavel||profile.nome,'text','required');
-  const categoryOptions=PURCHASE_SERVICES.map(x=>'<option value="'+esc(x.id)+'"'+(cat===x.id?' selected':'')+'>'+esc(x.short)+'</option>').join('');
+  const categoryOptions=(cat==='Sem classificação'?'<option value="" selected disabled>Escolha a modalidade desta demanda</option>':'')+PURCHASE_SERVICES.map(x=>'<option value="'+esc(x.id)+'"'+(cat===x.id?' selected':'')+'>'+esc(x.short)+'</option>').join('');
   const body='<div class="sig-buy-form-lead">A demanda e a primeira tarefa serão vinculadas ao mesmo processo. Escolha a modalidade para exibir somente os campos pertinentes.</div>'+
    '<div class="form-grid">'+
    '<div class="form-row"><label for="f-tipo_servico">Divisão de Compras *</label><select id="f-tipo_servico" name="tipo_servico" required>'+categoryOptions+'</select></div>'+
