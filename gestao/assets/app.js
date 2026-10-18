@@ -890,7 +890,7 @@ function requiresAipc(p){
 }
 function getAipc(processId){return (db.aipc||[]).find(a=>a.processo_id===processId)||null}
 function aipcProcess(id){return findProcess(id)||sharedProcessRows.find(p=>p.id===id)||null;}
-function canEditAipc(){return !previewRole&&!!profile?.ativo&&profile.setor==='Compras'&&['compras','chefe_compras','chefia'].includes(profile.role);}
+function canEditAipc(){return !previewRole&&!!profile?.ativo&&profile.setor==='Compras'&&['admin','compras','chefe_compras','chefia'].includes(profile.role);}
 function canViewAipc(){return !!profile?.ativo&&(cloud()?!!session:true);}
 function isAipcReady(processId){const a=getAipc(processId);return !!a&&a.status==='pronta'&&!!String(a.numero_processo_compras||'').trim();}
 function aipcStatusText(id){
