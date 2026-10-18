@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
-const TABLES=['aipc','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
+const TABLES=['aipc','aipc_revisoes','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
@@ -863,6 +863,7 @@ const AIPC_SECTIONS=[
  ]},
  {title:'Documentos e origem do recurso',fields:[
   ['memorando','Memorando nº','text'],['pa','PA nº','text'],['sei','SEI','text'],
+  ['link_documento_sei','Link do documento oficial no SEI (se existir)','url'],
   ['origem_recurso','Origem do recurso','text'],
   ['convenio','Convênio (SIGCON / +Brasil)','text'],['numero_convenio','Nº convênio (SIAFI)','text'],
   ['vigencia_convenio','Vigência do convênio','date'],
@@ -875,6 +876,7 @@ const AIPC_SECTIONS=[
   ['preposto','Preposto','text'],['posto_preposto','Posto do militar preposto','text'],
   ['nome_preposto','Nome do militar preposto','text'],
   ['fiscal_contrato','Fiscal do contrato','text'],
+  ['chefe_compras','Chefe da Seção de Compras','text'],
   ['ordenador_despesa','Ordenador de despesa','text'],
   ['ordenador_substituto','Ordenador substituto','text']
  ]}
@@ -885,6 +887,9 @@ function requiresAipc(p){
  return ['cotep','pregao','registro de preco','registro de precos','adesao arp'].includes(kind);
 }
 function getAipc(processId){return (db.aipc||[]).find(a=>a.processo_id===processId)||null}
+function aipcProcess(id){return findProcess(id)||sharedProcessRows.find(p=>p.id===id)||null;}
+function canEditAipc(){return !previewRole&&!!profile?.ativo&&profile.setor==='Compras'&&['compras','chefe_compras','chefia'].includes(profile.role);}
+function canViewAipc(){return !!profile?.ativo&&(cloud()?!!session:true);}
 function isAipcReady(processId){const a=getAipc(processId);return !!a&&a.status==='pronta'&&!!String(a.numero_processo_compras||'').trim();}
 function aipcStatusText(id){
  const a=getAipc(id);
@@ -912,15 +917,15 @@ function aipcSnapshot(form){
  const dados={quantidade_itens:String(quantity)};
  for(const [key,value] of Object.entries(d)){
   if(!key.startsWith('aipc__')||String(value).trim()==='')continue;
-  const field=key.slice(6),m=/^item_(\d+)_(quantidade|siad|descricao|unitario|total)$/.exec(field);
+  const field=key.slice(6),m=/^item_(\d+)_(lote|quantidade|siad|descricao|unitario|total)$/.exec(field);
   if(m&&(Number(m[1])<1||Number(m[1])>quantity))continue;
   dados[field]=String(value).trim();
  }
  return {numero:String(d.numero_processo_compras||'').trim(),dados};
 }
 async function aipcPersist(form,mode='auto'){
- const id=form?.dataset.id,p=findProcess(id);
- if(!form||!p||!canWrite(p.setor)||previewRole)throw Error('AIPC indisponível para esta seção.');
+ const id=form?.dataset.id,p=aipcProcess(id);
+ if(!form||!p||!canEditAipc())throw Error('Somente a Compras pode editar a AIPC.');
  const final=mode==='finalizar';
  const snap=aipcSnapshot(form);
  if(final&&!snap.numero)throw Error('Informe o Número do Processo de Compras para finalizar a AIPC.');
@@ -980,8 +985,8 @@ function aipcField([key,label,type],data){
    '<input id="aipc-'+key+'" name="aipc__'+key+'" type="'+type+'" value="'+esc(v)+'">')+'</div>';
 }
 function aipcForm(id){
- const p=findProcess(id);
- if(!p||!canWrite(p.setor)||previewRole)return showToast('AIPC: acesso permitido somente aos militares da seção que está executando o processo.');
+ const p=aipcProcess(id);
+ if(!p||!canEditAipc())return showToast('Somente a Seção de Compras pode editar a AIPC.');
  const item=getAipc(id);
  const old=item?.dados&&typeof item.dados==='object'?item.dados:{};
  const defaults={
@@ -991,7 +996,7 @@ function aipcForm(id){
  // Migrar visualmente o campo antigo "Localidade" para "RPM" sem perder seu valor.
  const data={...defaults,...old,rpm:old.rpm??old.localidade??''};
  const legacyCount=Array.from({length:30},(_,idx)=>idx+1)
-  .filter(n=>['quantidade','siad','descricao','unitario','total']
+  .filter(n=>['lote','quantidade','siad','descricao','unitario','total']
    .some(field=>String(old['item_'+n+'_'+field]??'').trim()!==''))
   .reduce((max,n)=>Math.max(max,n),0);
  const initialCount=Math.max(0,Math.min(30,Math.max(legacyCount,Number.parseInt(old.quantidade_itens,10)||0)));
@@ -1002,6 +1007,7 @@ function aipcForm(id){
  const itemFields=rowNums.map(n=>
   '<div class="sig-aipc-item" data-aipc-item-row="'+n+'"'+(n>initialCount?' hidden':'')+'>'+
   '<strong>Item '+n+'</strong><div class="form-grid">'+[
+   ['item_'+n+'_lote','Lote','text'],
    ['item_'+n+'_quantidade','Quantidade','text'],
    ['item_'+n+'_siad','Código SIAD','text'],
    ['item_'+n+'_descricao','Descrição do material / serviço','textarea'],
@@ -1440,7 +1446,8 @@ function limitCloudRowsForChief(data,role,sector,userId){
  const procIDs=new Set(p.map(v=>v.id)),taskIDs=new Set(t.map(v=>v.id));
  return {...clean,
   processos:p,tarefas:t,
-  aipc:clean.aipc.filter(v=>procIDs.has(v.processo_id)),
+  aipc:clean.aipc,
+  aipc_revisoes:clean.aipc_revisoes,
   usuarios:clean.usuarios.filter(v=>v.ativo&&v.setor===expected),
   eventos:clean.eventos.filter(v=>procIDs.has(v.processo_id)),
   tramites:clean.tramites.filter(v=>procIDs.has(v.processo_id)),
