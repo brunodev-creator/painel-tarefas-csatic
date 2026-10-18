@@ -348,7 +348,7 @@ function v3ChiefView(){
    '<span class="sig-chief-progress"><i style="width:'+Math.min(100,x.ratio)+'%"></i></span></button>';
  }).join('')+'</div>':'<div class="sig-chief-empty">Nenhum militar ativo cadastrado para esta seção. O administrador deve cadastrar os integrantes e seus setores.</div>')+
  '</section>';
- const taskRows=allTasks.filter(t=>chiefTaskFilter==='active'?t.status!=='Concluída':chiefTaskFilter==='late'?isOverdue(t):chiefTaskFilter==='done'?t.status==='Concluída':true)
+ const taskRows=allTasks.filter(t=>chiefTaskFilter==='active'?isOpenTask(t):chiefTaskFilter==='late'?isOverdue(t):chiefTaskFilter==='done'?t.status==='Concluída':true)
  .filter(t=>chiefMemberFilter==='Todos'||t.responsavel_auth_id===chiefMemberFilter)
  .sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||daysLeft(a.prazo)-daysLeft(b.prazo));
  const rows=taskRows.slice(0,75).map(t=>
@@ -362,7 +362,7 @@ function v3ChiefView(){
  const suggestions=[];
  for(const source of loads.filter(x=>x.ratio>100)){
   const recipient=loads.filter(x=>x.user.setor===source.user.setor&&x.user.auth_id!==source.user.auth_id&&x.ratio<75).sort((a,b)=>a.points-b.points)[0];
-  const possible=source.tasks.filter(t=>t.status!=='Concluída').sort((a,b)=>chiefTaskPoints(a)-chiefTaskPoints(b))[0];
+  const possible=source.tasks.filter(isOpenTask).sort((a,b)=>chiefTaskPoints(a)-chiefTaskPoints(b))[0];
   if(recipient&&possible)suggestions.push({source:source.user,target:recipient.user,task:possible});
  }
  const suggestionsHtml='<section class="sig-chief-panel"><div class="sig-chief-section-title"><h2>Possíveis redistribuições</h2><small>Revisão manual da chefia</small></div>'+
@@ -707,7 +707,7 @@ function dashboardView(){
  return heading('Centro de controle','Visão geral','Acompanhamento de Compras, Licitação, SOFI e contratos.',`<button class="btn" data-action="export">↓ Exportar</button><button class="btn primary" data-action="newProcess">+ Novo processo</button>`)+periodNotice()+`<div class="kpi-grid">${k('Processos em aberto',opened.length,'Distribuídos entre três setores','▤','blue')}${k('Pendências e bloqueios',blocked.length,'Atrasos e impedimentos sinalizados','!','red')}${k('Tarefas atrasadas',lateTasks.length,'Providências com prazo vencido','◷','alert')}${k('Em análise para empenho',compact(waiting.reduce((a,p)=>a+moneyToCommit(p),0)),'Estimativa com base nos registros locais','▥')}</div>
  <div class="dashboard-grid"><div><div class="card section">${cardTitle('Carga de processos por setor','Processos ainda não concluídos')}<div class="stat-list">${dept.map(x=>`<div class="stat-line"><div class="stat-name">${x.s}</div><div class="barwrap"><div class="bar" style="width:${Math.round(x.n/max*100)}%"></div></div><div class="stat-num">${x.n}</div></div>`).join('')}</div></div>
  <div class="card section">${cardTitle('Processos que exigem atenção','Vencidos ou classificados como bloqueados',`<button class="btn small" data-view="processos">Ver todos →</button>`)}${blocked.slice(0,5).map(p=>`<div class="row-item"><div><button class="link-button item-title" data-action="detail" data-id="${esc(p.id)}">${esc(p.numero)} · ${esc(p.objeto)}</button><div class="item-meta">${esc(p.setor)} · ${esc(p.responsavel)} · ${esc(p.proxima_acao||'Sem próxima ação')}</div></div>${iconBadge(p.status)}</div>`).join('')||empty('Sem bloqueios ou atrasos registrados')}</div></div>
- <div><div class="card section">${cardTitle('Tarefas prioritárias','Ordenadas por vencimento',`<button class="btn small" data-view="tarefas">Minhas tarefas →</button>`)}${db.tarefas.filter(t=>t.status!=='Concluída').sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo)).slice(0,6).map(t=>`<div class="row-item"><div><div class="item-title">${esc(t.titulo)}</div><div class="item-meta">${esc(t.setor)} · ${esc(t.responsavel)} · ${fmtDate(t.prazo)}</div></div><span class="flag ${isOverdue(t)?'red':'amber'}">${isOverdue(t)?'Atrasada':esc(t.prioridade)}</span></div>`).join('')||empty('Nenhuma tarefa pendente')}</div>
+ <div><div class="card section">${cardTitle('Tarefas prioritárias','Ordenadas por vencimento',`<button class="btn small" data-view="tarefas">Minhas tarefas →</button>`)}${db.tarefas.filter(isOpenTask).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo)).slice(0,6).map(t=>`<div class="row-item"><div><div class="item-title">${esc(t.titulo)}</div><div class="item-meta">${esc(t.setor)} · ${esc(t.responsavel)} · ${fmtDate(t.prazo)}</div></div><span class="flag ${isOverdue(t)?'red':'amber'}">${isOverdue(t)?'Atrasada':esc(t.prioridade)}</span></div>`).join('')||empty('Nenhuma tarefa pendente')}</div>
  <div class="card section">${cardTitle('Contratos sob atenção','Cobertura inferior à meta configurada',`<button class="btn small" data-view="contratos">Contratos →</button>`)}${coverage.slice(0,4).map(c=>`<div class="row-item"><div><div class="item-title">${esc(c.numero)}</div><div class="item-meta">${esc(c.objeto)}</div></div><span class="flag amber">${(digits(c.saldo_empenho)/digits(c.custo_mensal)).toLocaleString('pt-BR',{maximumFractionDigits:1})} mês(es)</span></div>`).join('')||empty('Nenhum alerta de cobertura')}</div></div></div>`;
 }
 /* Área de Compras — primeiro ciclo de UX, sem novas tabelas ou APIs. */
@@ -1060,7 +1060,7 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
   const extras='<details class="sig-buy-extra"><summary>Mais detalhes do processo <span>Status, prioridade, valores, SEI e observações</span></summary>'+
    '<div class="form-grid">'+
     '<input type="hidden" name="setor" value="Compras">'+
-    '<input type="hidden" id="sig-servico-modalidade" name="modalidade" value="'+esc(({'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[cat])+'">'+
+    '<input type="hidden" id="sig-servico-modalidade" name="modalidade" value="'+esc(({'Registro de Preço':'Registro de Preço','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Elaboração de ARP'})[cat])+'">'+
     inputField('etapa','Etapa atual',p.etapa,'text','required')+
     selectField('status','Situação',STATUSES,p.status)+
     selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)+
@@ -1289,7 +1289,7 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
   if(!PURCHASE_SERVICES.some(x=>x.id===d.tipo_servico))return showToast('Modalidade de Compras inválida.');
   d.dados_servico=Object.fromEntries(Object.entries(d).filter(([key])=>key.startsWith('servico__')).map(([key,value])=>[key.slice(9),String(value).trim()]));
   for(const key of Object.keys(d))if(key.startsWith('servico__'))delete d[key];
-  d.modalidade=({'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[d.tipo_servico];
+  d.modalidade=({'Registro de Preço':'Registro de Preço','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Elaboração de ARP'})[d.tipo_servico];
   if(!id&&cloud()&&!isSectionChiefRole(profile.role)&&profile.role!=='admin')d.responsavel_auth_id=currentAuthId();
   if(d.responsavel_auth_id!==undefined){
    const selected=db.usuarios.find(u=>u.auth_id===d.responsavel_auth_id);
@@ -1354,7 +1354,7 @@ function assistantAnswer(question){const q=String(question||'').normalize('NFD')
   return 'PROJEÇÃO DE COBERTURA CONTRATUAL ('+arr.length+' contrato(s))\n'+(arr.map(c=>{const f=v4PredictedContract(c);return '• '+c.numero+' — saldo informado '+money(f.available)+'; previsão do horizonte '+money(f.needed)+'; diferença estimada '+money(f.shortfall)+'; vigência até '+fmtDate(c.fim)+(f.hasMissing?' (inclui média mensal estimada)':'');}).join('\n')||'Nenhum contrato vigente cadastrado.')+'\n\nCálculos de planejamento; não equivalem a saldo oficial ou autorização de reforço.';
  }
 
- const open=processOpen();const blocked=open.filter(processBlocked);const pending=db.tarefas.filter(t=>t.status!=='Concluída');const contracts=db.contratos.filter(c=>c.status==='Vigente');
+ const open=processOpen();const blocked=open.filter(processBlocked);const pending=db.tarefas.filter(isOpenTask);const contracts=db.contratos.filter(c=>c.status==='Vigente');
  if(/empenh|falta empenhar|financeiro/.test(q)){const arr=db.processos.filter(p=>p.status==='Aguardando empenho');return `PROCESSOS EM ANÁLISE PARA EMPENHO (${arr.length})\n`+(arr.map(p=>`• ${p.numero}: ${p.objeto} — valor ainda não registrado em empenhos: ${money(moneyToCommit(p))}. Próxima ação: ${p.proxima_acao||'não definida'}.`).join('\n')||'Nenhum processo com status "Aguardando empenho".')+'\n\nAtenção: cálculo estimativo com base no cadastro, não é disponibilidade oficial.'}
  if(/travad|parad|atras|bloque|gargal/.test(q)){return `PROCESSOS COM ALERTA (${blocked.length})\n`+(blocked.map(p=>`• ${p.numero} — ${p.setor} — ${p.status}. Responsável: ${p.responsavel}. ${p.bloqueio_motivo||p.proxima_acao||'Sem justificativa detalhada.'}`).join('\n')||'Nenhum bloqueio/atraso identificado.')+`\n\nTarefas com prazo vencido: ${pending.filter(isOverdue).length}.`}
  if(/contrat|vigenc|reforc|cobertura/.test(q)){const alerts=contracts.filter(c=>daysLeft(c.fim)<60||digits(c.custo_mensal)>0&&digits(c.saldo_empenho)/digits(c.custo_mensal)<digits(c.cobertura_alvo));return `CONTRATOS QUE EXIGEM ANÁLISE (${alerts.length})\n`+(alerts.map(c=>`• ${c.numero}: vigência até ${fmtDate(c.fim)}; saldo informado ${money(c.saldo_empenho)}; cobertura ${digits(c.custo_mensal)?(digits(c.saldo_empenho)/digits(c.custo_mensal)).toFixed(1):'indefinida'} meses. Gestor: ${c.gestor}.`).join('\n')||'Nenhum alerta nas regras configuradas.')+'\n\nAlertas dependem de confirmação dos dados contratuais e financeiros.'}
@@ -1438,7 +1438,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
    const area=document.getElementById('sig-service-fields');
    if(area){area.innerHTML=serviceDetailFields(e.target.value,{});}
    const modality=document.getElementById('sig-servico-modalidade');
-   if(modality)modality.value=({ 'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[e.target.value]||'Outro';
+   if(modality)modality.value=({ 'Registro de Preço':'Registro de Preço','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Elaboração de ARP'})[e.target.value]||'Outro';
    return;
   }
   if(e.target.id==='f-task-sector'&&e.target.closest('form[data-form="task"]')){
