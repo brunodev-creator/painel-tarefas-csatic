@@ -234,6 +234,9 @@ body.sig-auth-mode .sig-auth-blue::before {
    qualquer impressão estática do card que existe na arte de fundo. */
 body.sig-auth-mode .sig-auth-card {
   position:relative;
+  width:clamp(450px,33vw,660px);
+  min-height:83dvh;
+  max-width:100%;
   background:
     linear-gradient(158deg,
       rgba(250,251,252,.957) 0%,
@@ -248,10 +251,7 @@ body.sig-auth-mode .sig-auth-card {
     0 0 30px rgba(222,193,113,.13);
   backdrop-filter:blur(32px) saturate(.85);
   -webkit-backdrop-filter:blur(32px) saturate(.85);
-  transform:translate(
-    clamp(-95px,calc(212px - 18vw),0px),
-    clamp(-12px,-1.25dvh,-5px)
-  ) scale(var(--sig-auth-scale,1));
+  transform:translate(-5.7vw,clamp(-15px,-1.25dvh,-5px)) scale(var(--sig-auth-scale,1));
 }
 body.sig-auth-mode .sig-auth-crest {
   width:clamp(133px,27dvh,240px);
