@@ -323,3 +323,8 @@ body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes
 @media(max-width:1260px){.sig-chief-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.sig-chief-grid{grid-template-columns:1fr}}
 @media(max-width:720px){.sig-chief-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sig-chief-stat{padding:13px}.sig-chief-stat>strong{font-size:24px}.sig-chief-filters label{max-width:none;min-width:140px}.sig-chief-filters .btn{width:100%}.sig-chief-panel{padding:14px}.sig-chief-header{padding:15px}.sig-chief-team{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:420px){.sig-chief-team{grid-template-columns:1fr}.sig-chief-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Visibilidade setorial dos novos perfis de chefia. */
+body[data-sig-visible-role="chefe_compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefe_licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
