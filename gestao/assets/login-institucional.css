@@ -184,3 +184,150 @@ body.sig-auth-mode .sig-auth-settings {margin-top:clamp(4px,1.2dvh,11px);}
  body.sig-auth-mode .sig-auth-gold-rule {margin:5px auto;}
  body.sig-auth-mode .sig-auth-foot {margin-top:6px;}
 }
+
+
+
+/* ====== Referência aprovada | continuidade da paisagem + vidro fosco ======
+   A composição completa preserva todos os detalhes externos, inclusive
+   relevo, céu, contornos topográficos e textura dourada do lado direito.
+   Os controles HTML reais permanecem à frente, operacionais e acessíveis.
+   Somente a tela de autenticação é modificada.
+*/
+body.sig-auth-mode .sig-auth-shell {
+  isolation:isolate;
+  position:relative;
+  background-image:url('./login-referencia-completa.svg?v=20261018-composicao-1');
+  background-color:#123552;
+  background-size:cover;
+  background-repeat:no-repeat;
+  background-position:center center;
+}
+body.sig-auth-mode .sig-auth-landscape {
+  background:transparent!important;
+}
+body.sig-auth-mode .sig-auth-landscape::after,
+body.sig-auth-mode .sig-auth-topography,
+body.sig-auth-mode .sig-auth-mark,
+body.sig-auth-mode .sig-auth-blue::after {
+  display:none!important;
+}
+body.sig-auth-mode .sig-auth-blue {
+  background:transparent!important;
+  position:relative;
+}
+body.sig-auth-mode .sig-auth-blue::before {
+  content:'';
+  display:block;
+  position:absolute;
+  pointer-events:none;
+  inset:0;
+  background:linear-gradient(
+    90deg,
+    rgba(12,37,65,.00) 0%,
+    rgba(7,23,46,.035) 45%,
+    rgba(12,28,55,.08) 100%
+  );
+  opacity:1;
+  mask-image:none;
+}
+/* A imagem já possui a composição de referência; a camada de vidro disfarça
+   qualquer impressão estática do card que existe na arte de fundo. */
+body.sig-auth-mode .sig-auth-card {
+  position:relative;
+  background:
+    linear-gradient(158deg,
+      rgba(250,251,252,.957) 0%,
+      rgba(246,246,244,.944) 29%,
+      rgba(243,240,235,.947) 63%,
+      rgba(235,232,227,.951) 100%)!important;
+  border:2px solid rgba(238,209,135,.98);
+  border-radius:clamp(20px,1.75vw,28px);
+  box-shadow:
+    0 23px 52px rgba(5,15,35,.28),
+    0 0 0 1px rgba(255,255,255,.44) inset,
+    0 0 30px rgba(222,193,113,.13);
+  backdrop-filter:blur(32px) saturate(.85);
+  -webkit-backdrop-filter:blur(32px) saturate(.85);
+  transform:translate(
+    clamp(-95px,calc(212px - 18vw),0px),
+    clamp(-12px,-1.25dvh,-5px)
+  ) scale(var(--sig-auth-scale,1));
+}
+body.sig-auth-mode .sig-auth-crest {
+  width:clamp(133px,27dvh,240px);
+  height:auto;
+  max-height:27dvh;
+  margin-bottom:clamp(8px,1.55dvh,18px);
+  object-fit:contain;
+}
+body.sig-auth-mode .sig-auth-title {
+  font-size:clamp(23px,2.62vw,42px);
+  font-weight:900;
+  color:#091c47;
+  letter-spacing:-.9px;
+}
+body.sig-auth-mode .sig-auth-eyebrow {
+  color:#0c2554;
+  font-weight:700;
+  letter-spacing:clamp(3px,.54vw,8px);
+}
+body.sig-auth-mode .sig-auth-gold-rule {
+  background:#b69a59;
+  height:3px;
+  width:74px;
+  margin:clamp(10px,2dvh,22px) auto clamp(10px,2dvh,22px);
+}
+body.sig-auth-mode .sig-auth-form .sig-auth-field input {
+  background:rgba(255,255,255,.80);
+  border:1px solid rgba(255,255,255,.97);
+  box-shadow:0 2px 9px rgba(17,25,40,.055);
+  border-radius:11px;
+  color:#162745;
+}
+body.sig-auth-mode .sig-auth-form .sig-auth-field-icon {color:#343b47;}
+body.sig-auth-mode .sig-auth-remember,
+body.sig-auth-mode .sig-auth-forgot {color:#14224c;}
+body.sig-auth-mode .sig-auth-submit-wrap .sig-auth-submit {
+  background:linear-gradient(110deg,#223a9d 0%,#0e234d 96%);
+  border:2px solid #d7a94e;
+  border-radius:13px;
+  box-shadow:0 9px 24px rgba(13,32,85,.26),0 0 0 1px rgba(255,255,255,.12) inset;
+}
+body.sig-auth-mode .sig-auth-foot {
+  color:#b59b57;
+}
+body.sig-auth-mode .sig-auth-foot span {
+  color:#1d3053;
+}
+body.sig-auth-mode .sig-auth-settings {opacity:.60;font-size:10px;}
+/* Ao mudar para telas estreitas, usar somente a paisagem, sem reproduzir
+   imagem estática do formulário no fundo. O painel permanece interativo. */
+@media(max-width:1170px) {
+ body.sig-auth-mode .sig-auth-shell {
+  background-image:
+   linear-gradient(110deg,rgba(8,27,47,.16),rgba(8,28,55,.34)),
+   url('./login-paisagem-hd.svg?v=20261018-hd-1');
+  background-size:cover;
+  background-position:36% center;
+ }
+ body.sig-auth-mode .sig-auth-blue {
+  background:linear-gradient(120deg,rgba(10,32,58,.09),rgba(10,33,65,.19))!important;
+ }
+ body.sig-auth-mode .sig-auth-card {
+  transform:translateY(-.8dvh) scale(var(--sig-auth-scale,1));
+ }
+}
+@media(max-width:750px) {
+ body.sig-auth-mode .sig-auth-shell {
+  background-image:
+   linear-gradient(180deg,rgba(8,26,48,.22),rgba(7,28,53,.48)),
+   url('./login-paisagem-hd.svg?v=20261018-hd-1');
+  background-position:27% center;
+ }
+ body.sig-auth-mode .sig-auth-blue {background:transparent!important;}
+ body.sig-auth-mode .sig-auth-card {
+  background:linear-gradient(180deg,rgba(250,249,245,.961),rgba(242,239,232,.956))!important;
+  transform:scale(var(--sig-auth-scale,1));
+ }
+ body.sig-auth-mode .sig-auth-crest {width:clamp(70px,14dvh,122px);max-height:15dvh;}
+}
