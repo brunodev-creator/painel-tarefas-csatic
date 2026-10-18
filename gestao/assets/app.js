@@ -921,10 +921,27 @@ function usuariosView(){if(!isAdmin())return heading('Acesso','Não autorizado',
  return heading('Administração','Gestão de usuários','Convide usuários, escolha seus setores e controle permissões. Nenhuma senha é visível ao administrador.',`<button class="btn" data-action="reloadUsers">↻ Atualizar</button><button class="btn primary" data-action="inviteUser">+ Convidar usuário</button>`)+`<div class="info-note warning-note">Convites dependem do serviço de e-mail do Supabase e da configuração de URLs de redirecionamento. No plano gratuito existem limites de envio.</div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Nome / E-mail</th><th>Perfil</th><th>Setor</th><th>Acesso</th><th>Último login</th><th></th></tr></thead><tbody>${!adminLoaded?'<tr><td colspan="6" class="table-empty">Carregando usuários…</td></tr>':adminUsers.map(u=>`<tr><td><div class="cell-main">${esc(u.nome)}</div><div class="cell-sub">${esc(u.email)}</div></td><td>${esc(labelRole(u.role))}</td><td>${esc(u.setor||'—')}</td><td>${iconBadge(u.ativo?'Ativo':'Inativo')}</td><td>${u.ultimo_acesso?new Date(u.ultimo_acesso).toLocaleString('pt-BR'):'Nunca'}</td><td>${u.role!=='admin'?`<button class="btn small" data-action="editUser" data-id="${esc(u.auth_id)}">Gerenciar</button>`:'<span class="cell-sub">Administrador</span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="table-empty">Nenhum perfil encontrado.</td></tr>'}</tbody></table></div></div>`;
 }
 function setorOptionsUsers(sector,selected){return `<option value="">Fila do setor (não atribuído)</option>`+userCandidates(sector).map(u=>`<option value="${esc(u.auth_id)}" ${u.auth_id===selected?'selected':''}>${esc(u.nome)} · ${esc(u.role)}</option>`).join('')}
-function transferForm(id){const p=findProcess(id);if(!p||!canWrite(p.setor)||!activeProcess(p))return showToast('Processo indisponível para encaminhamento.');
- const dest=({Compras:'Licitação','Licitação':'SOFI','SOFI':'Compras'})[p.setor];
- const html=`<div class="info-note"><strong>${esc(p.numero)}</strong> · origem: ${esc(p.setor)} · último responsável: ${esc(p.responsavel)}</div><form data-form="transfer" data-id="${esc(id)}"><div class="form-grid">${selectField('destino','Setor de destino',SECTORS,dest)}<div class="form-row"><label for="f-destinatario_auth_id">Destinatário autorizado</label><select name="destinatario_auth_id" id="f-destinatario_auth_id">${setorOptionsUsers(dest,'')}</select></div>${selectField('status','Situação ao receber',['Aguardando providência','Aguardando documentação','Aguardando empenho','Em andamento','Bloqueado'],dest==='SOFI'?'Aguardando empenho':'Aguardando providência')}${inputField('prazo','Prazo da próxima ação',dayOffset(3),'date')}${textareaField('motivo','Motivo do encaminhamento (obrigatório)','')}${textareaField('proxima_acao','Próxima providência do destino','')}</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Confirmar encaminhamento</button></div></form>`;
- openModal('Encaminhar processo',`${p.numero} · a transferência ficará registrada na linha do tempo.`,html,true);
+function transferForm(id,selectedTaskId){
+ const p=findProcess(id);
+ if(!p||!canWrite(p.setor)||!activeProcess(p)||previewRole)return showToast('Processo indisponível para tramitação.');
+ const target=({Compras:'Licitação','Licitação':'SOFI','SOFI':'Compras'})[p.setor];
+ const tasks=db.tarefas.filter(t=>t.processo_id===p.id&&t.setor===p.setor&&isOpenTask(t)&&
+  (profile.role==='admin'||isSectionChiefRole(profile.role)||assignedToMe(t)));
+ const preferred=selectedTaskId||tasks.find(t=>assignedToMe(t))?.id||'';
+ const fields='<div class="form-grid">'+
+  '<div class="form-row"><label for="f-destino">Destino</label><select id="f-destino" name="destino">'+SECTORS.filter(x=>x!==p.setor).map(x=>'<option value="'+esc(x)+'"'+(x===target?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'+
+  selectField('tipo','Tipo',['Encaminhamento','Devolução','Consulta'],'Encaminhamento')+
+  '<div class="form-row full"><label for="f-tarefa_origem">Providência da sua seção (opcional)</label><select name="tarefa_origem" id="f-tarefa_origem"><option value="">Nenhuma tarefa específica</option>'+
+    tasks.map(t=>'<option value="'+esc(t.id)+'"'+(t.id===preferred?' selected':'')+'>'+esc(t.titulo.slice(0,95))+'</option>').join('')+'</select>'+
+    '<small class="helper">Ao encaminhar a tarefa escolhida, ela ficará registrada como Encaminhada, sem perder seu histórico.</small></div>'+
+  inputField('prazo','Prazo solicitado',dayOffset(3),'date')+
+  textareaField('motivo','Motivo / providência realizada','')+
+  textareaField('proxima_acao','O que a seção de destino deve fazer?','')+
+  '</div>';
+ const html='<div class="info-note"><strong>'+esc(p.numero)+'</strong> · origem: '+esc(p.setor)+'. O envio cria uma tarefa na fila da seção de destino; qualquer integrante poderá assumi-la.</div>'+
+  '<form data-form="transfer" data-id="'+esc(id)+'">'+fields+
+  '<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Encaminhar para a seção</button></div></form>';
+ openModal('Tramitar demanda',p.numero+' · transferência registrada no histórico do processo.',html,true);
 }
 function userForm(id){
  if(!isAdmin()||!cloud())return showToast('É necessário ser administrador conectado.');
@@ -945,20 +962,47 @@ async function adminApi(acao,payload={}){if(!cloud()||!session||!isAdmin())throw
  const r=await rest('/functions/v1/gerenciar-usuarios','POST',{acao,...payload});if(r?.erro)throw Error(r.erro);return r;
 }
 async function loadAdminUsers(){if(!isAdmin()||!cloud())return;try{const r=await adminApi('listar');adminUsers=r.usuarios||[];adminLoaded=true;render();if(r.parcial)showToast('Lista parcial: limite de 1.000 contas.')}catch(e){adminLoaded=true;showToast('Falha ao carregar usuários: '+errMsg(e));render()}}
-async function submitTransfer(form){const d=gather(form),p=findProcess(form.dataset.id);if(!p)throw Error('Processo não encontrado');
- if(d.motivo.trim().length<8||d.proxima_acao.trim().length<5)return showToast('Informe motivo (8 caracteres) e próxima ação (5 caracteres).');
- if(!canWrite(p.setor))return showToast('Sem permissão no setor de origem.');
- const selected=db.usuarios.find(u=>u.auth_id===d.destinatario_auth_id),name=selected?.nome||'Fila da '+d.destino;
- busy=true;try{
-  if(cloud())await rest('/rest/v1/rpc/encaminhar_processo','POST',{p_processo_id:p.id,p_destino:d.destino,p_destinatario_auth_id:d.destinatario_auth_id||null,p_motivo:d.motivo,p_proxima_acao:d.proxima_acao,p_prazo:d.prazo||null,p_status:d.status,p_versao:p.updated_at});
-  else{
-   const origem=p.setor;p.setor=d.destino;p.responsavel=name;p.responsavel_auth_id=d.destinatario_auth_id||null;p.etapa='Recebido pela '+d.destino;p.status=d.status;p.proxima_acao=d.proxima_acao;p.prazo=d.prazo;p.updated_at=nowIso();
-   db.tramites.unshift({id:uuid(),processo_id:p.id,origem,destino:d.destino,motivo:d.motivo,proxima_acao:d.proxima_acao,responsavel_destino:name,destinatario_auth_id:d.destinatario_auth_id||null,prazo:d.prazo,status_destino:d.status,criado_em:nowIso()});
-   db.tarefas.unshift({id:uuid(),processo_id:p.id,titulo:'Receber '+p.numero+': '+d.proxima_acao,descricao:d.motivo,setor:d.destino,responsavel:name,responsavel_auth_id:d.destinatario_auth_id||null,prioridade:p.prioridade,status:'Pendente',prazo:d.prazo,updated_at:nowIso()});
-   db.eventos.unshift({id:uuid(),processo_id:p.id,tipo:'Encaminhamento',descricao:origem+' → '+d.destino+' | '+d.motivo,usuario:profile.nome,criado_em:nowIso()});saveLocal();
+async function submitTransfer(form){
+ const d=gather(form),p=findProcess(form.dataset.id);
+ if(!p||!canWrite(p.setor)||previewRole)throw Error('Processo indisponível para encaminhamento.');
+ if(d.destino===p.setor||!SECTORS.includes(d.destino))return showToast('Selecione outra seção como destino.');
+ if(!['Encaminhamento','Devolução','Consulta'].includes(d.tipo))return showToast('Tipo de tramitação inválido.');
+ if((d.motivo||'').trim().length<8||(d.proxima_acao||'').trim().length<5)
+  return showToast('Informe motivo (mínimo 8 caracteres) e próxima ação (mínimo 5).');
+ const selected=d.tarefa_origem?db.tarefas.find(t=>t.id===d.tarefa_origem):null;
+ if(d.tarefa_origem&&(!selected||selected.processo_id!==p.id||selected.setor!==p.setor||!canManageTask(selected)))
+  return showToast('A tarefa selecionada não pode ser encaminhada por este usuário.');
+ busy=true;
+ try{
+  if(cloud()){
+   await rest('/rest/v1/rpc/encaminhar_demanda','POST',{
+    p_processo_id:p.id,p_destino:d.destino,p_motivo:d.motivo,
+    p_proxima_acao:d.proxima_acao,p_prazo:d.prazo||null,
+    p_versao:p.updated_at,p_tipo:d.tipo,p_tarefa_origem:selected?.id||null
+   });
+   await fetchCloud();
+  }else{
+   const original=p.setor;
+   if(selected)selected.status='Encaminhada';
+   Object.assign(p,{setor:d.destino,status:d.destino==='SOFI'?'Aguardando empenho':'Aguardando providência',
+    etapa:(d.tipo==='Devolução'?'Devolvido para ':'Recebido pela ')+d.destino,
+    responsavel:'Fila da '+d.destino,responsavel_auth_id:null,
+    proxima_acao:d.proxima_acao,prazo:d.prazo||null,updated_at:nowIso()});
+   db.tramites.unshift({id:uuid(),processo_id:p.id,origem:original,destino:d.destino,
+    tipo:d.tipo,motivo:d.motivo,proxima_acao:d.proxima_acao,
+    responsavel_destino:'Fila da '+d.destino,destinatario_auth_id:null,
+    prazo:d.prazo,criado_em:nowIso()});
+   db.tarefas.unshift({id:uuid(),processo_id:p.id,titulo:(d.tipo==='Devolução'?'Corrigir ':'Atender ')+p.numero+': '+d.proxima_acao,
+    descricao:d.motivo,setor:d.destino,responsavel:'Fila da '+d.destino,responsavel_auth_id:null,
+    prioridade:p.prioridade,status:'Pendente',prazo:d.prazo,updated_at:nowIso()});
+   db.eventos.unshift({id:uuid(),processo_id:p.id,tipo:d.tipo,
+    descricao:original+' → '+d.destino+' · '+d.proxima_acao,usuario:profile.nome,criado_em:nowIso()});
+   saveLocal();
   }
-  closeModal();busy=false;if(cloud())await fetchCloud();render();showToast('Encaminhamento e tarefa registrados.');
- }catch(e){busy=false;showToast('Encaminhamento não realizado: '+errMsg(e))}
+  closeModal();render();
+  showToast('Demanda encaminhada à '+d.destino+'. Nova tarefa criada na fila do setor.');
+ }catch(e){showToast('Encaminhamento não realizado: '+errMsg(e))}
+ finally{busy=false}
 }
 async function submitUser(form){const d=gather(form),existing=form.dataset.form==='updateUser';
  const fixed=SIG_CHIEF_SECTIONS[d.role]||({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[d.role]||null;
@@ -1375,7 +1419,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'startReceipt': await v3StartReceipt(id);break;
  case 'chiefSector': navigate('processos');filters.setor=btn.dataset.sector||'Todos';render();break;
  case'menu':document.getElementById('sidebar').classList.toggle('open');document.getElementById('shade').classList.toggle('visible');break;
- case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
+ case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
 function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{if(e.target.dataset?.chiefFilter){
    const field=e.target.dataset.chiefFilter,value=e.target.value;
