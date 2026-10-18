@@ -984,6 +984,114 @@ function aipcField([key,label,type],data){
   (type==='textarea'?'<textarea id="aipc-'+key+'" name="aipc__'+key+'" rows="2">'+esc(v)+'</textarea>':
    '<input id="aipc-'+key+'" name="aipc__'+key+'" type="'+type+'" value="'+esc(v)+'">')+'</div>';
 }
+
+// Visualizador institucional. Usa apenas valores gravados na AIPC, sem fabricar
+// autenticação/assinatura SEI; não cria linhas para itens não preenchidos.
+function aipcItensPreenchidos(data){
+ const fields=['lote','quantidade','siad','descricao','unitario','total'];
+ return Array.from({length:30},(_,idx)=>idx+1).map(n=>{
+  const item=Object.fromEntries(fields.map(k=>[k,String(data['item_'+n+'_'+k]??'').trim()]));
+  return {n,...item};
+ }).filter(item=>fields.some(k=>item[k]!==''));
+}
+function aipcLinkSei(data){
+ const value=String(data?.link_documento_sei||'').trim();
+ if(!value)return '';
+ try{
+  const url=new URL(value);
+  const hostname=url.hostname.toLowerCase();
+  return url.protocol==='https:'&&(hostname==='sei.mg.gov.br'||hostname.endsWith('.sei.mg.gov.br'))?url.href:'';
+ }catch{return ''}
+}
+function aipcDocumentoHtml(p,doc){
+ const data=doc.dados&&typeof doc.dados==='object'?doc.dados:{};
+ const groups=[
+  ['AQUISIÇÃO',data.ordem_aquisicao],
+  ['SOLICITAÇÃO DE COMPRA',data.solicitacao_compra],
+  ['PEDIDO DE COMPRA',data.pedido_compra],
+  ['PROCESSO DE COMPRA',doc.numero_processo_compras],
+  ['DESTINO(S)',data.unidade_beneficiada],
+  ['RPM',data.rpm??data.localidade],
+  ['OBJETO',data.objeto],
+  ['VALOR TOTAL',data.valor_total],
+  ['UNID. EXECUTORA',data.unidade_executora],
+  ['DOTAÇÃO ORÇAMENTÁRIA',data.dotacao],
+  ['MODALIDADE DE AQUISIÇÃO',data.modalidade],
+  ['NÚMERO DA MODALIDADE / ATA',data.numero_modalidade],
+  ['MEMORANDO INTERNO',data.memorando],
+  ['PA DISPONIBILIDADE ORÇAMENTÁRIA',data.pa],
+  ['SEI',data.sei],
+  ['ORIGEM DO RECURSO',data.origem_recurso],
+  ['CONVÊNIO',data.convenio],
+  ['Nº CONVÊNIO (SIAFI)',data.numero_convenio],
+  ['VIGÊNCIA DO CONVÊNIO',data.vigencia_convenio],
+  ['TRANSFERÊNCIA ESPECIAL',data.transferencia_especial],
+  ['EMENDA PARLAMENTAR',data.emenda_parlamentar],
+  ['PARLAMENTAR',data.parlamentar],
+  ['Nº DA INDICAÇÃO',data.numero_indicacao],
+  ['BANCO',data.banco],['AGÊNCIA BANCÁRIA',data.agencia],['CONTA BANCÁRIA',data.conta],
+  ['PREPOSTO',data.preposto],['POSTO DO PREPOSTO',data.posto_preposto],
+  ['NOME DO PREPOSTO',data.nome_preposto],['FISCAL DO CONTRATO',data.fiscal_contrato],
+  ['ORDENADOR DE DESPESA',data.ordenador_despesa],
+  ['ORDENADOR DE DESPESA SUBSTITUTO',data.ordenador_substituto]
+ ];
+ const identification=groups.filter(([,v])=>String(v??'').trim()!=='')
+  .map(([name,value])=>'<div class="sig-aipc-doc-field"><strong>'+esc(name)+':</strong> <span>'+esc(value)+'</span></div>').join('');
+ const filled=aipcItensPreenchidos(data);
+ const rows=filled.map(item=>
+  '<tr><td>'+esc(item.lote)+'</td><td>'+esc(item.quantidade)+'</td>'+
+  '<td>'+esc(item.siad)+'</td><td class="sig-aipc-desc">'+esc(item.descricao)+'</td>'+
+  '<td>'+esc(item.unitario)+'</td><td>'+esc(item.total)+'</td></tr>').join('');
+ const table=filled.length?'<table class="sig-aipc-doc-table"><thead><tr>'+
+  '<th>LOTE</th><th>QTD</th><th>CÓDIGO SIAD</th><th>DESCRIÇÃO DO SERVIÇO/MATERIAL</th>'+
+  '<th>VALOR UNITÁRIO</th><th>VALOR TOTAL</th></tr></thead><tbody>'+rows+'</tbody></table>':
+  '<p class="sig-aipc-doc-empty">Nenhum item de aquisição foi preenchido na AIPC.</p>';
+ const chief=String(data.chefe_compras||'').trim();
+ const revisionCount=(db.aipc_revisoes||[]).filter(v=>v.processo_id===doc.processo_id).length;
+ const status=doc.status==='pronta'?'AIPC pronta':'AIPC em rascunho';
+ return '<article class="sig-aipc-paper" aria-label="AIPC formatada para consulta">'+
+  '<header class="sig-aipc-paper-head"><div class="sig-aipc-paper-government">'+
+  '<strong>GOVERNO DO ESTADO DE MINAS GERAIS</strong><strong>POLÍCIA MILITAR DE MINAS GERAIS</strong>'+
+  '<span>CSA-TIC — Seção de Compras</span></div>'+
+  '<div class="sig-aipc-paper-meta">'+esc(status)+
+   (doc.atualizado_em?' · Atualização do SIG: '+new Date(doc.atualizado_em).toLocaleDateString('pt-BR'):'')+
+  '</div></header>'+
+  '<h2>AIPC — AUTORIZAÇÃO DE INSTAURAÇÃO DE PROCESSO DE COMPRAS</h2>'+
+  '<section class="sig-aipc-doc-section"><h3>1. IDENTIFICAÇÃO</h3>'+
+   (identification||'<p class="sig-aipc-doc-empty">Identificação ainda não preenchida.</p>')+'</section>'+
+  '<section class="sig-aipc-doc-section"><h3>2. MATERIAL OU SERVIÇO</h3>'+table+'</section>'+
+  '<section class="sig-aipc-doc-section"><h3>3. CHEFE DA SEÇÃO DE COMPRAS</h3>'+
+   (chief?'<p>'+esc(chief)+'</p>':'<p class="sig-aipc-doc-empty">Identificação não informada.</p>')+
+  '</section>'+
+  '<footer class="sig-aipc-paper-foot"><strong>Prévia gerada pelo SIG Online.</strong> Não contém assinatura eletrônica, código verificador ou CRC do SEI.'+
+   (revisionCount?' Revisões anteriores registradas: '+revisionCount+'.':'')+
+  '</footer></article>';
+}
+function aipcVisualizar(id){
+ if(!canViewAipc())return showToast('Faça login para consultar a AIPC.');
+ const doc=getAipc(id);
+ if(!doc)return showToast('AIPC ainda não cadastrada para este processo.');
+ const p=aipcProcess(id)||{id,numero:doc.numero_processo_compras||'—',objeto:doc.dados?.objeto||'AIPC'};
+ const url=aipcLinkSei(doc.dados);
+ const actions='<div class="sig-aipc-view-actions">'+
+  '<button type="button" class="btn" data-action="aipcPrint">Imprimir / salvar PDF</button>'+
+  (url?'<a class="btn" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Abrir documento oficial no SEI ↗</a>':
+   '<span class="sig-aipc-no-sei">Link do documento oficial no SEI não informado.</span>')+
+  (canEditAipc()?'<button type="button" class="btn primary" data-action="aipcEdit" data-id="'+esc(id)+'">Editar AIPC</button>':'')+
+  '<button type="button" class="btn" data-action="closeModal">Fechar</button></div>';
+ const html='<div class="sig-aipc-document-view">'+
+  '<div class="info-note">Visualização somente leitura. Apenas a Seção de Compras pode alterar a AIPC; o documento oficial assinado deve ser consultado no SEI.</div>'+
+  actions+aipcDocumentoHtml(p,doc)+'</div>';
+ openModal('Visualizar AIPC',p.numero+' · '+(p.objeto||'Aquisição'),html,true);
+}
+function aipcImprimir(){
+ if(!document.querySelector('.sig-aipc-paper'))return showToast('Abra a AIPC antes de imprimir.');
+ document.body.classList.add('sig-aipc-printing');
+ const cleanup=()=>document.body.classList.remove('sig-aipc-printing');
+ window.addEventListener('afterprint',cleanup,{once:true});
+ window.print();
+}
+
 function aipcForm(id){
  const p=aipcProcess(id);
  if(!p||!canEditAipc())return showToast('Somente a Seção de Compras pode editar a AIPC.');
