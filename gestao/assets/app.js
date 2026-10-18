@@ -148,6 +148,9 @@ function cardTitle(title,sub='',act=''){return `<div class="section-heading"><di
 function empty(label='Nenhum registro encontrado'){return `<div class="empty"><div class="empty-icon">◌</div>${esc(label)}</div>`}
 function periodNotice(){return cloud()?`<div class="info-note">Dados consultados no banco da organização ${lastLoad?'· última atualização '+new Date(lastLoad).toLocaleTimeString('pt-BR'):''}. Confirme a completude das importações antes de tomar decisões orçamentárias.</div>`:`<div class="info-note warning-note">Indicadores baseados exclusivamente em <strong>registros fictícios</strong>. Os cálculos não representam saldos oficiais ou situação real de qualquer processo.</div>`}
 function updateChrome(){
+ // Estado visual separado do perfil real: o CSS também oculta menus não autorizados.
+ document.body.dataset.sigVisibleRole=effectiveRole();
+ document.body.classList.toggle('sig-role-preview',!!previewRole);
  const personalTaskCount=db.tarefas.filter(t=>t.status!=='Concluída'&&assignedToMe(t)).length;
  const unread=v3Unread();
  document.getElementById('nav').innerHTML=currentMenus().map(id=>NAV.find(([key])=>key===id)).filter(Boolean).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
