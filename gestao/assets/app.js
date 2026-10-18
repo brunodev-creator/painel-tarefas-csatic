@@ -1240,9 +1240,9 @@ function tasksView(){
   taskScope==='queue'?t.setor===setor&&queueClaimable(t):
   taskScope==='sector'?t.setor===setor:true);
  const arr=list.filter(t=>filters.setor==='Todos'||t.setor===filters.setor)
-  .filter(t=>filters.status==='Todos'||t.status===filters.status)
+  .filter(t=>filters.status==='Todos'||(taskIsPriorStage(t)?'Encaminhada':t.status)===filters.status)
   .filter(t=>searchText(t.titulo,t.responsavel,t.descricao,taskProcessSummary(t)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR')))
-  .sort((a,b)=>(!isOpenTask(a))-(!isOpenTask(b))||daysLeft(a.prazo)-daysLeft(b.prazo));
+  .sort((a,b)=>(!isOpenTask(a)||taskIsPriorStage(a))-(!isOpenTask(b)||taskIsPriorStage(b))||daysLeft(a.prazo)-daysLeft(b.prazo));
  const actions='<div class="sig-task-tabs">'+[
   ['mine','Minhas tarefas'],['queue','Fila disponível'],['sector','Toda a seção']
  ].map(([key,label])=>'<button type="button" class="btn small'+(taskScope===key?' primary':'')+'" data-action="taskScope" data-scope="'+key+'">'+label+'</button>').join('')+
