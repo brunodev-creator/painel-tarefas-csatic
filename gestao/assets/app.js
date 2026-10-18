@@ -885,7 +885,94 @@ function requiresAipc(p){
  return ['cotep','pregao','registro de preco','registro de precos','adesao arp'].includes(kind);
 }
 function getAipc(processId){return (db.aipc||[]).find(a=>a.processo_id===processId)||null}
-function isAipcReady(processId){return Boolean(String(getAipc(processId)?.numero_processo_compras||'').trim());}
+function isAipcReady(processId){const a=getAipc(processId);return !!a&&a.status==='pronta'&&!!String(a.numero_processo_compras||'').trim();}
+function aipcStatusText(id){
+ const a=getAipc(id);
+ return !a?'AIPC · Não iniciada':isAipcReady(id)?'AIPC ✓ Pronta':'AIPC · Rascunho';
+}
+let aipcAutoTimer=null,aipcSaveChain=Promise.resolve();
+function aipcSaveMessage(form,label,state=''){
+ const el=form?.querySelector('[data-aipc-save-status]');
+ if(el){el.textContent=label;el.dataset.state=state;}
+}
+function aipcScheduleAutosave(form){
+ if(!form?.isConnected)return;
+ form.dataset.dirty='1';
+ form.dataset.changeSeq=String((Number(form.dataset.changeSeq)||0)+1);
+ aipcSaveMessage(form,'Alterações ainda não salvas','dirty');
+ clearTimeout(aipcAutoTimer);
+ aipcAutoTimer=setTimeout(()=>{
+  if(form.isConnected&&form.dataset.dirty==='1')
+   aipcPersist(form,'auto').catch(()=>{});
+ },1600);
+}
+function aipcSnapshot(form){
+ const d=gather(form),quantity=Number.parseInt(d.quantidade_itens,10);
+ if(!Number.isInteger(quantity)||quantity<0||quantity>30)throw Error('Escolha de 0 a 30 itens na AIPC.');
+ const dados={quantidade_itens:String(quantity)};
+ for(const [key,value] of Object.entries(d)){
+  if(!key.startsWith('aipc__')||String(value).trim()==='')continue;
+  const field=key.slice(6),m=/^item_(\d+)_(quantidade|siad|descricao|unitario|total)$/.exec(field);
+  if(m&&(Number(m[1])<1||Number(m[1])>quantity))continue;
+  dados[field]=String(value).trim();
+ }
+ return {numero:String(d.numero_processo_compras||'').trim(),dados};
+}
+async function aipcPersist(form,mode='auto'){
+ const id=form?.dataset.id,p=findProcess(id);
+ if(!form||!p||!canWrite(p.setor)||previewRole)throw Error('AIPC indisponível para esta seção.');
+ const final=mode==='finalizar';
+ const snap=aipcSnapshot(form);
+ if(final&&!snap.numero)throw Error('Informe o Número do Processo de Compras para finalizar a AIPC.');
+ clearTimeout(aipcAutoTimer);aipcAutoTimer=null;
+ const seq=String(form.dataset.changeSeq||'0');
+ aipcSaveMessage(form,final?'Finalizando AIPC…':'Salvando no servidor…','saving');
+ const job=aipcSaveChain.catch(()=>{}).then(async()=>{
+  let saved;
+  if(cloud()){
+   saved=await rest('/rest/v1/rpc/salvar_aipc','POST',{
+    p_processo_id:id,p_numero:snap.numero||null,p_dados:snap.dados,p_finalizar:final
+   });
+   if(Array.isArray(saved))saved=saved[0];
+   if(!saved||saved.processo_id!==id)throw Error('O servidor não confirmou o salvamento.');
+  }else{
+   const old=getAipc(id);
+   saved={...old,processo_id:id,numero_processo_compras:snap.numero||null,dados:snap.dados,
+    status:final?'pronta':old?.status==='pronta'&&snap.numero?'pronta':'rascunho',
+    atualizado_em:nowIso()};
+  }
+  db.aipc=db.aipc||[];
+  const i=db.aipc.findIndex(a=>a.processo_id===id);
+  if(i>=0)db.aipc.splice(i,1,saved);else db.aipc.push(saved);
+  if(!cloud())saveLocal();
+  if(form.isConnected&&String(form.dataset.changeSeq||'0')===seq){
+   form.dataset.dirty='0';
+   const hour=new Date(saved.atualizado_em||Date.now()).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+   aipcSaveMessage(form,(cloud()?'Salvo no servidor às ':'Salvo neste dispositivo às ')+hour,'saved');
+   const tag=form.querySelector('[data-aipc-document-status]');
+   if(tag)tag.textContent=saved.status==='pronta'?'Pronta':'Rascunho';
+  }
+  return saved;
+ });
+ aipcSaveChain=job;
+ try{
+  const saved=await job;
+  if(mode!=='auto'&&form.isConnected){
+   if(String(form.dataset.changeSeq||'0')!==seq){
+    form.dataset.aipcClosing='0';aipcScheduleAutosave(form);
+    showToast('Há alterações mais recentes. Aguarde o salvamento antes de fechar.');
+   }else{
+    form.dataset.dirty='0';closeModal();render();
+    showToast(final?'AIPC finalizada. O processo pode ser encaminhado.':'Rascunho da AIPC salvo com sucesso.');
+   }
+  }
+  return saved;
+ }catch(e){
+  if(form.isConnected){form.dataset.dirty='1';form.dataset.aipcClosing='0';aipcSaveMessage(form,'Falha ao salvar. Tente novamente.','error');}
+  if(mode!=='auto')showToast('Não foi possível salvar a AIPC: '+errMsg(e));
+  throw e;
+ }
+}
 function aipcField([key,label,type],data){
  const v=data[key]??'';
  return '<div class="form-row'+(type==='textarea'?' full':'')+'"><label for="aipc-'+key+'">'+esc(label)+'</label>'+
@@ -932,13 +1019,17 @@ function aipcForm(id){
   selector+'<div class="sig-aipc-items">'+itemFields+'</div></details>';
 
  const html='<form data-form="aipc" data-id="'+esc(id)+'" data-initial-item-count="'+initialCount+'" class="sig-aipc-form">'+
-  '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Identificação vinculada ao mesmo processo e mantida nas tramitações entre seções.</div>'+
-  '<div class="sig-aipc-essential"><label for="aipc-numero_processo_compras"><strong>Número do Processo de Compras *</strong></label>'+
-   '<input id="aipc-numero_processo_compras" name="numero_processo_compras" required maxlength="120" value="'+esc(item?.numero_processo_compras||'')+'" placeholder="Informe o número do Processo de Compras">'+
-   '<small>Este é o único campo obrigatório. Os demais podem ser preenchidos agora ou posteriormente.</small></div>'+
+  '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Salve o rascunho mesmo sem número e continue o preenchimento depois.</div>'+
+  '<div class="sig-aipc-statebar"><span data-aipc-document-status>'+esc(item?.status==='pronta'?'Pronta':item?'Rascunho':'Não iniciada')+'</span>'+
+   '<span data-aipc-save-status aria-live="polite">'+(item?.atualizado_em?'Salvo às '+new Date(item.atualizado_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Ainda não salvo')+'</span></div>'+
   sections+items+
-  '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button>'+
-  '<button type="submit" class="btn primary">'+(item?'Atualizar AIPC':'Salvar AIPC')+'</button></div></form>';
+  '<div class="sig-aipc-essential"><div class="sig-aipc-final-step"><strong>Finalização da AIPC</strong><small>Preencha o número ao fim do procedimento, quando estiver disponível.</small></div>'+
+   '<label for="aipc-numero_processo_compras">Número do Processo de Compras</label>'+
+   '<input id="aipc-numero_processo_compras" name="numero_processo_compras" maxlength="120" value="'+esc(item?.numero_processo_compras||'')+'" placeholder="Preencher por último">'+
+   '<small>O número não é obrigatório para salvar o rascunho.</small></div>'+
+  '<div class="modal-footer sig-aipc-actions"><button type="button" class="btn" data-action="closeModal">Fechar</button>'+
+  '<button type="submit" class="btn" name="acao" value="rascunho">Salvar rascunho</button>'+
+  '<button type="submit" class="btn primary" name="acao" value="finalizar">Finalizar AIPC</button></div></form>';
  openModal((item?'Editar':'Preencher')+' AIPC',p.numero+' · '+p.objeto,html,true);
  updateAipcItemCount(document.querySelector('#modal-root form[data-form="aipc"]'));
 }
@@ -958,38 +1049,9 @@ function updateAipcItemCount(form){
  if(warning)warning.hidden=requested>=old;
 }
 
-async function submitAipc(form){
- const id=form.dataset.id,p=findProcess(id);
- if(!p||!canWrite(p.setor))throw Error('Sem permissão para editar AIPC de outro setor.');
- const d=gather(form);
- const number=String(d.numero_processo_compras||'').trim();
- if(!number)return showToast('Informe o número do Processo de Compras na AIPC.');
- const quantidadeItens=Number.parseInt(d.quantidade_itens,10);
- if(!Number.isInteger(quantidadeItens)||quantidadeItens<0||quantidadeItens>30)
-  return showToast('Selecione uma quantidade de 0 a 30 itens.');
- const dados={quantidade_itens:String(quantidadeItens)};
- for(const [key,value] of Object.entries(d)){
-  if(!key.startsWith('aipc__')||String(value).trim()==='')continue;
-  const itemKey=key.slice(6),match=/^item_(\d+)_(quantidade|siad|descricao|unitario|total)$/.exec(itemKey);
-  if(match&&(Number(match[1])<1||Number(match[1])>quantidadeItens))continue;
-  dados[itemKey]=String(value).trim();
- }
- const previous=getAipc(id);
- const payload={numero_processo_compras:number,dados};
- busy=true;
- try{
-  if(cloud()){
-   if(previous)await rest('/rest/v1/aipc?processo_id=eq.'+encodeURIComponent(id),'PATCH',payload);
-   else await rest('/rest/v1/aipc','POST',{processo_id:id,...payload});
-   await fetchCloud();
-  }else{
-   const record={...previous,processo_id:id,...payload,atualizado_em:nowIso()};
-   if(previous)db.aipc.splice(db.aipc.indexOf(previous),1,record);
-   else db.aipc.push(record);
-   saveLocal();
-  }
-  closeModal();render();showToast('AIPC salva. O Processo de Compras está registrado para o encaminhamento.');
- }finally{busy=false;}
+async function submitAipc(form,action){
+ try{return await aipcPersist(form,action==='finalizar'?'finalizar':'rascunho')}
+ catch(e){if(action==='finalizar'&&!String(form.querySelector('[name="numero_processo_compras"]')?.value||'').trim())showToast(errMsg(e));return}
 }
 
 function canManageTask(t){
@@ -1439,7 +1501,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type==='aipc')return submitAipc(form);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
