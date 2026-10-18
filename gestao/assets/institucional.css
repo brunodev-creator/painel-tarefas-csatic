@@ -189,3 +189,82 @@ body[data-sig-visible-role="licitacao"] #nav .navitem:not([data-view="notificaco
 body[data-sig-visible-role="sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 body[data-sig-visible-role="chefia"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="compras"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+
+
+/* Compras — etapa 1 de UX: fila operacional, ações objetivas e formulário compacto. */
+.sig-buy-page{max-width:1240px;margin:0 auto;color:#253343}
+.sig-buy-head{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:0 0 24px}
+.sig-buy-head h1{font-size:clamp(25px,2.5vw,33px);margin:5px 0 6px;letter-spacing:-.045em;color:#242b36}
+.sig-buy-head p{font-size:13px;color:#727985;margin:0;line-height:1.6}
+.sig-buy-head-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.sig-buy-head-actions .btn{min-height:42px;font-size:12px}
+.sig-buy-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:22px}
+.sig-buy-metric{text-align:left;background:#fff;border:1px solid #deded9;border-radius:13px;padding:17px 17px 15px;color:#333b4c;box-shadow:0 3px 12px #171e2a08;display:flex;flex-direction:column;gap:10px;min-width:0;transition:border-color .15s ease,transform .15s ease}
+.sig-buy-metric:hover{border-color:#b49b6d;transform:translateY(-1px)}
+.sig-buy-metric.active{border:2px solid #a18551;padding:16px 16px 14px;background:#fcfaf5}
+.sig-buy-metric:focus-visible,.sig-buy-item button:focus-visible,.sig-buy-search input:focus-visible,.sig-buy-extra summary:focus-visible{outline:3px solid #b59b6b;outline-offset:2px}
+.sig-buy-metric-top{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;font-weight:800}
+.sig-buy-metric-icon{font-size:17px;color:#9b8153}
+.sig-buy-metric strong{font:800 30px/1 Manrope,system-ui,sans-serif;letter-spacing:-.05em;color:#1d2f49}
+.sig-buy-metric small{font-size:10px;line-height:1.5;color:#767d85}
+.sig-buy-workbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px}
+.sig-buy-search{display:flex;align-items:center;gap:10px;border:1px solid #d9deda;background:#fff;border-radius:10px;max-width:580px;flex:1;padding:0 14px;color:#a38652}
+.sig-buy-search:focus-within{border-color:#a99163;box-shadow:0 0 0 3px #cbb68c26}
+.sig-buy-search input{width:100%;height:45px;border:0;outline:0;background:transparent;color:#283746;font-size:13px}
+.sig-buy-count{font-size:12px;color:#858b92;white-space:nowrap}
+.sig-buy-list{display:grid;gap:12px}
+.sig-buy-item{background:#fff;border:1px solid #e1e1db;border-radius:13px;padding:20px 23px;box-shadow:0 4px 14px #17253607;border-left:4px solid #b8c8c8}
+.sig-buy-item.near{border-left-color:#d1b16b}
+.sig-buy-item.urgent{border-left-color:#b77a51}
+.sig-buy-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}
+.sig-buy-item-heading{min-width:0}
+.sig-buy-process-link{display:inline-flex;align-items:center;color:#344e68;border:0;background:none;padding:0;margin:0 0 5px;font-size:12px;font-weight:800;cursor:pointer}
+.sig-buy-process-link:hover{text-decoration:underline}
+.sig-buy-item h3{color:#222d39;font-size:15px;line-height:1.45;letter-spacing:-.015em;overflow-wrap:anywhere}
+.sig-buy-tags{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:7px}
+.sig-buy-high{font-size:10px;font-weight:800;border-radius:6px;padding:5px 8px;background:#f6f0e4;color:#946a35;white-space:nowrap}
+.sig-buy-next{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:15px 0 15px;padding:12px 14px;background:#f7f8f6;border-radius:8px}
+.sig-buy-next span{font-size:11px;font-weight:800;color:#7d817e;white-space:nowrap}
+.sig-buy-next strong{font-size:12px;font-weight:600;line-height:1.55;color:#343a3f;overflow-wrap:anywhere}
+.sig-buy-item-bottom{display:flex;align-items:flex-end;justify-content:space-between;gap:15px}
+.sig-buy-meta{display:flex;gap:7px 16px;flex-wrap:wrap;font-size:11px;color:#797f85;line-height:1.6}
+.sig-buy-meta b{color:#4b5664}
+.sig-buy-deadline-urgent{color:#a95942;font-weight:800}
+.sig-buy-actions{display:flex;gap:8px;white-space:nowrap}
+.sig-buy-actions .btn{font-size:11px}
+.sig-buy-empty{border:1px dashed #d2d1c9;background:#fff;border-radius:12px;padding:52px 24px;text-align:center;display:flex;flex-direction:column;gap:8px;color:#5e646a}
+.sig-buy-empty strong{font-size:15px;color:#293747}
+.sig-buy-empty span{font-size:12px;color:#858b8f}
+.sig-buy-hint{font-size:11px;color:#8c8c85;line-height:1.5;margin:14px 0}
+.sig-buy-process-form .sig-buy-form-lead{background:#f7f6f2;color:#60676d;border:1px solid #eeeae2;border-radius:10px;padding:13px 15px;line-height:1.6;font-size:12px;margin-bottom:19px}
+.sig-buy-extra{margin-top:19px;border:1px solid #e3e0d8;border-radius:11px;overflow:hidden}
+.sig-buy-extra summary{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;font-weight:800;color:#344154;background:#faf9f7;list-style:none;font-size:12px}
+.sig-buy-extra summary::-webkit-details-marker{display:none}
+.sig-buy-extra summary::before{content:'+';margin-right:3px;font-size:18px;color:#9a8251}
+.sig-buy-extra[open] summary::before{content:'−'}
+.sig-buy-extra summary span{font-weight:500;font-size:11px;color:#7f858c;margin-left:auto;text-align:right}
+.sig-buy-extra .form-grid{padding:18px 16px 20px}
+.sig-buy-readonly{border:1px solid #e3e6e8;background:#f7f8f8;border-radius:9px;min-height:42px;padding:11px 12px;font-size:12px;font-weight:700;color:#404b58}
+.sig-buy-readonly small{display:block;font-weight:400;line-height:1.5;color:#7d8590;margin-top:5px}
+@media(max-width:1050px){.sig-buy-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:670px){
+ .sig-buy-head{align-items:stretch}
+ .sig-buy-head-actions{width:100%}
+ .sig-buy-head-actions .btn{flex:1;white-space:normal}
+ .sig-buy-item{padding:15px}
+ .sig-buy-item-head{flex-direction:column;gap:9px}
+ .sig-buy-tags{justify-content:flex-start}
+ .sig-buy-item-bottom{align-items:flex-start;flex-direction:column}
+ .sig-buy-actions{width:100%}
+ .sig-buy-actions .btn{flex:1;white-space:normal}
+ .sig-buy-metrics{gap:8px}
+ .sig-buy-metric{padding:13px;min-height:121px}
+ .sig-buy-metric.active{padding:12px}
+ .sig-buy-metric strong{font-size:25px}
+ .sig-buy-metric small{font-size:10px}
+ .sig-buy-workbar{align-items:flex-start;flex-direction:column}
+ .sig-buy-search{min-width:100%}
+ .sig-buy-extra summary{flex-wrap:wrap}
+ .sig-buy-extra summary span{text-align:left;width:100%}
+}
+@media(prefers-reduced-motion:reduce){.sig-buy-metric{transition:none}.sig-buy-metric:hover{transform:none}}
