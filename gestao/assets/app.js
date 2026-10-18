@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
-const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
+const TABLES=['aipc','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
@@ -111,7 +111,7 @@ function reconnectInstitutional(){previewRole=null;
 }
 function loadSession(){try{return JSON.parse(sessionStorage.getItem(KEYS.session)||'null')}catch{return null}}
 const cloud=()=>!!(config.url&&config.key);
-const SIG_FAST_TABLES=['processos','tarefas','contratos','empenhos'];
+const SIG_FAST_TABLES=['aipc','processos','tarefas','contratos','empenhos'];
 // Prévia visual: não troca autenticação, sessão, JWT ou perfis do banco.
 const SIG_PREVIEW_ROLES=[
  {id:'compras',label:'Compras',desc:'Processos e tarefas de compras'},
@@ -843,6 +843,116 @@ function taskIsCurrentStage(t){
 function queueClaimable(t){
  return !!t&&t.status==='Pendente'&&!t.responsavel_auth_id&&taskIsCurrentStage(t);
 }
+
+// AIPC: Autorização de Instauração de Processo de Compras.
+// Campos obtidos do modelo AIPC da CSA-TIC (formulário institucional).
+// O único campo obrigatório é o número do Processo de Compras.
+const AIPC_SECTIONS=[
+ {title:'Identificação da aquisição',fields:[
+  ['ordem_aquisicao','Ordem de aquisição / solicitação','text'],
+  ['solicitacao_compra','Solicitação de compra','text'],
+  ['pedido_compra','Pedido de compra','text'],
+  ['unidade_direcao','Unidade de direção','text'],
+  ['unidade_beneficiada','Unidade(s) beneficiada(s)','text'],
+  ['localidade','Localidade','text'],
+  ['objeto','Objeto da aquisição','textarea'],
+  ['valor_total','Valor total (R$)','text'],
+  ['unidade_executora','Unidade executora','text'],
+  ['dotacao','Dotação orçamentária','text'],
+  ['modalidade','Modalidade de aquisição','text'],
+  ['numero_modalidade','Número da modalidade / ata','text'],
+  ['observacoes_modalidade','Observações da modalidade','textarea']
+ ]},
+ {title:'Documentos e origem do recurso',fields:[
+  ['memorando','Memorando nº','text'],['pa','PA nº','text'],['sei','SEI','text'],
+  ['origem_recurso','Origem do recurso','text'],
+  ['convenio','Convênio (SIGCON / +Brasil)','text'],['numero_convenio','Nº convênio (SIAFI)','text'],
+  ['vigencia_convenio','Vigência do convênio','date'],
+  ['banco','Banco','text'],['agencia','Agência bancária','text'],['conta','Conta bancária','text'],
+  ['transferencia_especial','Transferência especial','text'],
+  ['emenda_parlamentar','Emenda parlamentar','text'],['parlamentar','Parlamentar','text'],
+  ['numero_indicacao','Nº da indicação','text']
+ ]},
+ {title:'Preposto e responsáveis',fields:[
+  ['preposto','Preposto','text'],['posto_preposto','Posto do militar preposto','text'],
+  ['nome_preposto','Nome do militar preposto','text'],
+  ['fiscal_contrato','Fiscal do contrato','text'],
+  ['ordenador_despesa','Ordenador de despesa','text'],
+  ['ordenador_substituto','Ordenador substituto','text']
+ ]}
+];
+function requiresAipc(p){
+ if(!p)return false;
+ const kind=String(p.tipo_servico||p.modalidade||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+ return ['cotep','pregao','registro de preco','registro de precos','adesao arp'].includes(kind);
+}
+function getAipc(processId){return (db.aipc||[]).find(a=>a.processo_id===processId)||null}
+function isAipcReady(processId){return Boolean(String(getAipc(processId)?.numero_processo_compras||'').trim());}
+function aipcField([key,label,type],data){
+ const v=data[key]??'';
+ return '<div class="form-row'+(type==='textarea'?' full':'')+'"><label for="aipc-'+key+'">'+esc(label)+'</label>'+
+  (type==='textarea'?'<textarea id="aipc-'+key+'" name="aipc__'+key+'" rows="2">'+esc(v)+'</textarea>':
+   '<input id="aipc-'+key+'" name="aipc__'+key+'" type="'+type+'" value="'+esc(v)+'">')+'</div>';
+}
+function aipcForm(id){
+ const p=findProcess(id);
+ if(!p||!canWrite(p.setor)||previewRole)return showToast('AIPC: acesso permitido somente aos militares da seção que está executando o processo.');
+ const item=getAipc(id);
+ const old=item?.dados&&typeof item.dados==='object'?item.dados:{};
+ const defaults={
+  objeto:p.objeto,valor_total:p.valor_homologado||p.valor_estimado||'',dotacao:p.dotacao||'',
+  modalidade:p.tipo_servico||p.modalidade||'',sei:p.referencia_sei||''
+ };
+ const data={...defaults,...old};
+ const sections=AIPC_SECTIONS.map((sec,i)=>
+  '<details class="sig-aipc-section"'+(i===0?' open':'')+'><summary>'+esc(sec.title)+' <span>opcional</span></summary>'+
+  '<div class="form-grid">'+sec.fields.map(x=>aipcField(x,data)).join('')+'</div></details>').join('');
+ const rowNums=[1,2,3,4,5];
+ const itemFields=rowNums.map(n=>'<div class="sig-aipc-item"><strong>Item '+n+'</strong><div class="form-grid">'+[
+   ['item_'+n+'_quantidade','Quantidade','text'],
+   ['item_'+n+'_siad','Código SIAD','text'],
+   ['item_'+n+'_descricao','Descrição do material / serviço','textarea'],
+   ['item_'+n+'_unitario','Valor unitário (R$)','text'],
+   ['item_'+n+'_total','Valor total (R$)','text']
+  ].map(x=>aipcField(x,data)).join('')+'</div></div>').join('');
+ const items='<details class="sig-aipc-section"><summary>Itens da aquisição <span>até 5 itens opcionais</span></summary>'+itemFields+'</details>';
+ const html='<form data-form="aipc" data-id="'+esc(id)+'" class="sig-aipc-form">'+
+  '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Identificação vinculada ao mesmo processo e mantida nas tramitações entre seções.</div>'+
+  '<div class="sig-aipc-essential"><label for="aipc-numero_processo_compras"><strong>Número do Processo de Compras *</strong></label>'+
+   '<input id="aipc-numero_processo_compras" name="numero_processo_compras" required maxlength="120" value="'+esc(item?.numero_processo_compras||'')+'" placeholder="Informe o número do Processo de Compras">'+
+   '<small>Este é o único campo obrigatório. Os demais podem ser preenchidos agora ou posteriormente.</small></div>'+
+  sections+items+
+  '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button>'+
+  '<button type="submit" class="btn primary">'+(item?'Atualizar AIPC':'Salvar AIPC')+'</button></div></form>';
+ openModal((item?'Editar':'Preencher')+' AIPC',p.numero+' · '+p.objeto,html,true);
+}
+async function submitAipc(form){
+ const id=form.dataset.id,p=findProcess(id);
+ if(!p||!canWrite(p.setor))throw Error('Sem permissão para editar AIPC de outro setor.');
+ const d=gather(form);
+ const number=String(d.numero_processo_compras||'').trim();
+ if(!number)return showToast('Informe o número do Processo de Compras na AIPC.');
+ const dados={};
+ for(const [key,value] of Object.entries(d))
+  if(key.startsWith('aipc__')&&String(value).trim()!=='')dados[key.slice(6)]=String(value).trim();
+ const previous=getAipc(id);
+ const payload={numero_processo_compras:number,dados};
+ busy=true;
+ try{
+  if(cloud()){
+   if(previous)await rest('/rest/v1/aipc?processo_id=eq.'+encodeURIComponent(id),'PATCH',payload);
+   else await rest('/rest/v1/aipc','POST',{processo_id:id,...payload});
+   await fetchCloud();
+  }else{
+   const record={...previous,processo_id:id,...payload,atualizado_em:nowIso()};
+   if(previous)db.aipc.splice(db.aipc.indexOf(previous),1,record);
+   else db.aipc.push(record);
+   saveLocal();
+  }
+  closeModal();render();showToast('AIPC salva. O Processo de Compras está registrado para o encaminhamento.');
+ }finally{busy=false;}
+}
+
 function canManageTask(t){
  if(!t||previewRole||!canWrite(t.setor)||!isOpenTask(t)||!taskIsCurrentStage(t))return false;
  return profile.role==='admin'||isSectionChiefRole(profile.role)||assignedToMe(t);
@@ -1211,6 +1321,7 @@ function limitCloudRowsForChief(data,role,sector,userId){
  const procIDs=new Set(p.map(v=>v.id)),taskIDs=new Set(t.map(v=>v.id));
  return {...clean,
   processos:p,tarefas:t,
+  aipc:clean.aipc.filter(v=>procIDs.has(v.processo_id)),
   usuarios:clean.usuarios.filter(v=>v.ativo&&v.setor===expected),
   eventos:clean.eventos.filter(v=>procIDs.has(v.processo_id)),
   tramites:clean.tramites.filter(v=>procIDs.has(v.processo_id)),
