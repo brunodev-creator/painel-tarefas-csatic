@@ -37,7 +37,7 @@ function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashb
 const SIG_FAST_VIEWS=['dashboard','tarefas','compras','licitacao','processos'];
 const SECTORS=['Compras','Licitação','SOFI'];
 const STATUSES=['Em andamento','Aguardando providência','Aguardando documentação','Aguardando empenho','Bloqueado','Concluído','Cancelado'];
-const TASK_STATUSES=['Pendente','Em andamento','Aguardando terceiro','Concluída'];
+const TASK_STATUSES=['Pendente','Em andamento','Aguardando terceiro','Encaminhada','Concluída'];
 const PRIORITIES=['Alta','Média','Baixa'];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const digits=v=>Number(v||0)||0;
@@ -54,7 +54,8 @@ const ageDays=d=>d?Math.floor((Date.now()-new Date(d).getTime())/86400000):0;
 const daysLeft=d=>d?Math.ceil((new Date(String(d).slice(0,10)+'T23:59:00').getTime()-Date.now())/86400000):Infinity;
 const activeProcess=p=>!['Concluído','Cancelado'].includes(p.status);
 const today=()=>isoDay(new Date());
-const isOverdue=t=>t.status!=='Concluída'&&daysLeft(t.prazo)<0;
+const isOpenTask=t=>!['Concluída','Encaminhada'].includes(t.status);
+const isOverdue=t=>isOpenTask(t)&&daysLeft(t.prazo)<0;
 function seed(){
  const p=(i,numero,objeto,setor,etapa,status,responsavel,prioridade,valor,deadline,acao,block='')=>({id:'d-p'+i,numero,objeto,setor,etapa,status,responsavel,prioridade,valor_estimado:valor*1.11,valor_homologado:valor,modalidade:i%2?'COTEP':'Pregão',data_entrada:dayOffset(-(7+i*2)),prazo:dayOffset(deadline),proxima_acao:acao,bloqueio_motivo:block,dotacao:i%2?'DEMO-33.90.30':'DEMO-44.90.52',referencia_sei:'',updated_at:new Date(Date.now()-(i*2)*86400000).toISOString()});
  const processos=[
@@ -196,7 +197,7 @@ function updateChrome(){
  // Estado visual separado do perfil real: o CSS também oculta menus não autorizados.
  document.body.dataset.sigVisibleRole=effectiveRole();
  document.body.classList.toggle('sig-role-preview',!!previewRole);
- const personalTaskCount=db.tarefas.filter(t=>t.status!=='Concluída'&&assignedToMe(t)).length;
+ const personalTaskCount=db.tarefas.filter(t=>isOpenTask(t)&&assignedToMe(t)).length;
  const unread=v3Unread();
  document.getElementById('nav').innerHTML=currentMenus().map(id=>NAV.find(([key])=>key===id)).filter(Boolean).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
  document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';
@@ -269,12 +270,12 @@ function chiefTeam(sector){
 }
 function chiefTaskPoints(t){return ({Alta:3,'Média':2,Baixa:1})[t.prioridade]||2}
 function chiefWorkload(u,teamTasks){
- const open=teamTasks.filter(t=>t.responsavel_auth_id===u.auth_id&&t.status!=='Concluída');
+ const open=teamTasks.filter(t=>t.responsavel_auth_id===u.auth_id&&isOpenTask(t));
  const points=open.reduce((n,t)=>n+chiefTaskPoints(t),0);
  return {user:u,tasks:open,points,ratio:Math.round(points/12*100),late:open.filter(isOverdue).length};
 }
 function chiefCanManageTask(t){
- if(!t||t.status==='Concluída'||previewRole)return false;
+ if(!t||!isOpenTask(t)||previewRole)return false;
  const sector=chiefScope();
  if(sector==='__unauthorized__'||(sector&&t.setor!==sector))return false;
  return !!session&&!!profile.ativo&&(profile.role==='admin'||(isSectionChiefRole(profile.role)&&profile.setor===t.setor&&(!SIG_CHIEF_SECTIONS[profile.role]||SIG_CHIEF_SECTIONS[profile.role]===t.setor)));
@@ -318,7 +319,7 @@ function v3ChiefView(){
  if(!['admin',...SIG_CHIEF_ROLES].includes(effectiveRole()))return heading('Acesso restrito','Painel da chefia','Apenas chefias e administração.');
  const scope=chiefScope();
  if(scope==='__unauthorized__')return heading('Seção não vinculada','Painel da chefia','Solicite ao administrador que associe sua conta a Compras, Licitação ou SOFI.');
- const team=chiefTeam(scope),allTasks=(db.tarefas||[]).filter(t=>!scope||t.setor===scope),active=allTasks.filter(t=>t.status!=='Concluída');
+ const team=chiefTeam(scope),allTasks=(db.tarefas||[]).filter(t=>!scope||t.setor===scope),active=allTasks.filter(isOpenTask);
  const loads=team.map(u=>chiefWorkload(u,allTasks)).sort((a,b)=>b.points-a.points||a.user.nome.localeCompare(b.user.nome,'pt-BR'));
  const overdue=active.filter(isOverdue),doneRecent=allTasks.filter(t=>t.status==='Concluída'&&t.concluida_em&&Date.now()-new Date(t.concluida_em).getTime()<=7*86400000);
  const overloaded=loads.filter(x=>x.ratio>100),average=loads.length?Math.round(loads.reduce((n,x)=>n+x.ratio,0)/loads.length):0;
@@ -761,7 +762,7 @@ function purchaseView(){
    '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn primary" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+'</div></div></article>';
  };
  const list=visible.length?visible.slice(0,purchaseLimit).map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
- const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&t.status!=='Concluída'&&assignedToMe(t)).length;
+ const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&isOpenTask(t)&&assignedToMe(t)).length;
  const headingHtml='<div class="sig-buy-head"><div><div class="eyebrow">Fluxo de aquisições</div><h1>Central de Compras</h1><p>Encontre rapidamente as demandas que precisam de providência.</p></div><div class="sig-buy-head-actions">'+
   '<button type="button" class="btn" data-view="tarefas">Minhas tarefas'+(taskCount?' · '+taskCount+' no setor':'')+'</button>'+
   (canEdit?'<button type="button" class="btn primary" data-action="newProcess" data-sector="Compras">+ Nova demanda</button>':'')+
@@ -836,9 +837,59 @@ function processView(sector){if(sector==='Compras')return purchaseView();
  const toolbar=`<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar número, objeto, responsável ou dotação..." value="${esc(filters.q)}"></label>${!sector?`<select data-filter="setor" class="field-select">${optionsWithAll(SECTORS)}</select>`:''}<select data-filter="status" class="field-select">${optionsWithAll(STATUSES)}</select></div>`;
  return heading(sector?'Fluxo setorial':'Acompanhamento',''+title,`${arr.length} registro(s) exibido(s) · processos e responsáveis atualizados pelos usuários.`,actions)+periodNotice()+toolbar+`<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo / Objeto</th><th>Setor / Etapa</th><th>Responsável</th><th>Próxima ação</th><th>Prazo</th><th>Status</th><th></th></tr></thead><tbody>${arr.map(p=>`<tr><td><button class="link-button cell-main" data-action="detail" data-id="${esc(p.id)}">${esc(p.numero)}</button><div class="cell-sub">${esc(p.objeto)}</div></td><td><div class="cell-main">${esc(p.setor)}</div><div class="cell-sub">${esc(p.etapa)}</div></td><td>${esc(p.responsavel||'Não atribuído')}</td><td>${esc(p.proxima_acao||'Não definida')}</td><td><span class="${daysLeft(p.prazo)<0&&activeProcess(p)?'badge-inline':''}">${fmtDate(p.prazo)}</span></td><td>${iconBadge(p.status)}</td><td><button class="btn small" data-action="detail" data-id="${esc(p.id)}">Abrir →</button></td></tr>`).join('')||'<tr><td colspan="7" class="table-empty">Nenhum processo corresponde aos filtros.</td></tr>'}</tbody></table></div></div><div class="filter-summary">Exibindo ${arr.length} de ${all.length} processos.</div>`;
 }
+function canManageTask(t){
+ if(!t||previewRole||!canWrite(t.setor)||!isOpenTask(t))return false;
+ return profile.role==='admin'||isSectionChiefRole(profile.role)||assignedToMe(t);
+}
+async function claimQueueTask(id){
+ if(previewRole)throw Error('Prévia somente de leitura');
+ const t=db.tarefas.find(x=>x.id===id);
+ if(!t||t.responsavel_auth_id||t.status!=='Pendente'||!canWrite(t.setor))throw Error('Tarefa indisponível para assumir');
+ busy=true;
+ try{
+  if(cloud()){
+   await rest('/rest/v1/rpc/assumir_tarefa','POST',{p_tarefa_id:id});
+   await fetchCloud();
+  }else{t.responsavel_auth_id=currentAuthId();t.responsavel=profile.nome;t.updated_at=nowIso();saveLocal();}
+  render();showToast('Tarefa assumida. Você é o responsável por esta providência.');
+ }finally{busy=false}
+}
 function tasksView(){
- const arr=db.tarefas.filter(t=>!cloud()||taskScope==='all'||assignedToMe(t)).filter(t=>filters.setor==='Todos'||t.setor===filters.setor).filter(t=>filters.status==='Todos'||t.status===filters.status).filter(t=>searchText(t.titulo,t.responsavel,t.descricao,findProcess(t.processo_id)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||daysLeft(a.prazo)-daysLeft(b.prazo));
- return heading('Fluxo de trabalho',taskScope==='mine'&&cloud()?'Minhas tarefas':'Tarefas dos setores','Demandas recebidas, prazos, responsáveis e providências.',`<button class="btn" data-action="taskScope" data-scope="${taskScope==='mine'?'all':'mine'}">${taskScope==='mine'?'Ver todas as tarefas':'Somente minhas tarefas'}</button>${!previewRole&&(!cloud()||['admin',...SIG_CHIEF_ROLES].includes(profile.role))?'<button class="btn primary" data-action="newTask">+ Nova tarefa</button>':''}`)+`<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar tarefa ou processo..." value="${esc(filters.q)}"></label><select data-filter="setor" class="field-select">${optionsWithAll(SECTORS)}</select><select data-filter="status" class="field-select">${optionsWithAll(TASK_STATUSES)}</select></div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarefa</th><th>Processo</th><th>Setor</th><th>Responsável</th><th>Prazo</th><th>Prioridade</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${arr.map(t=>`<tr><td><button class="link-button cell-main" data-action="editTask" data-id="${esc(t.id)}">${esc(t.titulo)}</button><div class="cell-sub">${esc(t.descricao||'Sem observações')}</div></td><td>${findProcess(t.processo_id)?`<button class="link-button" data-action="detail" data-id="${esc(t.processo_id)}">${esc(findProcess(t.processo_id).numero)}</button>`:'—'}</td><td>${esc(t.setor)}</td><td>${esc(t.responsavel||'Não atribuído')}</td><td>${fmtDate(t.prazo)}${isOverdue(t)?'<div class="cell-sub" style="color:#c4504a">Em atraso</div>':''}</td><td>${iconBadge(t.prioridade)}</td><td>${iconBadge(t.status)}</td><td><button class="btn small" data-action="editTask" data-id="${esc(t.id)}">Editar</button>${t.status!=='Concluída'&&canWrite(t.setor)?`<button class="btn small primary" data-action="v4FinishTask" data-id="${esc(t.id)}">Concluir</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="table-empty">Nenhuma tarefa encontrada.</td></tr>'}</tbody></table></div></div>`;
+ const setor=setorUsuario();
+ const list=db.tarefas.filter(t=>
+  taskScope==='mine'?assignedToMe(t):
+  taskScope==='queue'?t.setor===setor&&t.status==='Pendente'&&!t.responsavel_auth_id:
+  taskScope==='sector'?t.setor===setor:true);
+ const arr=list.filter(t=>filters.setor==='Todos'||t.setor===filters.setor)
+  .filter(t=>filters.status==='Todos'||t.status===filters.status)
+  .filter(t=>searchText(t.titulo,t.responsavel,t.descricao,findProcess(t.processo_id)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR')))
+  .sort((a,b)=>(!isOpenTask(a))-(!isOpenTask(b))||daysLeft(a.prazo)-daysLeft(b.prazo));
+ const actions='<div class="sig-task-tabs">'+[
+  ['mine','Minhas tarefas'],['queue','Fila disponível'],['sector','Toda a seção']
+ ].map(([key,label])=>'<button type="button" class="btn small'+(taskScope===key?' primary':'')+'" data-action="taskScope" data-scope="'+key+'">'+label+'</button>').join('')+
+  (!previewRole&&canWrite(setor)?'<button type="button" class="btn primary" data-action="newTask" data-sector="'+esc(setor)+'">+ Criar tarefa</button>':'')+'</div>';
+ const rows=arr.map(t=>{
+  const available=t.setor===setor&&!t.responsavel_auth_id&&t.status==='Pendente'&&!previewRole;
+  const managed=canManageTask(t);
+  const link=findProcess(t.processo_id);
+  return '<tr><td><strong>'+esc(t.titulo)+'</strong><div class="cell-sub">'+esc(t.descricao||'—')+'</div></td>'+
+   '<td>'+(link?'<button class="link-button" data-action="detail" data-id="'+esc(link.id)+'">'+esc(link.numero)+'</button>':'—')+'</td>'+
+   '<td>'+esc(t.setor)+'</td><td>'+esc(t.responsavel||'Fila da seção')+'</td>'+
+   '<td>'+fmtDate(t.prazo)+(isOverdue(t)?'<div class="cell-sub" style="color:#b85243">Atrasada</div>':'')+'</td>'+
+   '<td>'+iconBadge(t.status)+'</td><td><div class="sig-task-actions">'+
+    (available?'<button class="btn small primary" data-action="claimTask" data-id="'+esc(t.id)+'">Assumir</button>':'')+
+    (managed?'<button class="btn small" data-action="editTask" data-id="'+esc(t.id)+'">Editar</button>':'')+
+    (managed&&t.processo_id&&link&&link.setor===t.setor?'<button class="btn small" data-action="transfer" data-id="'+esc(t.processo_id)+'" data-task="'+esc(t.id)+'">Encaminhar</button>':'')+
+    (managed?'<button class="btn small" data-action="v4FinishTask" data-id="'+esc(t.id)+'">Concluir</button>':'')+
+    (!managed&&!available?'<span class="cell-sub">Acompanhamento</span>':'')+
+   '</div></td></tr>';
+ }).join('');
+ return heading('Execução descentralizada','Tarefas da seção','Cada militar pode criar tarefas próprias, assumir a fila e encaminhar demandas. A chefia distribui e redistribui.',actions)+
+  '<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar tarefa..." value="'+esc(filters.q)+'"></label>'+
+  '<select data-filter="status" class="field-select">'+optionsWithAll(TASK_STATUSES,'Todas as situações')+'</select></div>'+
+  '<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarefa</th><th>Processo</th><th>Seção</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th>Ações</th></tr></thead><tbody>'+
+  (rows||'<tr><td colspan="7" class="table-empty">Nenhuma tarefa nesta fila.</td></tr>')+
+  '</tbody></table></div></div>';
 }
 function contractsView(){
  const contracts=db.contratos.filter(c=>searchText(c.numero,c.objeto,c.fornecedor,c.gestor).includes(filters.q.toLowerCase()));
@@ -1270,6 +1321,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  switch(action){
  case 'sharedDetail':sharedProcessDetail(id);break;
  case 'refreshShared':await loadSharedProcesses();break;
+ case 'claimTask':await claimQueueTask(id);break;
  case 'buyService':if(btn.dataset.service!=='Todos'&&!PURCHASE_SERVICES.some(x=>x.id===btn.dataset.service))break;serviceFilter=btn.dataset.service;purchaseLimit=12;render();break;
  case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
  case 'buyMore':purchaseLimit+=12;render();break;
