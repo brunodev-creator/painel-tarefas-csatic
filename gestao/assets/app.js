@@ -101,7 +101,7 @@ function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
  previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||'dashboard';
- taskScope='all';receiptScope='sector';filters={q:'',setor:'Todos',status:'Todos'};
+ taskScope='all';receiptScope=role==='chefia'?'all':'sector';filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
 function exitRolePreview(){
