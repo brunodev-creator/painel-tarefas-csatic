@@ -122,12 +122,12 @@ body.sig-auth-mode .sig-auth-landscape {
 }
 body.sig-auth-mode .sig-auth-blue {height:100dvh;min-height:0;max-height:100dvh;padding:clamp(9px,2.0dvh,29px) clamp(12px,2vw,34px);overflow:visible;}
 body.sig-auth-mode .sig-auth-card {
-  width:min(555px,100%);min-height:min(81dvh,778px);max-height:none;
+  width:min(555px,100%);min-height:min(83dvh,778px);max-height:none;
   display:flex;flex-direction:column;justify-content:flex-start;
   box-sizing:border-box;flex-shrink:0;
   padding:clamp(13px,2.6dvh,38px) clamp(18px,2.25vw,42px) clamp(13px,2dvh,27px);
   transform-origin:center center;
-  transform:translateX(calc(-1 * clamp(0px, (100vw - 1180px) * .18, 95px))) scale(var(--sig-auth-scale,1));
+  transform:translateX(clamp(-95px, calc(212px - 18vw), 0px)) scale(var(--sig-auth-scale,1));
 }
 body.sig-auth-mode .sig-auth-crest {
   width:clamp(100px,20.5dvh,205px);height:auto;max-height:22dvh;
