@@ -216,7 +216,7 @@ function updateChrome(){
 }
 function navigate(v){
  if(!canVisitMenu(v))return showToast('Este módulo não está disponível para o seu perfil.');
- view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras'){purchaseFilter='all';purchaseLimit=12;}
+ view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras'){purchaseFilter='all';purchaseLimit=12;serviceFilter='Todos';}
  updateChrome();render();
  document.getElementById('sidebar').classList.remove('open');
  document.getElementById('shade').classList.remove('visible');
@@ -733,7 +733,7 @@ function purchaseSort(a,b){
 function purchaseView(){
  const all=db.processos.filter(p=>p.setor==='Compras');
  const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,done:all.filter(p=>p.status==='Concluído').length};
- const visible=all.filter(p=>purchaseFilter==='attention'?purchaseIssue(p):purchaseFilter==='week'?purchaseDueSoon(p):purchaseFilter==='done'?p.status==='Concluído':true)
+ const visible=all.filter(p=>serviceFilter==='Todos'||categoryFromProcess(p)===serviceFilter).filter(p=>purchaseFilter==='attention'?purchaseIssue(p):purchaseFilter==='week'?purchaseDueSoon(p):purchaseFilter==='done'?p.status==='Concluído':true)
   .filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.proxima_acao,p.referencia_sei,p.dotacao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort(purchaseSort);
  const tabs=[
   {id:'all',label:'Todos os processos',help:'Registro completo',value:counts.all,icon:'▤'},
@@ -742,6 +742,11 @@ function purchaseView(){
   {id:'done',label:'Concluídos',help:'Histórico finalizado',value:counts.done,icon:'✓'}
  ];
  const canEdit=!previewRole&&canWrite('Compras');
+ const categoryCards='<div class="sig-buy-services">'+PURCHASE_SERVICES.map(x=>{
+  const total=all.filter(p=>categoryFromProcess(p)===x.id).length;
+  return '<button class="sig-buy-service'+(serviceFilter===x.id?' selected':'')+'" type="button" data-action="buyService" data-service="'+esc(x.id)+'"><span class="sig-buy-service-icon">'+x.icon+'</span>'+
+   '<strong>'+esc(x.short)+'</strong><small>'+esc(x.desc)+'</small><span class="sig-buy-service-count">'+total+' demanda(s)</span></button>';
+ }).join('')+'</div>';
  const metrics='<div class="sig-buy-metrics" aria-label="Filtrar processos de compras">'+tabs.map(t=>
   '<button type="button" class="sig-buy-metric'+(purchaseFilter===t.id?' active':'')+'" data-action="buyFilter" data-filter="'+t.id+'" aria-pressed="'+String(purchaseFilter===t.id)+'"><span class="sig-buy-metric-top"><span>'+esc(t.label)+'</span><span class="sig-buy-metric-icon" aria-hidden="true">'+t.icon+'</span></span><strong>'+t.value+'</strong><small>'+esc(t.help)+'</small></button>'
  ).join('')+'</div>';
@@ -763,7 +768,7 @@ function purchaseView(){
   '</div></div>';
  const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+all.length+' processo(s)</span></div>';
  const more=visible.length>purchaseLimit?'<div class="sig-buy-more"><span>Exibindo '+Math.min(visible.length,purchaseLimit)+' de '+visible.length+' processos filtrados</span><button type="button" class="btn" data-action="buyMore">Ver mais processos ↓</button></div>':'';
- return '<section class="sig-buy-page">'+headingHtml+metrics+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
+ return '<section class="sig-buy-page">'+headingHtml+categoryCards+'<div class="sig-buy-service-toggle"><button class="btn small" data-action="buyService" data-service="Todos">'+(serviceFilter==='Todos'?'Todas as modalidades ✓':'Exibir todas as modalidades')+'</button></div>'+metrics+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
 }
 async function loadSharedProcesses(){
  if(!cloud()||!session?.user?.id)return;
@@ -934,21 +939,33 @@ function closeModal(){document.getElementById('modal-root').innerHTML=''}
 function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero:'',objeto:'',modalidade:'COTEP',setor:sector||'Compras',etapa:'Triagem da demanda',status:'Em andamento',responsavel:'',prioridade:'Média',data_entrada:today(),prazo:dayOffset(7),valor_estimado:0,valor_homologado:0,dotacao:'',proxima_acao:'',bloqueio_motivo:'',referencia_sei:''};
  if(!canWrite(p.setor))return showToast('Sem permissão de edição neste setor.');
  if(p.setor==='Compras'){
-  // Cadastro enxuto; todos os campos existentes continuam editáveis em "Mais detalhes".
-  const primary=
-   '<div class="sig-buy-form-lead">Comece pelos dados necessários para identificar e acompanhar a demanda. Outros detalhes podem ser preenchidos agora ou depois.</div>'+
+  const cat=categoryFromProcess(p);
+  const editing=!!id;
+  const chief=!previewRole&&(profile.role==='admin'||isSectionChiefRole(profile.role));
+  const values=p.dados_servico&&typeof p.dados_servico==='object'?p.dados_servico:{};
+  const possible=cloud()?userCandidates('Compras'):[];
+  const assigned=p.responsavel_auth_id||(chief?'':currentAuthId());
+  const whoSelect=cloud()?(
+   editing?'<div class="form-row"><label>Responsável atual</label><div class="sig-buy-readonly">'+esc(p.responsavel||'Fila da Compras')+'<small>Para mudar de setor, use Encaminhar.</small></div></div>':
+   chief?'<div class="form-row"><label for="f-responsavel_auth_id">Responsável inicial</label><select name="responsavel_auth_id" id="f-responsavel_auth_id"><option value="">Fila da Compras (disponível)</option>'+
+    possible.map(u=>'<option value="'+esc(u.auth_id)+'"'+(assigned===u.auth_id?' selected':'')+'>'+esc(u.nome)+'</option>').join('')+'</select><small>O chefe pode distribuir agora ou deixar na fila.</small></div>':
+   '<div class="form-row"><label>Responsável inicial</label><div class="sig-buy-readonly">'+esc(profile.nome)+'<small>Você será o responsável inicial.</small></div><input type="hidden" name="responsavel_auth_id" value="'+esc(currentAuthId())+'"></div>'
+  ):inputField('responsavel','Responsável pela demanda',p.responsavel||profile.nome,'text','required');
+  const categoryOptions=PURCHASE_SERVICES.map(x=>'<option value="'+esc(x.id)+'"'+(cat===x.id?' selected':'')+'>'+esc(x.short)+'</option>').join('');
+  const body='<div class="sig-buy-form-lead">A demanda e a primeira tarefa serão vinculadas ao mesmo processo. Escolha a modalidade para exibir somente os campos pertinentes.</div>'+
    '<div class="form-grid">'+
-    inputField('numero','Número / identificador do processo',p.numero,'text','required maxlength="80" placeholder="Ex.: 123/2026"')+
-    selectField('modalidade','Modalidade',['COTEP','Pregão','Dispensa','Inexigibilidade','Adesão ARP','Outro'],p.modalidade)+
-    '<div class="form-row full"><label for="f-objeto">Objeto da aquisição *</label><textarea id="f-objeto" name="objeto" rows="3" required placeholder="Descreva de forma objetiva o que será adquirido">'+esc(p.objeto)+'</textarea></div>'+
-    (id&&cloud()?'<div class="form-row"><label>Responsável atual</label><div class="sig-buy-readonly">'+esc(p.responsavel||'Não atribuído')+'<small>Para alterar o setor ou responsável, use Encaminhar no processo.</small></div></div>':inputField('responsavel','Responsável pela demanda',p.responsavel,'text','required placeholder="Nome ou equipe responsável"'))+
-    inputField('prazo','Prazo da próxima etapa',p.prazo,'date')+
-    '<div class="form-row full"><label for="f-proxima_acao">Próxima providência</label><textarea id="f-proxima_acao" name="proxima_acao" rows="2" placeholder="Qual é a próxima ação para avançar?">'+esc(p.proxima_acao||'')+'</textarea></div>'+
+   '<div class="form-row"><label for="f-tipo_servico">Divisão de Compras *</label><select id="f-tipo_servico" name="tipo_servico" required>'+categoryOptions+'</select></div>'+
+   inputField('numero','Número / identificador do processo',p.numero,'text','required maxlength="80" placeholder="Ex.: 123/2026"')+
+   '<div class="form-row full"><label for="f-objeto">Objeto da aquisição *</label><textarea id="f-objeto" name="objeto" rows="3" required placeholder="Descreva o objeto">'+esc(p.objeto)+'</textarea></div>'+
+   '<div class="form-row full sig-service-details"><h3>Campos de '+esc(cat)+'</h3><div id="sig-service-fields" class="form-grid">'+serviceDetailFields(cat,values)+'</div></div>'+
+   whoSelect+
+   inputField('prazo','Prazo da próxima etapa',p.prazo,'date')+
+   '<div class="form-row full"><label for="f-proxima_acao">Próxima providência</label><textarea id="f-proxima_acao" name="proxima_acao" rows="2" placeholder="O que precisa ser feito?">'+esc(p.proxima_acao||'')+'</textarea></div>'+
    '</div>';
-  const secondary=
-   '<details class="sig-buy-extra"><summary>Mais detalhes do processo <span>Etapa, status, prioridade, valores e referências</span></summary>'+
+  const extras='<details class="sig-buy-extra"><summary>Mais detalhes do processo <span>Status, prioridade, valores, SEI e observações</span></summary>'+
    '<div class="form-grid">'+
-    (id&&cloud()?'<div class="form-row"><label>Setor responsável</label><div class="sig-buy-readonly">'+esc(p.setor)+'</div></div>':'<input type="hidden" name="setor" value="Compras">')+
+    '<input type="hidden" name="setor" value="Compras">'+
+    '<input type="hidden" id="sig-servico-modalidade" name="modalidade" value="'+esc(({'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[cat])+'">'+
     inputField('etapa','Etapa atual',p.etapa,'text','required')+
     selectField('status','Situação',STATUSES,p.status)+
     selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)+
@@ -957,14 +974,15 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
     inputField('valor_homologado','Valor homologado (R$)',p.valor_homologado,'number','step="0.01" min="0"')+
     inputField('dotacao','Dotação orçamentária',p.dotacao)+
     inputField('referencia_sei','Referência / link SEI',p.referencia_sei)+
-    textareaField('bloqueio_motivo','Motivo do impedimento (se houver)',p.bloqueio_motivo)+
+    textareaField('bloqueio_motivo','Motivo do impedimento',p.bloqueio_motivo)+
    '</div></details>';
-  const html='<form class="sig-buy-process-form" data-form="process" data-id="'+esc(id||'')+'">'+primary+secondary+
-    '<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">'+(id?'Salvar atualizações':'Cadastrar demanda')+'</button></div></form>';
-  openModal(id?'Atualizar demanda de Compras':'Nova demanda de Compras',
-   id?'Atualize a próxima providência e o prazo sem perder o histórico.':'Cadastro rápido para iniciar o acompanhamento.',html,true);
+  const html='<form class="sig-buy-process-form" data-form="process" data-id="'+esc(id||'')+'">'+body+extras+
+   '<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">'+(editing?'Salvar alterações':'Cadastrar demanda e tarefa')+'</button></div></form>';
+  openModal(editing?'Atualizar demanda de Compras':'Nova demanda de Compras',
+   editing?'Mantenha o histórico e registre as providências.':'Cadastro único com campos por tipo de serviço.',html,true);
   return;
  }
+
  const html=`<form data-form="process" data-id="${esc(id||'')}"><div class="form-grid">${inputField('numero','Número do processo',p.numero,'text','required maxlength="80"')}${id&&cloud()?`<div class="form-row"><label>Setor responsável</label><div class="info-note">${esc(p.setor)} · use Encaminhar para transferir</div></div>`:selectField('setor','Setor responsável',SECTORS,p.setor)}${textareaField('objeto','Objeto da aquisição',p.objeto)}${selectField('modalidade','Modalidade',['COTEP','Pregão','Dispensa','Inexigibilidade','Adesão ARP','Outro'],p.modalidade)}${inputField('etapa','Etapa atual',p.etapa,'text','required')}${selectField('status','Situação',STATUSES,p.status)}${id&&cloud()?`<div class="form-row"><label>Responsável</label><div class="info-note">${esc(p.responsavel)} · use Encaminhar para redistribuir</div></div>`:inputField('responsavel','Responsável / equipe',p.responsavel,'text','required')}${selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)}${inputField('data_entrada','Data de entrada',p.data_entrada,'date')}${inputField('prazo','Prazo da etapa',p.prazo,'date')}${inputField('valor_estimado','Valor estimado (R$)',p.valor_estimado,'number','step="0.01" min="0"')}${inputField('valor_homologado','Valor homologado (R$)',p.valor_homologado,'number','step="0.01" min="0"')}${inputField('dotacao','Dotação',p.dotacao)}${inputField('referencia_sei','Referência / link SEI',p.referencia_sei)}${textareaField('proxima_acao','Próxima providência',p.proxima_acao)}${textareaField('bloqueio_motivo','Motivo do impedimento (se houver)',p.bloqueio_motivo)}</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">${id?'Salvar alterações':'Cadastrar processo'}</button></div></form>`;
  openModal(id?'Editar processo':'Cadastrar novo processo','Cada processo tem um responsável, situação e próxima providência.',html,true);
 }
@@ -1166,6 +1184,18 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  for(const n of numbers)d[n]=digits(d[n]);if(type==='empenho'){d.processo_id=d.processo_id||null;d.contrato_id=d.contrato_id||null}if(type==='task')d.processo_id=d.processo_id||null;
  if(type==='task'&&old?.status!=='Concluída'&&d.status==='Concluída'&&String(d.conclusao_observacao||'').trim().length<8)return showToast('Para concluir, descreva a providência (mínimo 8 caracteres).');
  if(type==='task'&&old?.status==='Concluída'&&d.status!=='Concluída')return showToast('Tarefa concluída não pode ser reaberta neste piloto.');
+ if(type==='process'&&d.tipo_servico){
+  if(!PURCHASE_SERVICES.some(x=>x.id===d.tipo_servico))return showToast('Modalidade de Compras inválida.');
+  d.dados_servico=Object.fromEntries(Object.entries(d).filter(([key])=>key.startsWith('servico__')).map(([key,value])=>[key.slice(9),String(value).trim()]));
+  for(const key of Object.keys(d))if(key.startsWith('servico__'))delete d[key];
+  d.modalidade=({'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[d.tipo_servico];
+  if(!id&&cloud()&&!isSectionChiefRole(profile.role)&&profile.role!=='admin')d.responsavel_auth_id=currentAuthId();
+  if(d.responsavel_auth_id!==undefined){
+   const selected=db.usuarios.find(u=>u.auth_id===d.responsavel_auth_id);
+   d.responsavel=selected?.nome||'Fila da Compras';
+   d.responsavel_auth_id=d.responsavel_auth_id||null;
+  }
+ }
  if(type==='process'&&(!d.numero||!d.objeto))return showToast('Número e objeto são obrigatórios.');
  if(type==='process'&&db.processos.some(p=>p.numero===d.numero&&p.id!==id))return showToast('Já existe outro processo com esse número.');
  if((type==='process'||type==='task')&&!canWrite(old?.setor||d.setor))return showToast('Você não pode editar registros do setor de origem.');
@@ -1240,6 +1270,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  switch(action){
  case 'sharedDetail':sharedProcessDetail(id);break;
  case 'refreshShared':await loadSharedProcesses();break;
+ case 'buyService':if(btn.dataset.service!=='Todos'&&!PURCHASE_SERVICES.some(x=>x.id===btn.dataset.service))break;serviceFilter=btn.dataset.service;purchaseLimit=12;render();break;
  case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
  case 'buyMore':purchaseLimit+=12;render();break;
  case 'chiefMember':chiefMemberFilter=chiefMemberFilter===btn.dataset.member?'Todos':btn.dataset.member;render();break;
@@ -1295,6 +1326,13 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
   }
   if(e.target.id==='f-role'&&e.target.closest('form[data-form="inviteUser"],form[data-form="updateUser"]')){
    syncUserRoleSetor();return;
+  }
+  if(e.target.id==='f-tipo_servico'&&e.target.closest('form[data-form="process"]')){
+   const area=document.getElementById('sig-service-fields');
+   if(area){area.innerHTML=serviceDetailFields(e.target.value,{});}
+   const modality=document.getElementById('sig-servico-modalidade');
+   if(modality)modality.value=({ 'Registro de Preço':'Adesão ARP','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Pregão'})[e.target.value]||'Outro';
+   return;
   }
   if(e.target.id==='f-task-sector'&&e.target.closest('form[data-form="task"]')){
    const newSector=e.target.value;
