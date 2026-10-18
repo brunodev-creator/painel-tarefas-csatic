@@ -157,3 +157,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .sig-return-button:hover{background:#182d59}
 .sig-return-button span{padding-left:8px}
 @media(max-width:650px){.demo-banner{align-items:stretch}.sig-return-button{width:100%;white-space:normal}}
+
+
+/* Administrador: seletor de prévia de perfis. Não altera a sessão real. */
+.sig-preview-trigger{
+ appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+ border:1px solid #bfa368;border-radius:10px;padding:9px 13px;max-width:240px;
+ background:#3d3830;color:#f5e5c1;font-weight:800;font-size:12px;line-height:1.2;
+ white-space:nowrap;transition:background .15s,box-shadow .15s;
+}
+.sig-preview-trigger[hidden]{display:none!important}
+.sig-preview-trigger:hover{background:#554b39;box-shadow:0 0 0 2px #bfa36825}
+.sig-preview-trigger:focus-visible,.sig-preview-choice:focus-visible{outline:3px solid #dfbd7e;outline-offset:2px}
+.sig-preview-info{font-size:13px;line-height:1.6;color:#524938;background:#fcf7eb;border:1px solid #e4d4b1;padding:14px 16px;border-radius:10px;margin:16px 0}
+.sig-preview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:3px 0 13px}
+.sig-preview-choice{appearance:none;text-align:left;border:1px solid #d9d3c5;border-radius:11px;background:#fff;color:#24272c;padding:14px 16px;display:flex;flex-direction:column;gap:6px;min-height:78px}
+.sig-preview-choice:hover,.sig-preview-choice.selected{border-color:#b69a5e;background:#f8f3e7}
+.sig-preview-choice strong{font:800 15px Manrope,Arial,sans-serif}
+.sig-preview-choice small{color:#706b61;line-height:1.35;font-size:12px}
+.sig-preview-banner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 18px;margin-bottom:19px;border-radius:12px;background:#f3ead8;border:1px solid #cdb47d;border-left:4px solid #947437;color:#43392a}
+.sig-preview-banner>div{display:flex;flex-direction:column;gap:4px;flex:1;min-width:190px}
+.sig-preview-banner strong{font:800 15px Manrope,Arial,sans-serif}
+.sig-preview-banner span{font-size:12px;line-height:1.45}
+.sig-preview-return{background:#fff;border-color:#bda06a;color:#5e492c;white-space:normal}
+@media(max-width:850px){.sig-preview-trigger{font-size:11px;padding:8px 10px;max-width:180px;background:#f6f1e7;color:#5d4a2b}}
+@media(max-width:510px){.sig-preview-trigger{padding:8px 9px}.sig-preview-trigger span{display:none}.sig-preview-grid{grid-template-columns:1fr}.sig-preview-banner{padding:12px;align-items:stretch}.sig-preview-return{width:100%}}
