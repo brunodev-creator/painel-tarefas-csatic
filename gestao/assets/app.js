@@ -994,6 +994,29 @@ async function refreshSession(){
  })();
  try{return await pendingSessionRefresh;}finally{pendingSessionRefresh=null;}
 }
+function limitCloudRowsForChief(data,role,sector,userId){
+ if(!isSectionChiefRole(role))return data;
+ const expected=SIG_CHIEF_SECTIONS[role]||sector;
+ const safe=SECTORS.includes(expected)&&sector===expected;
+ const clean=Object.fromEntries(TABLES.map(key=>[key,Array.isArray(data[key])?data[key]:[]]));
+ if(!safe)return Object.fromEntries(TABLES.map(key=>[key,[]]));
+ const p=clean.processos.filter(v=>v.setor===expected);
+ const t=clean.tarefas.filter(v=>v.setor===expected);
+ const procIDs=new Set(p.map(v=>v.id)),taskIDs=new Set(t.map(v=>v.id));
+ return {...clean,
+  processos:p,tarefas:t,
+  usuarios:clean.usuarios.filter(v=>v.ativo&&v.setor===expected),
+  eventos:clean.eventos.filter(v=>procIDs.has(v.processo_id)),
+  tramites:clean.tramites.filter(v=>procIDs.has(v.processo_id)),
+  notificacoes:clean.notificacoes.filter(v=>
+   v.destinatario_auth_id===userId&&
+   (!v.processo_id||procIDs.has(v.processo_id))&&
+   (!v.tarefa_id||taskIDs.has(v.tarefa_id))),
+  empenhos:clean.empenhos.filter(v=>v.processo_id&&procIDs.has(v.processo_id)),
+  solicitacoes_empenho:clean.solicitacoes_empenho.filter(v=>procIDs.has(v.processo_id)),
+  contratos:[],repasses:[],competencias_contratuais:[]
+ };
+}
 function onCloudReady(){
  lastLoad=nowIso();
  if(v3NotificationsReady&&v3Unread()>v3UnreadSeen)showToast('Você recebeu '+(v3Unread()-v3UnreadSeen)+' novo(s) aviso(s).');
@@ -1018,11 +1041,13 @@ async function fetchCloud(options={}){
    profile=identity[0];if(profile.role!=='admin')previewRole=null;
    db=Object.fromEntries(TABLES.map(t=>[t,[]]));
    SIG_FAST_TABLES.forEach((k,i)=>db[k]=mainRows[i]||[]);
+   db=limitCloudRowsForChief(db,profile.role,profile.setor,userId);
    cloudDataReady=true;cloudExtraState='loading';cloudLoadError='';view=firstRoleView();render();
    void extraReq.then(result=>{
     if(session?.user?.id!==userId)return;
     if(!result.ok){cloudExtraState='error';cloudLoadError=errMsg(result.error);render();showToast('Falha na sincronização complementar. Tente novamente.');return;}
     extraNames.forEach((k,i)=>db[k]=result.rows[i]||[]);
+    db=limitCloudRowsForChief(db,profile.role,profile.setor,userId);
     cloudExtraState='ready';cloudLoadError='';onCloudReady();
    });
    return true;
@@ -1031,6 +1056,7 @@ async function fetchCloud(options={}){
   if(session?.user?.id!==userId)return false;
   if(!identity?.[0]?.ativo)throw Error('Usuário não habilitado no SIG. Solicite acesso ao administrador.');
   profile=identity[0];if(profile.role!=='admin')previewRole=null;db=Object.fromEntries(TABLES.map((k,i)=>[k,rows[i]||[]]));
+  db=limitCloudRowsForChief(db,profile.role,profile.setor,userId);
   cloudDataReady=true;cloudExtraState='ready';cloudLoadError='';onCloudReady();return true;
  }catch(e){
   if(session?.user?.id!==userId)return false;
@@ -1093,7 +1119,7 @@ async function signIn({email,password}){if(!cloud()||busy)return;
  }catch(e){showToast('Falha no acesso: '+errMsg(e))}
  finally{busy=false;if(button?.isConnected){button.disabled=false;button.innerHTML='Entrar <span class="sig-auth-arrow" aria-hidden="true">→</span>';}}
 }
-async function signOut(){previewRole=null;try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
+async function signOut(){previewRole=null;chat=[];v5Report=null;try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
 function saveSettings({url,key}){previewRole=null;url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(cloud()?config:{...config,mode:'demo'}));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
 function assistantAnswer(question){const q=String(question||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const respostaV7=window.SIG_V7.answer(question,canFinance());if(respostaV7)return respostaV7;
