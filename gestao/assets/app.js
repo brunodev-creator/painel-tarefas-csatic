@@ -5,17 +5,34 @@ const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'
 const TABLES=['processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
+const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
+const SIG_CHIEF_ROLES=['chefia',...Object.keys(SIG_CHIEF_SECTIONS)];
+const isSectionChiefRole=r=>SIG_CHIEF_ROLES.includes(r);
+const SIG_ROLE_CHOICES=[['compras','Compras'],['licitacao','Licitação'],['sofi','SOFI'],['chefe_compras','Chefe da Compras'],['chefe_licitacao','Chefe da Licitação'],['chefe_sofi','Chefe da SOFI'],['chefia','Chefia (perfil existente)'],['leitura','Consulta / Leitura']];
+const labelRole=r=>SIG_ROLE_CHOICES.find(x=>x[0]===r)?.[1]||({admin:'Administrador'})[r]||r;
+function syncUserRoleSetor(){
+ const form=document.querySelector('#modal-root form[data-form="inviteUser"],#modal-root form[data-form="updateUser"]');
+ if(!form)return;
+ const role=form.querySelector('#f-role'),sector=form.querySelector('#f-setor');if(!role||!sector)return;
+ const fixed=SIG_CHIEF_SECTIONS[role.value]||({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[role.value]||null;
+ const hidden=form.querySelector('#sig-fixed-sector');
+ if(fixed){sector.value=fixed;sector.disabled=true;if(hidden){hidden.name='setor';hidden.value=fixed;}}
+ else{sector.disabled=false;if(hidden){hidden.name='';hidden.value='';}}
+}
 const SIG_ROLE_MENUS=Object.freeze({
  compras:['notificacoes','tarefas','compras','cotas','processos','assistente'],
  licitacao:['notificacoes','tarefas','licitacao','cotas','processos','assistente'],
  sofi:['notificacoes','tarefas','sofi','cotas','processos','assistente'],
  chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','cotas','processos','assistente'],
+ chefe_compras:['notificacoes','chefia','tarefas','compras','cotas','processos','assistente'],
+ chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','cotas','processos','assistente'],
+ chefe_sofi:['notificacoes','chefia','tarefas','sofi','cotas','processos','assistente'],
  leitura:['notificacoes','tarefas','processos','assistente']
 });
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
 function currentMenus(){return menusForRole(effectiveRole());}
 function canVisitMenu(id){return currentMenus().includes(id);}
-function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':role==='compras'?'compras':'tarefas';}
+function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':isSectionChiefRole(role)?'chefia':role==='compras'?'compras':'tarefas';}
 // Visões que usam somente as tabelas carregadas na etapa rápida do login.
 const SIG_FAST_VIEWS=['dashboard','tarefas','compras','licitacao','processos'];
 const SECTORS=['Compras','Licitação','SOFI'];
@@ -99,7 +116,10 @@ const SIG_PREVIEW_ROLES=[
  {id:'compras',label:'Compras',desc:'Processos e tarefas de compras'},
  {id:'licitacao',label:'Licitação',desc:'Fluxo licitatório e providências'},
  {id:'sofi',label:'SOFI',desc:'Empenhos e demandas financeiras'},
- {id:'chefia',label:'Chefia',desc:'Painel gerencial e acompanhamento'},
+ {id:'chefia',label:'Chefia (existente)',desc:'Painel gerencial atual'},
+  {id:'chefe_compras',label:'Chefe da Compras',desc:'Painel e tarefas da seção Compras'},
+  {id:'chefe_licitacao',label:'Chefe da Licitação',desc:'Painel e tarefas da seção Licitação'},
+  {id:'chefe_sofi',label:'Chefe da SOFI',desc:'Painel e tarefas da seção SOFI'},
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
@@ -116,8 +136,8 @@ function previewProfileModal(){
 function setRolePreview(role){
  if(!canPreviewRole())return showToast('Prévia disponível somente para administradores autenticados.');
  if(!SIG_PREVIEW_ROLES.some(r=>r.id===role))return showToast('Perfil desconhecido.');
- previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia'})[role]||firstRoleView();purchaseFilter='all';chiefSectorFilter=role==='chefia'?(SECTORS.includes(profile.setor)?profile.setor:'Compras'):'Todos';chiefTaskFilter='active';chiefMemberFilter='Todos';
- taskScope='all';receiptScope=role==='chefia'?'all':'sector';purchaseLimit=12;filters={q:'',setor:'Todos',status:'Todos'};
+ previewRole=role;view=({compras:'compras',licitacao:'licitacao',sofi:'sofi',chefia:'chefia',chefe_compras:'chefia',chefe_licitacao:'chefia',chefe_sofi:'chefia'})[role]||firstRoleView();purchaseFilter='all';chiefSectorFilter=SIG_CHIEF_SECTIONS[role]||(role==='chefia'?(SECTORS.includes(profile.setor)?profile.setor:'Compras'):'Todos');chiefTaskFilter='active';chiefMemberFilter='Todos';
+ taskScope='all';receiptScope='sector';purchaseLimit=12;filters={q:'',setor:'Todos',status:'Todos'};
  closeModal();document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible');render();window.scrollTo(0,0);
 }
 function exitRolePreview(){
@@ -128,14 +148,14 @@ function exitRolePreview(){
 let cloudDataReady=false,cloudExtraState='idle',cloudLoadError='';
 if(cloud()&&session){db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Verificando acesso',role:'leitura',setor:'',ativo:false};}
 function saveLocal(){if(!cloud())localStorage.setItem(KEYS.data,JSON.stringify(db))}
-function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;const role=effectiveRole();return role==='admin'||(role==='chefia'&&profile.setor===sector)||role===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
-function canFinance(){return !cloud()||['admin','chefia','sofi'].includes(effectiveRole())}
-function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao'].includes(effectiveRole())}
+function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;const role=effectiveRole();return role==='admin'||(isSectionChiefRole(role)&&profile.setor===sector&&(!SIG_CHIEF_SECTIONS[role]||SIG_CHIEF_SECTIONS[role]===sector))||role===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
+function canFinance(){return !cloud()||['admin','chefia','sofi','chefe_sofi'].includes(effectiveRole())}
+function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao','chefe_compras','chefe_licitacao','chefe_sofi'].includes(effectiveRole())}
 function isAdmin(){return !previewRole&&profile.role==='admin'&&(!cloud()||!!session)}
 function currentAuthId(){return session?.user?.id||'demo-admin'}
-function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[effectiveRole()]||profile.setor||'Compras'}
-function assignedToMe(t){if(previewRole){const sector=({'compras':'Compras','licitacao':'Licitação','sofi':'SOFI'})[previewRole];return !!sector&&t.setor===sector;}return !!(t.responsavel_auth_id&&t.responsavel_auth_id===currentAuthId())||(!t.responsavel_auth_id&&String(t.responsavel).toLowerCase()===String(profile.nome).toLowerCase())}
-function userCandidates(setor){return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&u.setor===setor&&['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[setor]].includes(u.role))}
+function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:'SOFI',...SIG_CHIEF_SECTIONS})[effectiveRole()]||profile.setor||'Compras'}
+function assignedToMe(t){if(previewRole){const sector=({'compras':'Compras','licitacao':'Licitação','sofi':'SOFI',...SIG_CHIEF_SECTIONS})[previewRole];return !!sector&&t.setor===sector;}return !!(t.responsavel_auth_id&&t.responsavel_auth_id===currentAuthId())||(!t.responsavel_auth_id&&String(t.responsavel).toLowerCase()===String(profile.nome).toLowerCase())}
+function userCandidates(setor){return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&u.setor===setor&&['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[setor],...Object.entries(SIG_CHIEF_SECTIONS).filter(([,v])=>v===setor).map(([k])=>k)].includes(u.role))}
 function iconBadge(status){const s=String(status||'');const cls=/Bloqueado|Vencido|Atrasad|Cancelad/.test(s)?'red':/Aguardando|Pendente|Baixa cobertura|Próximo vencimento/.test(s)?'amber':/Conclu|Vigente|Ativo/.test(s)?'teal':/andamento|prepara/i.test(s)?'blue':'gray';return `<span class="flag ${cls}">${esc(s)}</span>`}
 function showToast(msg){const root=document.getElementById('toast-root');root.innerHTML=`<div class="toast">${esc(msg)}</div>`;setTimeout(()=>root.querySelector('.toast')?.remove(),3500)}
 function errMsg(err){return err?.message||'Ocorreu um erro inesperado.'}
@@ -207,17 +227,22 @@ function v3AlertView(){
  return html+'</tbody></table></div></div><p class="v3-hint">Regra piloto: dias corridos, considerando alterações do processo, registros da linha do tempo e tramitações. Confirme a causa da espera antes de classificar como gargalo.</p>';
 }
 function chiefScope(){
- if(!['admin','chefia'].includes(effectiveRole()))return '__unauthorized__';
- if(effectiveRole()==='chefia'){
+ const role=effectiveRole();
+ if(role==='admin')return SECTORS.includes(chiefSectorFilter)?chiefSectorFilter:null;
+ if(SIG_CHIEF_SECTIONS[role]){
+  const expected=SIG_CHIEF_SECTIONS[role];
+  return previewRole?expected:(profile.setor===expected?expected:'__unauthorized__');
+ }
+ if(role==='chefia'){
   if(previewRole==='chefia')return SECTORS.includes(chiefSectorFilter)?chiefSectorFilter:'__unauthorized__';
   return SECTORS.includes(profile.setor)?profile.setor:'__unauthorized__';
  }
- return SECTORS.includes(chiefSectorFilter)?chiefSectorFilter:null;
+ return '__unauthorized__';
 }
 function chiefTeam(sector){
  return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&SECTORS.includes(u.setor)&&
   (!sector||u.setor===sector)&&
-  ['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[u.setor]].includes(u.role));
+  ['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[u.setor],...Object.entries(SIG_CHIEF_SECTIONS).filter(([,v])=>v===u.setor).map(([k])=>k)].includes(u.role));
 }
 function chiefTaskPoints(t){return ({Alta:3,'Média':2,Baixa:1})[t.prioridade]||2}
 function chiefWorkload(u,teamTasks){
@@ -229,7 +254,7 @@ function chiefCanManageTask(t){
  if(!t||t.status==='Concluída'||previewRole)return false;
  const sector=chiefScope();
  if(sector==='__unauthorized__'||(sector&&t.setor!==sector))return false;
- return !!session&&!!profile.ativo&&(profile.role==='admin'||(profile.role==='chefia'&&profile.setor===t.setor));
+ return !!session&&!!profile.ativo&&(profile.role==='admin'||(isSectionChiefRole(profile.role)&&profile.setor===t.setor&&(!SIG_CHIEF_SECTIONS[profile.role]||SIG_CHIEF_SECTIONS[profile.role]===t.setor)));
 }
 function chiefRedistributeForm(id,proposed){
  const t=db.tarefas.find(x=>x.id===id);
@@ -267,7 +292,7 @@ async function chiefReassignSubmit(form){
  }finally{busy=false;}
 }
 function v3ChiefView(){
- if(!['admin','chefia'].includes(effectiveRole()))return heading('Acesso restrito','Painel da chefia','Apenas chefias e administração.');
+ if(!['admin',...SIG_CHIEF_ROLES].includes(effectiveRole()))return heading('Acesso restrito','Painel da chefia','Apenas chefias e administração.');
  const scope=chiefScope();
  if(scope==='__unauthorized__')return heading('Seção não vinculada','Painel da chefia','Solicite ao administrador que associe sua conta a Compras, Licitação ou SOFI.');
  const team=chiefTeam(scope),allTasks=(db.tarefas||[]).filter(t=>!scope||t.setor===scope),active=allTasks.filter(t=>t.status!=='Concluída');
@@ -727,7 +752,7 @@ function processView(sector){if(sector==='Compras')return purchaseView();
 }
 function tasksView(){
  const arr=db.tarefas.filter(t=>!cloud()||taskScope==='all'||assignedToMe(t)).filter(t=>filters.setor==='Todos'||t.setor===filters.setor).filter(t=>filters.status==='Todos'||t.status===filters.status).filter(t=>searchText(t.titulo,t.responsavel,t.descricao,findProcess(t.processo_id)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort((a,b)=>(a.status==='Concluída')-(b.status==='Concluída')||daysLeft(a.prazo)-daysLeft(b.prazo));
- return heading('Fluxo de trabalho',taskScope==='mine'&&cloud()?'Minhas tarefas':'Tarefas dos setores','Demandas recebidas, prazos, responsáveis e providências.',`<button class="btn" data-action="taskScope" data-scope="${taskScope==='mine'?'all':'mine'}">${taskScope==='mine'?'Ver todas as tarefas':'Somente minhas tarefas'}</button>${!previewRole&&(!cloud()||['admin','chefia'].includes(profile.role))?'<button class="btn primary" data-action="newTask">+ Nova tarefa</button>':''}`)+`<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar tarefa ou processo..." value="${esc(filters.q)}"></label><select data-filter="setor" class="field-select">${optionsWithAll(SECTORS)}</select><select data-filter="status" class="field-select">${optionsWithAll(TASK_STATUSES)}</select></div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarefa</th><th>Processo</th><th>Setor</th><th>Responsável</th><th>Prazo</th><th>Prioridade</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${arr.map(t=>`<tr><td><button class="link-button cell-main" data-action="editTask" data-id="${esc(t.id)}">${esc(t.titulo)}</button><div class="cell-sub">${esc(t.descricao||'Sem observações')}</div></td><td>${findProcess(t.processo_id)?`<button class="link-button" data-action="detail" data-id="${esc(t.processo_id)}">${esc(findProcess(t.processo_id).numero)}</button>`:'—'}</td><td>${esc(t.setor)}</td><td>${esc(t.responsavel||'Não atribuído')}</td><td>${fmtDate(t.prazo)}${isOverdue(t)?'<div class="cell-sub" style="color:#c4504a">Em atraso</div>':''}</td><td>${iconBadge(t.prioridade)}</td><td>${iconBadge(t.status)}</td><td><button class="btn small" data-action="editTask" data-id="${esc(t.id)}">Editar</button>${t.status!=='Concluída'&&canWrite(t.setor)?`<button class="btn small primary" data-action="v4FinishTask" data-id="${esc(t.id)}">Concluir</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="table-empty">Nenhuma tarefa encontrada.</td></tr>'}</tbody></table></div></div>`;
+ return heading('Fluxo de trabalho',taskScope==='mine'&&cloud()?'Minhas tarefas':'Tarefas dos setores','Demandas recebidas, prazos, responsáveis e providências.',`<button class="btn" data-action="taskScope" data-scope="${taskScope==='mine'?'all':'mine'}">${taskScope==='mine'?'Ver todas as tarefas':'Somente minhas tarefas'}</button>${!previewRole&&(!cloud()||['admin',...SIG_CHIEF_ROLES].includes(profile.role))?'<button class="btn primary" data-action="newTask">+ Nova tarefa</button>':''}`)+`<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar tarefa ou processo..." value="${esc(filters.q)}"></label><select data-filter="setor" class="field-select">${optionsWithAll(SECTORS)}</select><select data-filter="status" class="field-select">${optionsWithAll(TASK_STATUSES)}</select></div><div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarefa</th><th>Processo</th><th>Setor</th><th>Responsável</th><th>Prazo</th><th>Prioridade</th><th>Situação</th><th>Ação</th></tr></thead><tbody>${arr.map(t=>`<tr><td><button class="link-button cell-main" data-action="editTask" data-id="${esc(t.id)}">${esc(t.titulo)}</button><div class="cell-sub">${esc(t.descricao||'Sem observações')}</div></td><td>${findProcess(t.processo_id)?`<button class="link-button" data-action="detail" data-id="${esc(t.processo_id)}">${esc(findProcess(t.processo_id).numero)}</button>`:'—'}</td><td>${esc(t.setor)}</td><td>${esc(t.responsavel||'Não atribuído')}</td><td>${fmtDate(t.prazo)}${isOverdue(t)?'<div class="cell-sub" style="color:#c4504a">Em atraso</div>':''}</td><td>${iconBadge(t.prioridade)}</td><td>${iconBadge(t.status)}</td><td><button class="btn small" data-action="editTask" data-id="${esc(t.id)}">Editar</button>${t.status!=='Concluída'&&canWrite(t.setor)?`<button class="btn small primary" data-action="v4FinishTask" data-id="${esc(t.id)}">Concluir</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="table-empty">Nenhuma tarefa encontrada.</td></tr>'}</tbody></table></div></div>`;
 }
 function contractsView(){
  const contracts=db.contratos.filter(c=>searchText(c.numero,c.objeto,c.fornecedor,c.gestor).includes(filters.q.toLowerCase()));
@@ -850,9 +875,9 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
  openModal(id?'Editar processo':'Cadastrar novo processo','Cada processo tem um responsável, situação e próxima providência.',html,true);
 }
 function taskForm(id,proc,requestedSection,requestedMember){
- if(!id&&cloud()&&!['admin','chefia'].includes(profile.role))return showToast('O cadastro e a distribuição de tarefas são realizados pela chefia da seção.');
+ if(!id&&cloud()&&!['admin',...SIG_CHIEF_ROLES].includes(profile.role))return showToast('O cadastro e a distribuição de tarefas são realizados pela chefia da seção.');
  const existing=db.tarefas.find(x=>x.id===id)||null;
- const scoped=profile.role==='chefia'&&!previewRole?profile.setor:null;
+ const scoped=isSectionChiefRole(profile.role)&&!previewRole?profile.setor:null;
  const sector=existing?.setor||scoped||((requestedSection&&SECTORS.includes(requestedSection))?requestedSection:findProcess(proc)?.setor||'Compras');
  const t=existing||{processo_id:proc||'',titulo:'',descricao:'',setor:sector,responsavel:'',responsavel_auth_id:requestedMember||'',prioridade:'Média',status:'Pendente',prazo:dayOffset(3)};
  if(!canWrite(t.setor))return showToast('Sem permissão para atribuir tarefas nesta seção.');
@@ -932,7 +957,7 @@ async function requestRecovery(d){
 function loginView(){return `<div class="login-wrapper"><h2>Identificação do usuário</h2><p class="sub">Somente contas liberadas pelo administrador podem acessar o banco.</p><form data-form="login" style="margin-top:18px"><div class="form-grid">${inputField('email','E-mail','', 'email','required autocomplete="username"')}${inputField('password','Senha','', 'password','required autocomplete="current-password"')}</div><div class="modal-footer"><button type="button" class="btn" data-action="settings">Configurações</button><button type="submit" class="btn primary">Entrar</button></div></form><p class="helper">As senhas são enviadas diretamente à autenticação do projeto Supabase; não são gravadas pelo protótipo.</p><div class="card section" style="margin-top:20px"><h3>Primeiro acesso ou esqueceu a senha?</h3><p class="sub">Se o convite direcionou para localhost ou você ainda não definiu sua senha, solicite um novo link. O administrador deve configurar a URL pública no Supabase antes do envio.</p><form data-form="recover" style="margin-top:12px">${inputField('email','E-mail da sua conta','', 'email','required autocomplete="email"')}<div class="modal-footer"><button type="submit" class="btn">Enviar link de definição de senha</button></div></form></div></div>`}
 function settingsModal(){const html=`<div class="info-note warning-note"><strong>Atenção:</strong> o site compartilhado não é local apropriado para dados internos antes de autorização institucional, revisão de segurança e configuração das permissões do banco.</div><form data-form="settings"><div class="form-grid">${inputField('url','URL do projeto Supabase',config.url,'url','placeholder="https://projeto.supabase.co"')}${inputField('key','Chave pública (anon/publishable)',config.key,'text','autocomplete="off" placeholder="sb_publishable_..."')}</div><div class="modal-footer"><button type="button" class="btn" data-action="disconnect">${cloud()?'Desconectar / voltar à demo':'Restaurar demonstração'}</button><button type="submit" class="btn primary">Salvar conexão</button></div></form><div class="card section" style="margin-top:17px"><h3>Modo demonstração</h3><p class="sub">Permite testar todas as funcionalidades no navegador, sem servidor e sem criar conta.</p><div class="detail-actions"><button class="btn" data-action="export">↓ Exportar JSON</button><button class="btn" data-action="import">↑ Importar JSON</button><button class="btn danger" data-action="resetDemo">Reiniciar demo</button></div><p class="helper">Sincronização multiusuário só funciona com um projeto PostgreSQL configurado. As credenciais de serviço não devem ser inseridas neste aplicativo.</p></div><div class="card section"><h3>Como ativar a versão compartilhada</h3><p class="sub">1. Criar um projeto no Supabase sob conta aprovada. 2. Executar <span class="code">database/schema.sql</span>. 3. Cadastrar usuários no Authentication e autorizar os perfis na tabela <span class="code">usuarios</span>. 4. Informar aqui a URL e a chave pública do projeto.</p></div>`;
  openModal('Configurações e conexão','Administração local e conexão do banco de dados.',html,true)}
-function profileModal(){const html=cloud()?`<div class="card section"><h3>${esc(profile.nome||'Usuário')}</h3><p class="sub">Perfil real: ${esc(profile.role)} · setor: ${esc(profile.setor||'—')}</p><div class="detail-actions">${canPreviewRole()?'<button class="btn" data-action="previewProfiles">Visualizar outros perfis</button>':''}<button class="btn danger" data-action="signOut">Sair da conta</button></div></div>`:`<div class="info-note">A demonstração não possui autenticação. Perfis nesta tela apenas ilustram possíveis permissões, sem restringir dados reais.</div><div class="card section"><h3>Perfil de simulação</h3><p class="sub">Atual: ${esc(profile.role)}</p><div class="detail-actions">${['admin','chefia','compras','licitacao','sofi','leitura'].map(r=>`<button class="btn small" data-action="demoRole" data-role="${r}">${r}</button>`).join('')}</div></div>`;openModal('Perfil de acesso',cloud()?'Sessão autorizada pelo banco':'Somente para navegação demonstrativa.',html)}
+function profileModal(){const html=cloud()?`<div class="card section"><h3>${esc(profile.nome||'Usuário')}</h3><p class="sub">Perfil real: ${esc(labelRole(profile.role))} · setor: ${esc(profile.setor||'—')}</p><div class="detail-actions">${canPreviewRole()?'<button class="btn" data-action="previewProfiles">Visualizar outros perfis</button>':''}<button class="btn danger" data-action="signOut">Sair da conta</button></div></div>`:`<div class="info-note">A demonstração não possui autenticação. Perfis nesta tela apenas ilustram possíveis permissões, sem restringir dados reais.</div><div class="card section"><h3>Perfil de simulação</h3><p class="sub">Atual: ${esc(profile.role)}</p><div class="detail-actions">${['admin','chefia','chefe_compras','chefe_licitacao','chefe_sofi','compras','licitacao','sofi','leitura'].map(r=>`<button class="btn small" data-action="demoRole" data-role="${r}">${r}</button>`).join('')}</div></div>`;openModal('Perfil de acesso',cloud()?'Sessão autorizada pelo banco':'Somente para navegação demonstrativa.',html)}
 // Camada de dados: demo local ou Supabase REST + GoTrue (chave pública, políticas RLS).
 async function rest(path,method='GET',payload=null,token=session?.access_token){
  if(!cloud())throw Error('Projeto em nuvem não configurado.');
@@ -1025,7 +1050,7 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  if((type==='process'||type==='task')&&!canWrite(old?.setor||d.setor))return showToast('Você não pode editar registros do setor de origem.');
   if(type==='task'){
    if(old?.setor&&d.setor!==old.setor)return showToast('Para alterar o setor, utilize a tramitação do processo. A tarefa deve permanecer na seção de origem.');
-   if(profile.role==='chefia'&&d.setor!==profile.setor)return showToast('A chefia pode distribuir tarefas apenas na própria seção.');
+   if(isSectionChiefRole(profile.role)&&d.setor!==profile.setor)return showToast('A chefia pode distribuir tarefas apenas na própria seção.');
    if(d.processo_id&&findProcess(d.processo_id)?.setor!==d.setor)return showToast('O processo relacionado deve pertencer à mesma seção.');
    if(cloud()&&d.responsavel_auth_id&&!userCandidates(d.setor).some(u=>u.auth_id===d.responsavel_auth_id))return showToast('Escolha um militar ativo da mesma seção.');
   }
@@ -1098,7 +1123,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'chiefNewTask':{
   const sec=chiefScope();
   const target=SECTORS.includes(sec)?sec:(SECTORS.includes(btn.dataset.sector)?btn.dataset.sector:'Compras');
-  if(previewRole||!(profile.role==='admin'||profile.role==='chefia')||!canWrite(target))return showToast('Acesso restrito à chefia da seção.');
+  if(previewRole||!(profile.role==='admin'||isSectionChiefRole(profile.role))||!canWrite(target))return showToast('Acesso restrito à chefia da seção.');
   taskForm(null,null,target,chiefMemberFilter==='Todos'?'':chiefMemberFilter);break;
  }
  case 'chiefReassign':chiefRedistributeForm(id,btn.dataset.member);break;
