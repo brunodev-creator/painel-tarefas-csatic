@@ -81,7 +81,7 @@ function loadSession(){try{return JSON.parse(sessionStorage.getItem(KEYS.session
 const cloud=()=>!!(config.url&&config.key);
 const SIG_FAST_TABLES=['processos','tarefas','contratos','empenhos'];
 let cloudDataReady=false,cloudExtraState='idle',cloudLoadError='';
-if(cloud()&&session)db=Object.fromEntries(TABLES.map(t=>[t,[]]));
+if(cloud()&&session){db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Verificando acesso',role:'leitura',setor:'',ativo:false};}
 function saveLocal(){if(!cloud())localStorage.setItem(KEYS.data,JSON.stringify(db))}
 function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;return ['admin','chefia'].includes(profile.role)||profile.role===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
 function canFinance(){return !cloud()||['admin','chefia','sofi'].includes(profile.role)}
@@ -742,6 +742,7 @@ async function signIn({email,password}){if(!cloud()||busy)return;
   session={access_token:r.access_token,refresh_token:r.refresh_token,user:r.user,expires_at:Date.now()+r.expires_in*1000};
   sessionStorage.setItem(KEYS.session,JSON.stringify(session));
   cloudDataReady=false;cloudExtraState='idle';cloudLoadError='';
+  profile={nome:'Verificando acesso',role:'leitura',setor:'',ativo:false};
   db=Object.fromEntries(TABLES.map(t=>[t,[]]));
   const ok=await fetchCloud({fastInitial:true});
   if(ok){closeModal();showToast('Sessão iniciada.');}
@@ -780,7 +781,7 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}if(btn.dataset.view){navigate(btn.dataset.view);return}
- if(cloud()&&session&&cloudDataReady&&cloudExtraState!=='ready'&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
+ if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
  case 'cotaDetail':if(!canFinance())return showToast('Acesso financeiro restrito.');openModal('Detalhes da dotação','Posição orçamentária importada do SIG V6.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
