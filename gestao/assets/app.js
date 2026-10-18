@@ -548,18 +548,24 @@ function dashboardView(){
  <div class="card section">${cardTitle('Contratos sob atenção','Cobertura inferior à meta configurada',`<button class="btn small" data-view="contratos">Contratos →</button>`)}${coverage.slice(0,4).map(c=>`<div class="row-item"><div><div class="item-title">${esc(c.numero)}</div><div class="item-meta">${esc(c.objeto)}</div></div><span class="flag amber">${(digits(c.saldo_empenho)/digits(c.custo_mensal)).toLocaleString('pt-BR',{maximumFractionDigits:1})} mês(es)</span></div>`).join('')||empty('Nenhum alerta de cobertura')}</div></div></div>`;
 }
 /* Área de Compras — primeiro ciclo de UX, sem novas tabelas ou APIs. */
+function purchaseDays(prazo){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(prazo||'').slice(0,10)))return Infinity;
+ const target=new Date(String(prazo).slice(0,10)+'T12:00:00');
+ const current=new Date();current.setHours(12,0,0,0);
+ return Math.round((target.getTime()-current.getTime())/86400000);
+}
 function purchaseIssue(p){
- const due=daysLeft(p.prazo);
+ const due=purchaseDays(p.prazo);
  return activeProcess(p)&&(p.status==='Bloqueado'||p.status==='Aguardando providência'||due<0);
 }
 function purchaseDueSoon(p){
- const due=daysLeft(p.prazo);
+ const due=purchaseDays(p.prazo);
  return activeProcess(p)&&Number.isFinite(due)&&due>=0&&due<=7;
 }
 function purchaseSort(a,b){
  const score=p=>purchaseIssue(p)?0:purchaseDueSoon(p)?1:activeProcess(p)?2:3;
  const x=score(a)-score(b);if(x!==0)return x;
- const da=daysLeft(a.prazo),dbb=daysLeft(b.prazo);
+ const da=purchaseDays(a.prazo),dbb=purchaseDays(b.prazo);
  return da-dbb||String(a.numero).localeCompare(String(b.numero),'pt-BR',{numeric:true});
 }
 function purchaseView(){
@@ -578,7 +584,7 @@ function purchaseView(){
   '<button type="button" class="sig-buy-metric'+(purchaseFilter===t.id?' active':'')+'" data-action="buyFilter" data-filter="'+t.id+'" aria-pressed="'+String(purchaseFilter===t.id)+'"><span class="sig-buy-metric-top"><span>'+esc(t.label)+'</span><span class="sig-buy-metric-icon" aria-hidden="true">'+t.icon+'</span></span><strong>'+t.value+'</strong><small>'+esc(t.help)+'</small></button>'
  ).join('')+'</div>';
  const card=p=>{
-  const due=daysLeft(p.prazo),issue=purchaseIssue(p);
+  const due=purchaseDays(p.prazo),issue=purchaseIssue(p);
   const deadline=!p.prazo?'Prazo não definido':due<0?'Atrasado há '+Math.abs(due)+' dia(s)':due===0?'Vence hoje':due<=7?'Vence em '+due+' dia(s)':'Prazo '+fmtDate(p.prazo);
   const urgency=issue?' urgent':purchaseDueSoon(p)?' near':'';
   return '<article class="sig-buy-item'+urgency+'">'+
