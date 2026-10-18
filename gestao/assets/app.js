@@ -49,11 +49,11 @@ function seed(){
  return {solicitacoes_empenho,competencias_contratuais,processos,tarefas,contratos,repasses,empenhos,eventos,tramites:[],usuarios:[{auth_id:'demo-compras',nome:'Analista Compras (demo)',role:'compras',setor:'Compras',ativo:true},{auth_id:'demo-licitacao',nome:'Analista Licitação (demo)',role:'licitacao',setor:'Licitação',ativo:true},{auth_id:'demo-sofi',nome:'Analista SOFI (demo)',role:'sofi',setor:'SOFI',ativo:true}]};
 }
 function storage(){try{const item=JSON.parse(localStorage.getItem(KEYS.data));return item&&['processos','tarefas','contratos','repasses','empenhos','eventos'].every(k=>Array.isArray(item[k]))?{...item,tramites:item.tramites||[],usuarios:item.usuarios||seed().usuarios,solicitacoes_empenho:item.solicitacoes_empenho||seed().solicitacoes_empenho,competencias_contratuais:item.competencias_contratuais||seed().competencias_contratuais}:seed()}catch{return seed()}}
+const SIG_DEFAULT_CONNECTION=Object.freeze({url:'https://nrcobonppfbqgarfoqgj.supabase.co',key:'sb_publishable_q7Lhoq9CbOSJH0llBi6w_A_L8Qabbyl'});
 let db=storage();db.notificacoes=db.notificacoes||[];db.solicitacoes_empenho=db.solicitacoes_empenho||[];db.competencias_contratuais=db.competencias_contratuais||[];let config=loadSettings();let session=loadSession();let profile={nome:'Demonstração',role:localStorage.getItem(KEYS.profile)||'admin',setor:'Todos',ativo:true};let v5Report=null;let v3UnreadSeen=0,v3NotificationsReady=false;let stallDays=Math.max(1,Math.min(30,Number(localStorage.getItem('sig-alert-days')||5)));let view='dashboard',filters={q:'',setor:'Todos',status:'Todos'},chat=[],busy=false,lastLoad=null,taskScope='mine',receiptScope='mine',adminUsers=[],adminLoaded=false,inviteActive=false;
 /* Conexão institucional é o padrão. Configuração local vazia antiga não pode forçar demo.
  * Apenas mode:'demo' mantém a demonstração por escolha explícita do usuário.
  */
-const SIG_DEFAULT_CONNECTION=Object.freeze({url:'https://nrcobonppfbqgarfoqgj.supabase.co',key:'sb_publishable_q7Lhoq9CbOSJH0llBi6w_A_L8Qabbyl'});
 function loadSettings(){
  try {
   const raw=localStorage.getItem(KEYS.settings);
