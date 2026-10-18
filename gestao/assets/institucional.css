@@ -150,3 +150,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .brand-crest{display:block;width:104px;height:auto;max-height:120px;aspect-ratio:1831 / 2048;object-fit:contain;object-position:center;flex:none;image-rendering:auto}
 @media(max-width:850px){.brand-crest{width:86px;height:auto;max-height:100px}}
 @media(max-height:800px){.brand-crest{width:78px;height:auto;max-height:90px}}
+
+/* Acesso institucional a partir da tela demonstrativa (somente se usuário optou por demo). */
+.demo-banner{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}
+.sig-return-button{appearance:none;border:1px solid #b69b59;background:#263965;color:#fff;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;box-shadow:0 3px 12px #1b2e5120}
+.sig-return-button:hover{background:#182d59}
+.sig-return-button span{padding-left:8px}
+@media(max-width:650px){.demo-banner{align-items:stretch}.sig-return-button{width:100%;white-space:normal}}
