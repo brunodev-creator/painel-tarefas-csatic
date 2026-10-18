@@ -806,7 +806,7 @@ function sharedProcessDetail(id){
   '<div><small>Prazo</small><strong>'+fmtDate(p.prazo)+'</strong></div></div>'+
   '<div class="sig-flow-next"><small>Próxima providência</small><strong>'+esc(p.proxima_acao||'A definir')+'</strong></div>'+
   '<h3>Histórico entre as seções</h3>'+historyHtml+
-  '<div class="modal-footer">'+(getAipc(id)?'<button type="button" class="btn" data-action="aipcView" data-id="'+esc(id)+'">Visualizar AIPC</button>':
+  '<div class="modal-footer">'+(licDemoGet(id)?.contrato_gerado_em?'<button type="button" class="btn" data-action="licDemoOpen" data-id="'+esc(id)+'">Contrato e especificações</button>':'')+(getAipc(id)?'<button type="button" class="btn" data-action="aipcView" data-id="'+esc(id)+'">Visualizar AIPC</button>':
   canEditAipc()?'<button type="button" class="btn" data-action="aipcEdit" data-id="'+esc(id)+'">Preencher AIPC</button>':'')+
   actions+'<button type="button" class="btn" data-action="closeModal">Fechar</button></div></div>';
  openModal('Processo '+p.numero,p.objeto,html,true);
@@ -1090,6 +1090,8 @@ function taskReadDetail(id){
   '<p class="sub">Ainda não há encaminhamentos registrados.</p>';
  const actions=(doc?'<button type="button" class="btn primary" data-action="aipcView" data-id="'+esc(t.processo_id)+'">Visualizar AIPC</button>':
   t.processo_id?'<span class="sig-task-doc-missing">AIPC não cadastrada neste processo.</span>':'')+
+  (t.processo_id&&(licDemoGet(t.processo_id)?.contrato_gerado_em||process?.setor==='Licitação')?
+   '<button type="button" class="btn" data-action="licDemoOpen" data-id="'+esc(t.processo_id)+'">Contrato e especificações</button>':'')+
   (process?'<button type="button" class="btn" data-action="sharedDetail" data-id="'+esc(process.id)+'">Acompanhar processo</button>':'')+
   (editable?'<button type="button" class="btn" data-action="editTask" data-id="'+esc(id)+'">Editar tarefa</button>':'')+
   '<button type="button" class="btn" data-action="closeModal">Fechar</button>';
@@ -1473,6 +1475,8 @@ function tasksView(){
     '<button class="btn small" data-action="taskReadDetail" data-id="'+esc(t.id)+'">Ver tarefa</button>'+
     (available?'<button class="btn small primary" data-action="claimTask" data-id="'+esc(t.id)+'">Assumir</button>':'')+
     (managed?'<button class="btn small" data-action="editTask" data-id="'+esc(t.id)+'">Editar</button>':'')+
+    (t.processo_id&&(licDemoGet(t.processo_id)?.contrato_gerado_em||link?.setor==='Licitação')?
+      '<button class="btn small" data-action="licDemoOpen" data-id="'+esc(t.processo_id)+'">Contrato / Especificações</button>':'')+
     (t.processo_id&&getAipc(t.processo_id)?
       '<button class="btn small sig-aipc-action" data-action="aipcView" data-id="'+esc(t.processo_id)+'">Visualizar AIPC</button>':
      t.processo_id&&canEditAipc()?'<button class="btn small sig-aipc-action" data-action="aipc" data-id="'+esc(t.processo_id)+'">Preencher AIPC</button>':'')+
