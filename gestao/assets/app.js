@@ -657,12 +657,22 @@ async function rest(path,method='GET',payload=null,token=session?.access_token){
  if(token)headers['Authorization']='Bearer '+token;
  if(payload!==null){headers['Content-Type']='application/json';headers['Prefer']='return=representation'}
  let response=await fetch(config.url.replace(/\/$/,'')+path,{method,headers,body:payload!==null?JSON.stringify(payload):undefined,cache:'no-store'});
- if(response.status===401&&session?.refresh_token&&path.startsWith('/rest/')){await refreshSession();headers['Authorization']='Bearer '+session.access_token;response=await fetch(config.url.replace(/\/$/,'')+path,{method,headers,body:payload!==null?JSON.stringify(payload):undefined,cache:'no-store'})}
+ if(response.status===401&&session?.refresh_token&&path.startsWith('/rest/')){if(token===session.access_token)await refreshSession();headers['Authorization']='Bearer '+session.access_token;response=await fetch(config.url.replace(/\/$/,'')+path,{method,headers,body:payload!==null?JSON.stringify(payload):undefined,cache:'no-store'})}
  const raw=await response.text();let result;try{result=raw?JSON.parse(raw):null}catch{result={message:raw}}
  if(!response.ok)throw Error(result?.message||result?.msg||result?.error_description||`Erro HTTP ${response.status}`);
  return result;
 }
-async function refreshSession(){if(!session?.refresh_token)throw Error('Sessão expirada. Entre novamente.');const data=await rest('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token},null);session={access_token:data.access_token,refresh_token:data.refresh_token,user:data.user,expires_at:Date.now()+data.expires_in*1000};sessionStorage.setItem(KEYS.session,JSON.stringify(session))}
+let pendingSessionRefresh=null;
+async function refreshSession(){
+ if(pendingSessionRefresh)return pendingSessionRefresh;
+ pendingSessionRefresh=(async()=>{
+  if(!session?.refresh_token)throw Error('Sessão expirada. Entre novamente.');
+  const data=await rest('/auth/v1/token?grant_type=refresh_token','POST',{refresh_token:session.refresh_token},null);
+  session={access_token:data.access_token,refresh_token:data.refresh_token,user:data.user,expires_at:Date.now()+data.expires_in*1000};
+  sessionStorage.setItem(KEYS.session,JSON.stringify(session));
+ })();
+ try{return await pendingSessionRefresh;}finally{pendingSessionRefresh=null;}
+}
 function onCloudReady(){
  lastLoad=nowIso();
  if(v3NotificationsReady&&v3Unread()>v3UnreadSeen)showToast('Você recebeu '+(v3Unread()-v3UnreadSeen)+' novo(s) aviso(s).');
