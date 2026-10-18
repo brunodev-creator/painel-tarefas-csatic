@@ -328,3 +328,33 @@ body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes
 body[data-sig-visible-role="chefe_compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 body[data-sig-visible-role="chefe_licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+
+
+/* SIG fluxo hibrido – 4 tipos de Compras, filas e consulta intersetorial. */
+.sig-buy-services{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 13px}
+.sig-buy-service{border:1px solid #e1e3e3;border-radius:12px;padding:16px;background:#fff;display:flex;align-items:flex-start;flex-direction:column;gap:8px;cursor:pointer;text-align:left;min-width:0;box-shadow:0 3px 10px #172b4210;transition:background .15s ease,border-color .15s ease}
+.sig-buy-service:hover,.sig-buy-service.selected{border-color:#8b9a7e;background:#f4f7f2}
+.sig-buy-service-icon{display:grid;place-items:center;border-radius:9px;background:#ebeee9;color:#425e4c;font-size:22px;width:42px;height:42px}
+.sig-buy-service strong{font-size:12px;line-height:1.45;color:#263b4c}
+.sig-buy-service small{font-size:11px;color:#6f7c85;line-height:1.45;flex:1}
+.sig-buy-service-count{font-size:11px;font-weight:800;color:#51735e}
+.sig-buy-service-toggle{display:flex;justify-content:flex-end;margin-bottom:12px}
+.sig-service-details{display:block!important;border:1px solid #dce4dc;border-radius:11px;background:#f8faf7;padding:15px}
+.sig-service-details h3{font-size:13px;color:#375446;margin:0 0 12px}
+.sig-service-details>.form-grid{margin:0;gap:11px}
+.sig-task-tabs{display:flex;flex-wrap:wrap;gap:7px;align-items:center}
+.sig-task-tabs .btn{white-space:normal}
+.sig-task-actions{display:flex;flex-wrap:wrap;gap:5px}
+.sig-flow-history-row{padding:13px 8px;border-bottom:1px solid #e8e9e8;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.sig-flow-history-row strong{color:#304a61;font-size:12px}
+.sig-flow-history-row span{font-size:11px;color:#73818c}
+.sig-flow-shared-detail>h3{font-size:14px;margin:20px 0 5px}
+.sig-flow-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
+.sig-flow-detail-grid>div{background:#f5f6f6;border-radius:9px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.sig-flow-detail-grid small,.sig-flow-next small{font-size:11px;color:#69757d}
+.sig-flow-detail-grid strong{font-size:12px;line-height:1.5;color:#283b4e}
+.sig-flow-next{margin-top:13px;background:#f6f9f7;padding:13px;border-left:3px solid #6d9280;display:flex;flex-direction:column;gap:7px}
+.sig-flow-next strong{font-size:12px;line-height:1.5}
+@media(max-width:1050px){.sig-buy-services{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.sig-buy-services{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sig-buy-service{padding:12px}.sig-flow-history-row{flex-direction:column;align-items:start}.sig-task-tabs{width:100%}.sig-task-tabs .btn{flex:1}}
+@media(max-width:370px){.sig-buy-services{grid-template-columns:1fr}.sig-flow-detail-grid{grid-template-columns:1fr}}
