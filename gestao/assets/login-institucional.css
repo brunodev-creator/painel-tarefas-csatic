@@ -102,3 +102,85 @@ body.sig-auth-mode #modal-root { z-index:120; }
 }
 @media(max-width:380px){.sig-auth-options{gap:7px}.sig-auth-forgot,.sig-auth-remember{font-size:11.5px}.sig-auth-card{padding:18px 14px}.sig-auth-crest{width:97px}.sig-auth-title{font-size:24px}}
 @media(prefers-reduced-motion:reduce){.sig-auth-submit{transition:none}}
+
+
+/* Ajuste aprovado: imagem original 940×941, preenchimento por viewport e sem rolagem.
+   Mantém seletores exclusivos da autenticação, sem atingir o SIG após o login. */
+html:has(body.sig-auth-mode) {height:100%;overflow:hidden;}
+body.sig-auth-mode {width:100%;height:100dvh;min-height:0;max-height:100dvh;overflow:hidden;overscroll-behavior:none;}
+body.sig-auth-mode #app,
+body.sig-auth-mode .main-shell,
+body.sig-auth-mode .content {width:100%;height:100dvh;min-height:0;max-height:100dvh;overflow:hidden;}
+body.sig-auth-mode .content {padding:0!important;margin:0!important;}
+body.sig-auth-mode .sig-auth-shell {height:100dvh;min-height:0;max-height:100dvh;grid-template-columns:56.7% 43.3%;overflow:hidden;}
+body.sig-auth-mode .sig-auth-landscape {
+  min-height:0;height:100dvh;position:relative;
+  background-image:
+    linear-gradient(90deg,rgba(5,14,27,.025) 45%,rgba(11,31,55,.18) 92%,rgba(11,31,55,.39) 100%),
+    url('./login-paisagem-hd.svg?v=20261018-hd-1');
+  background-repeat:no-repeat;background-size:cover;background-position:12% center;
+}
+body.sig-auth-mode .sig-auth-blue {height:100dvh;min-height:0;max-height:100dvh;padding:clamp(9px,2.0dvh,29px) clamp(12px,2vw,34px);overflow:visible;}
+body.sig-auth-mode .sig-auth-card {
+  width:min(555px,100%);min-height:min(81dvh,778px);max-height:none;
+  display:flex;flex-direction:column;justify-content:flex-start;
+  box-sizing:border-box;flex-shrink:0;
+  padding:clamp(13px,2.6dvh,38px) clamp(18px,2.25vw,42px) clamp(13px,2dvh,27px);
+  transform-origin:center center;
+  transform:translateX(calc(-1 * clamp(0px, (100vw - 1180px) * .18, 95px))) scale(var(--sig-auth-scale,1));
+}
+body.sig-auth-mode .sig-auth-crest {
+  width:clamp(100px,20.5dvh,205px);height:auto;max-height:22dvh;
+  margin:0 auto clamp(7px,1.9dvh,20px);object-fit:contain;
+}
+body.sig-auth-mode .sig-auth-title {font-size:clamp(22px,2.5vw,39px);line-height:1.12;}
+body.sig-auth-mode .sig-auth-eyebrow {font-size:clamp(10px,1.0vw,15px);letter-spacing:clamp(2px,.48vw,8px);}
+body.sig-auth-mode .sig-auth-gold-rule {margin:clamp(8px,2.0dvh,23px) auto clamp(8px,2.1dvh,23px);}
+body.sig-auth-mode .sig-auth-form-slot {margin-top:clamp(1px,.9dvh,9px);}
+body.sig-auth-mode .sig-auth-form .form-grid {gap:clamp(7px,1.5dvh,14px);}
+body.sig-auth-mode .sig-auth-form .sig-auth-field input {height:clamp(41px,6.0dvh,56px);font-size:clamp(13px,1.05vw,16px);}
+body.sig-auth-mode .sig-auth-options {margin:clamp(7px,1.8dvh,19px) 0 clamp(7px,1.5dvh,16px);}
+body.sig-auth-mode .sig-auth-submit-wrap .sig-auth-submit {min-height:clamp(42px,6.4dvh,62px);font-size:clamp(17px,1.65vw,24px);}
+body.sig-auth-mode .sig-auth-foot {margin-top:auto;padding-top:clamp(5px,.8dvh,10px);gap:clamp(4px,1.0dvh,11px);}
+body.sig-auth-mode .sig-auth-foot svg {width:clamp(55px,8dvh,98px);height:clamp(16px,2.7dvh,26px);}
+body.sig-auth-mode .sig-auth-foot span {font-size:clamp(8px,.77vw,11px);}
+body.sig-auth-mode .sig-auth-settings {margin-top:clamp(4px,1.2dvh,11px);}
+@media(max-width:1170px){
+ body.sig-auth-mode .sig-auth-shell {grid-template-columns:48% 52%;}
+ body.sig-auth-mode .sig-auth-blue {padding:clamp(7px,1.6dvh,18px) clamp(12px,1.8vw,22px);}
+ body.sig-auth-mode .sig-auth-card {width:min(500px,100%);min-height:0;transform:scale(var(--sig-auth-scale,1));}
+}
+@media(max-width:750px){
+ body.sig-auth-mode .sig-auth-shell {position:relative;display:block;width:100%;height:100dvh;}
+ body.sig-auth-mode .sig-auth-landscape {
+  position:absolute;inset:0;width:100%;height:100dvh;min-height:0;max-height:none;
+  background-image:linear-gradient(180deg,rgba(8,27,52,.34),rgba(10,35,62,.32) 55%,rgba(6,27,53,.53)),url('./login-paisagem-hd.svg?v=20261018-hd-1');
+  background-size:cover;background-position:27% center;
+ }
+ body.sig-auth-mode .sig-auth-blue {position:absolute;inset:0;width:100%;height:100dvh;min-height:0;max-height:100dvh;
+  display:flex;align-items:center;justify-content:center;padding:8px 12px;
+  background:linear-gradient(140deg,rgba(9,33,62,.1),rgba(8,27,58,.26));overflow:hidden;
+ }
+ body.sig-auth-mode .sig-auth-card {position:relative;width:min(440px,100%);min-height:0;max-width:100%;max-height:none;
+  padding:clamp(11px,1.7dvh,20px) clamp(15px,4vw,25px) clamp(11px,1.7dvh,20px);
+  border-radius:22px;transform:scale(var(--sig-auth-scale,1));transform-origin:center center;
+ }
+ body.sig-auth-mode .sig-auth-crest {width:clamp(67px,14dvh,123px);max-height:15dvh;margin-bottom:clamp(5px,1dvh,10px);}
+ body.sig-auth-mode .sig-auth-title {font-size:clamp(19px,5.8vw,29px);}
+ body.sig-auth-mode .sig-auth-eyebrow {font-size:clamp(9px,2.6vw,12px);letter-spacing:clamp(1.5px,1vw,4px);}
+ body.sig-auth-mode .sig-auth-gold-rule {margin:clamp(5px,1dvh,12px) auto;}
+ body.sig-auth-mode .sig-auth-form .sig-auth-field input {height:clamp(37px,5.5dvh,52px);font-size:14px;}
+ body.sig-auth-mode .sig-auth-form .form-grid {gap:clamp(5px,1dvh,10px);}
+ body.sig-auth-mode .sig-auth-options {margin:clamp(6px,1.2dvh,12px) 0;}
+ body.sig-auth-mode .sig-auth-remember,body.sig-auth-mode .sig-auth-forgot {font-size:clamp(10px,3.2vw,13px);}
+ body.sig-auth-mode .sig-auth-submit-wrap .sig-auth-submit {min-height:clamp(39px,5.7dvh,55px);font-size:clamp(16px,4.5vw,21px);}
+ body.sig-auth-mode .sig-auth-foot {margin-top:clamp(10px,2dvh,19px);}
+ body.sig-auth-mode .sig-auth-foot span {font-size:clamp(7px,2vw,9px);letter-spacing:clamp(.7px,.45vw,1.4px);}
+ body.sig-auth-mode .sig-auth-settings {font-size:10px;}
+}
+@media(max-width:750px) and (max-height:550px){
+ body.sig-auth-mode .sig-auth-card {padding:7px 14px;}
+ body.sig-auth-mode .sig-auth-crest {width:clamp(48px,10dvh,65px);max-height:11dvh;}
+ body.sig-auth-mode .sig-auth-gold-rule {margin:5px auto;}
+ body.sig-auth-mode .sig-auth-foot {margin-top:6px;}
+}
