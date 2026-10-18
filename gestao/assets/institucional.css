@@ -472,3 +472,50 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .sig-task-detail-actions{flex-wrap:wrap;align-items:center}
 .sig-task-doc-missing{font-size:11px;color:#667783;line-height:1.5}
 @media(max-width:700px){.sig-task-detail-fields{grid-template-columns:1fr}.sig-task-detail-move{flex-direction:column;align-items:flex-start}.sig-task-detail-actions .btn{flex:1}}
+
+
+/* Piloto da Licitacao: contrato RP demonstrativo + 1-50 numeros e envio à SOFI */
+.sig-lic-flow-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0}
+.sig-lic-flow-card{background:#fff;border:1px solid #e2e8e4;border-radius:12px;padding:17px;display:flex;flex-direction:column;gap:8px;box-shadow:0 4px 16px #1839270b}
+.sig-lic-flow-card span{display:grid;place-items:center;width:32px;height:32px;background:#e8f1e8;color:#456951;border-radius:9px;font-weight:800;font-size:13px}
+.sig-lic-flow-card strong{font-size:13px;color:#304756}
+.sig-lic-flow-card small{font-size:11px;color:#75828a;line-height:1.5}
+.sig-lic-demo-modal{display:flex;flex-direction:column;gap:14px}
+.sig-lic-demo-step{border:1px solid #e1e8e3;border-radius:12px;padding:16px;background:#fff}
+.sig-lic-demo-step-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}
+.sig-lic-demo-step-heading strong{font-size:14px;color:#293d53}
+.sig-lic-demo-step-heading span{font-size:11px;font-weight:700;color:#52745f}
+.sig-lic-demo-step p{line-height:1.6;margin:8px 0 12px}
+.sig-lic-demo-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.sig-lic-spec-list{display:flex;flex-direction:column;gap:6px;margin:10px 0;max-height:220px;overflow:auto}
+.sig-lic-spec-list>div{display:flex;justify-content:space-between;gap:9px;padding:8px 10px;border-radius:7px;background:#f5f8f5}
+.sig-lic-spec-list span{font-size:12px;color:#576c60}
+.sig-lic-spec-list strong{font-size:12px;color:#1d4230;overflow-wrap:anywhere}
+.sig-lic-specs-scroll{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-height:46vh;overflow:auto;padding:6px}
+.sig-lic-spec-input[hidden]{display:none!important}
+.sig-lic-doc-view{display:flex;flex-direction:column;gap:12px}
+.sig-lic-doc-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sig-lic-template-paper{width:min(100%,210mm);margin:0 auto;box-sizing:border-box;padding:20mm 17mm;background:white;color:#202027!important;box-shadow:0 4px 24px #1a2a3919;border:1px solid #e0e0e0;border-radius:2px;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.55;overflow-wrap:anywhere}
+.sig-lic-template-cover{background:#fff8e6;color:#4d3a15;border:2px solid #b58b3d;border-radius:4px;padding:13px 16px;margin-bottom:26px;display:flex;flex-direction:column;gap:7px;font-size:11px;line-height:1.6}
+.sig-lic-template-cover>strong{font-size:17px;color:#8b3b17;text-align:center}
+.sig-lic-template-paper .sig-demo-template-body{color:#252525!important}
+.sig-lic-template-paper .sig-demo-template-body p{text-align:justify;margin:10px 0;line-height:1.65;color:inherit!important}
+.sig-lic-template-paper .sig-demo-template-body p:has(>strong:first-child){font-weight:700}
+.sig-lic-template-paper .sig-demo-template-body table,.sig-lic-template-table{width:100%;border-collapse:collapse;table-layout:auto;margin:12px 0 16px;font-size:9px;page-break-inside:auto}
+.sig-lic-template-paper .sig-demo-template-body td,.sig-lic-template-paper .sig-demo-template-body th,.sig-lic-template-table td,.sig-lic-template-table th{border:1px solid #a4a4a4;padding:6px 5px;vertical-align:top;overflow-wrap:anywhere}
+.sig-lic-template-paper .sig-demo-template-body tr{break-inside:avoid;page-break-inside:avoid}
+.sig-lic-template-paper .sig-demo-template-body thead{display:table-header-group}
+.sig-lic-template-table th{background:#eee}
+@media(max-width:900px){.sig-lic-flow-cards{grid-template-columns:1fr}.sig-lic-specs-scroll{grid-template-columns:1fr}.sig-lic-template-paper{padding:22px 16px;font-size:10px}}
+@media print{
+ @page{size:A4;margin:13mm}
+ body.sig-lic-demo-printing{background:#fff!important}
+ body.sig-lic-demo-printing #app,body.sig-lic-demo-printing #toast-root{display:none!important}
+ body.sig-lic-demo-printing #modal-root{display:block!important;position:static!important}
+ body.sig-lic-demo-printing .modal-backdrop{position:static!important;display:block!important;background:#fff!important;padding:0!important;overflow:visible!important}
+ body.sig-lic-demo-printing .modal{position:static!important;max-height:none!important;max-width:none!important;width:100%!important;min-height:0!important;padding:0!important;margin:0!important;overflow:visible!important;border:0!important;box-shadow:none!important}
+ body.sig-lic-demo-printing .modal-header,body.sig-lic-demo-printing .sig-lic-doc-actions{display:none!important}
+ body.sig-lic-demo-printing .sig-lic-doc-view{display:block!important}
+ body.sig-lic-demo-printing .sig-lic-template-paper{width:100%!important;max-width:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important;overflow:visible!important}
+ body.sig-lic-demo-printing .sig-lic-template-cover{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
