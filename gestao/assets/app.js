@@ -852,16 +852,14 @@ const AIPC_SECTIONS=[
   ['ordem_aquisicao','Ordem de aquisição / solicitação','text'],
   ['solicitacao_compra','Solicitação de compra','text'],
   ['pedido_compra','Pedido de compra','text'],
-  ['unidade_direcao','Unidade de direção','text'],
   ['unidade_beneficiada','Unidade(s) beneficiada(s)','text'],
-  ['localidade','Localidade','text'],
+  ['rpm','RPM','text'],
   ['objeto','Objeto da aquisição','textarea'],
   ['valor_total','Valor total (R$)','text'],
   ['unidade_executora','Unidade executora','text'],
   ['dotacao','Dotação orçamentária','text'],
   ['modalidade','Modalidade de aquisição','text'],
-  ['numero_modalidade','Número da modalidade / ata','text'],
-  ['observacoes_modalidade','Observações da modalidade','textarea']
+  ['numero_modalidade','Número da modalidade / ata','text']
  ]},
  {title:'Documentos e origem do recurso',fields:[
   ['memorando','Memorando nº','text'],['pa','PA nº','text'],['sei','SEI','text'],
@@ -903,20 +901,37 @@ function aipcForm(id){
   objeto:p.objeto,valor_total:p.valor_homologado||p.valor_estimado||'',dotacao:p.dotacao||'',
   modalidade:p.tipo_servico||p.modalidade||'',sei:p.referencia_sei||''
  };
- const data={...defaults,...old};
+ // Migrar visualmente o campo antigo "Localidade" para "RPM" sem perder seu valor.
+ const data={...defaults,...old,rpm:old.rpm??old.localidade??''};
+ const legacyCount=Array.from({length:30},(_,idx)=>idx+1)
+  .filter(n=>['quantidade','siad','descricao','unitario','total']
+   .some(field=>String(old['item_'+n+'_'+field]??'').trim()!==''))
+  .reduce((max,n)=>Math.max(max,n),0);
+ const initialCount=Math.max(0,Math.min(30,Math.max(legacyCount,Number.parseInt(old.quantidade_itens,10)||0)));
  const sections=AIPC_SECTIONS.map((sec,i)=>
   '<details class="sig-aipc-section"'+(i===0?' open':'')+'><summary>'+esc(sec.title)+' <span>opcional</span></summary>'+
   '<div class="form-grid">'+sec.fields.map(x=>aipcField(x,data)).join('')+'</div></details>').join('');
- const rowNums=[1,2,3,4,5];
- const itemFields=rowNums.map(n=>'<div class="sig-aipc-item"><strong>Item '+n+'</strong><div class="form-grid">'+[
+ const rowNums=Array.from({length:30},(_,i)=>i+1);
+ const itemFields=rowNums.map(n=>
+  '<div class="sig-aipc-item" data-aipc-item-row="'+n+'"'+(n>initialCount?' hidden':'')+'>'+
+  '<strong>Item '+n+'</strong><div class="form-grid">'+[
    ['item_'+n+'_quantidade','Quantidade','text'],
    ['item_'+n+'_siad','Código SIAD','text'],
    ['item_'+n+'_descricao','Descrição do material / serviço','textarea'],
    ['item_'+n+'_unitario','Valor unitário (R$)','text'],
    ['item_'+n+'_total','Valor total (R$)','text']
   ].map(x=>aipcField(x,data)).join('')+'</div></div>').join('');
- const items='<details class="sig-aipc-section"><summary>Itens da aquisição <span>até 5 itens opcionais</span></summary>'+itemFields+'</details>';
- const html='<form data-form="aipc" data-id="'+esc(id)+'" class="sig-aipc-form">'+
+ const options=Array.from({length:31},(_,n)=>
+  '<option value="'+n+'"'+(n===initialCount?' selected':'')+'>'+n+(n===1?' item':' itens')+'</option>').join('');
+ const selector='<div class="sig-aipc-item-picker">'+
+  '<label for="aipc-quantidade-itens"><strong>Quantos itens deseja preencher?</strong></label>'+
+  '<select id="aipc-quantidade-itens" name="quantidade_itens">'+options+'</select>'+
+  '<small>Selecione de 0 a 30 itens. Somente os campos selecionados serão exibidos.</small>'+
+  '<small class="sig-aipc-item-warning" id="aipc-item-warning" hidden>Reduzir a quantidade removerá os itens excedentes ao salvar.</small></div>';
+ const items='<details class="sig-aipc-section" open><summary>Itens da aquisição <span>até 30 itens opcionais</span></summary>'+
+  selector+'<div class="sig-aipc-items">'+itemFields+'</div></details>';
+
+ const html='<form data-form="aipc" data-id="'+esc(id)+'" data-initial-item-count="'+initialCount+'" class="sig-aipc-form">'+
   '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Identificação vinculada ao mesmo processo e mantida nas tramitações entre seções.</div>'+
   '<div class="sig-aipc-essential"><label for="aipc-numero_processo_compras"><strong>Número do Processo de Compras *</strong></label>'+
    '<input id="aipc-numero_processo_compras" name="numero_processo_compras" required maxlength="120" value="'+esc(item?.numero_processo_compras||'')+'" placeholder="Informe o número do Processo de Compras">'+
@@ -925,16 +940,40 @@ function aipcForm(id){
   '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button>'+
   '<button type="submit" class="btn primary">'+(item?'Atualizar AIPC':'Salvar AIPC')+'</button></div></form>';
  openModal((item?'Editar':'Preencher')+' AIPC',p.numero+' · '+p.objeto,html,true);
+ updateAipcItemCount(document.querySelector('#modal-root form[data-form="aipc"]'));
 }
+function updateAipcItemCount(form){
+ if(!form)return;
+ const picker=form.querySelector('#aipc-quantidade-itens');
+ if(!picker)return;
+ const requested=Math.max(0,Math.min(30,Number.parseInt(picker.value,10)||0));
+ for(const row of form.querySelectorAll('[data-aipc-item-row]')){
+  const n=Number(row.dataset.aipcItemRow);
+  const visible=n<=requested;
+  row.hidden=!visible;
+  for(const control of row.querySelectorAll('input,textarea'))control.disabled=!visible;
+ }
+ const old=form.dataset.initialItemCount?Number(form.dataset.initialItemCount):0;
+ const warning=form.querySelector('#aipc-item-warning');
+ if(warning)warning.hidden=requested>=old;
+}
+
 async function submitAipc(form){
  const id=form.dataset.id,p=findProcess(id);
  if(!p||!canWrite(p.setor))throw Error('Sem permissão para editar AIPC de outro setor.');
  const d=gather(form);
  const number=String(d.numero_processo_compras||'').trim();
  if(!number)return showToast('Informe o número do Processo de Compras na AIPC.');
- const dados={};
- for(const [key,value] of Object.entries(d))
-  if(key.startsWith('aipc__')&&String(value).trim()!=='')dados[key.slice(6)]=String(value).trim();
+ const quantidadeItens=Number.parseInt(d.quantidade_itens,10);
+ if(!Number.isInteger(quantidadeItens)||quantidadeItens<0||quantidadeItens>30)
+  return showToast('Selecione uma quantidade de 0 a 30 itens.');
+ const dados={quantidade_itens:String(quantidadeItens)};
+ for(const [key,value] of Object.entries(d)){
+  if(!key.startsWith('aipc__')||String(value).trim()==='')continue;
+  const itemKey=key.slice(6),match=/^item_(\d+)_(quantidade|siad|descricao|unitario|total)$/.exec(itemKey);
+  if(match&&(Number(match[1])<1||Number(match[1])>quantidadeItens))continue;
+  dados[itemKey]=String(value).trim();
+ }
  const previous=getAipc(id);
  const payload={numero_processo_compras:number,dados};
  busy=true;
@@ -1555,6 +1594,9 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
    }else if(field==='status'&&['active','late','done','all'].includes(value))chiefTaskFilter=value;
    else if(field==='member'&&(value==='Todos'||chiefTeam(chiefScope()).some(u=>u.auth_id===value)))chiefMemberFilter=value;
    render();return;
+  }
+  if(e.target.id==='aipc-quantidade-itens'&&e.target.closest('form[data-form="aipc"]')){
+   updateAipcItemCount(e.target.closest('form[data-form="aipc"]'));return;
   }
   if(e.target.id==='f-role'&&e.target.closest('form[data-form="inviteUser"],form[data-form="updateUser"]')){
    syncUserRoleSetor();return;
