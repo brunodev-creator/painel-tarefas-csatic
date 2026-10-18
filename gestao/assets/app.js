@@ -522,7 +522,7 @@ function v4CompetenceForm(id,contractId){
 }
 function v4FinishTaskModal(id){
  const t=db.tarefas.find(x=>x.id===id);
- if(!t||!canWrite(t.setor))return showToast('Sem permissão para concluir a tarefa.');
+ if(!t||!canManageTask(t))return showToast('Sem permissão para concluir esta tarefa.');
  if(t.status==='Concluída')return showToast('Tarefa já concluída.');
  const html='<div class="info-note"><strong>'+esc(t.titulo)+'</strong><p>Responsável: '+esc(t.responsavel)+' · Setor: '+esc(t.setor)+'</p></div>'+
  '<form data-form="v4FinishTask" data-id="'+esc(id)+'"><div class="form-grid">'+textareaField('conclusao_observacao','Providência executada e resultado','')+
@@ -531,7 +531,7 @@ function v4FinishTaskModal(id){
 }
 async function v4HandleFinishTask(form){
  const t=db.tarefas.find(x=>x.id===form.dataset.id);
- if(!t||!canWrite(t.setor))throw Error('Tarefa indisponível.');
+ if(!t||!canManageTask(t))throw Error('Somente o responsável pode concluir uma tarefa ativa.');
  const obs=String(gather(form).conclusao_observacao||'').trim();
  if(obs.length<8)return showToast('Descreva a providência executada (mínimo 8 caracteres).');
  if(t.status==='Concluída')return showToast('Tarefa já concluída.');
@@ -1038,28 +1038,34 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
  openModal(id?'Editar processo':'Cadastrar novo processo','Cada processo tem um responsável, situação e próxima providência.',html,true);
 }
 function taskForm(id,proc,requestedSection,requestedMember){
- if(!id&&cloud()&&!['admin',...SIG_CHIEF_ROLES].includes(profile.role))return showToast('O cadastro e a distribuição de tarefas são realizados pela chefia da seção.');
  const existing=db.tarefas.find(x=>x.id===id)||null;
- const scoped=isSectionChiefRole(profile.role)&&!previewRole?profile.setor:null;
- const sector=existing?.setor||scoped||((requestedSection&&SECTORS.includes(requestedSection))?requestedSection:findProcess(proc)?.setor||'Compras');
- const t=existing||{processo_id:proc||'',titulo:'',descricao:'',setor:sector,responsavel:'',responsavel_auth_id:requestedMember||'',prioridade:'Média',status:'Pendente',prazo:dayOffset(3)};
- if(!canWrite(t.setor))return showToast('Sem permissão para atribuir tarefas nesta seção.');
- const choices=(db.processos||[]).filter(p=>p.setor===t.setor).map(p=>({label:p.numero+' — '+p.objeto.slice(0,55),value:p.id}));
- const processSelect='<div class="form-row full"><label for="f-processo_id">Processo relacionado (opcional)</label><select name="processo_id" id="f-processo_id"><option value="">Sem processo vinculado</option>'+choices.map(p=>'<option value="'+esc(p.value)+'"'+(p.value===t.processo_id?' selected':'')+'>'+esc(p.label)+'</option>').join('')+'</select></div>';
- const sectionInput=(scoped||existing&&cloud())?'<div class="form-row"><label>Seção responsável</label><div class="sig-buy-readonly">'+esc(t.setor)+'</div><input type="hidden" name="setor" value="'+esc(t.setor)+'"></div>':
-  '<div class="form-row"><label for="f-task-sector">Seção responsável</label><select id="f-task-sector" name="setor">'+optionList(SECTORS,t.setor)+'</select></div>';
- const assignee=cloud()?'<div class="form-row"><label for="f-responsavel_auth_id">Militar responsável</label><select id="f-responsavel_auth_id" name="responsavel_auth_id">'+setorOptionsUsers(t.setor,t.responsavel_auth_id||requestedMember||'')+'</select><small class="helper">A lista contém somente pessoas ativas da seção.</small></div>':
-  inputField('responsavel','Militar responsável',t.responsavel,'text','required');
- const content='<form data-form="task" data-id="'+esc(id||'')+'"><div class="form-grid">'+
-  inputField('titulo','Descrição objetiva da tarefa',t.titulo,'text','required maxlength="180"')+
-  sectionInput+processSelect+assignee+
-  inputField('prazo','Prazo de conclusão',t.prazo,'date')+
+ if(existing&&!canManageTask(existing))return showToast('Somente o responsável ou a chefia pode editar uma tarefa ativa.');
+ const chief=profile.role==='admin'||isSectionChiefRole(profile.role);
+ const fixed=!chief||isSectionChiefRole(profile.role)?setorUsuario():null;
+ const setor=existing?.setor||fixed||((requestedSection&&SECTORS.includes(requestedSection))?requestedSection:findProcess(proc)?.setor||'Compras');
+ if(!canWrite(setor))return showToast('Sem permissão para criar tarefas neste setor.');
+ const t=existing||{processo_id:proc||'',titulo:'',descricao:'',setor,responsavel:'',responsavel_auth_id:requestedMember||(!chief&&cloud()?currentAuthId():''),prioridade:'Média',status:'Pendente',prazo:dayOffset(3)};
+ const choices=(db.processos||[]).filter(p=>p.setor===setor).map(p=>({label:p.numero+' — '+p.objeto.slice(0,55),value:p.id}));
+ const procSelect='<div class="form-row full"><label for="f-processo_id">Processo relacionado (opcional)</label><select id="f-processo_id" name="processo_id"><option value="">Tarefa independente</option>'+
+  choices.map(p=>'<option value="'+esc(p.value)+'"'+(p.value===t.processo_id?' selected':'')+'>'+esc(p.label)+'</option>').join('')+'</select></div>';
+ const setorField=(fixed||existing&&cloud())?'<div class="form-row"><label>Seção</label><div class="sig-buy-readonly">'+esc(setor)+'</div><input name="setor" type="hidden" value="'+esc(setor)+'"></div>':
+  '<div class="form-row"><label for="f-task-sector">Seção</label><select id="f-task-sector" name="setor">'+optionList(SECTORS,setor)+'</select></div>';
+ const assignee=cloud()?'<div class="form-row"><label for="f-responsavel_auth_id">Atribuição</label><select name="responsavel_auth_id" id="f-responsavel_auth_id">'+
+  (chief?setorOptionsUsers(setor,t.responsavel_auth_id||requestedMember||''):
+   '<option value="'+esc(currentAuthId())+'"'+(t.responsavel_auth_id?' selected':'')+'>Minha tarefa</option>'+
+   '<option value=""'+(!t.responsavel_auth_id?' selected':'')+'>Disponível na fila da minha seção</option>')+
+  '</select><small class="helper">'+(chief?'O chefe pode distribuir ou deixar disponível para a equipe.':'Você pode criar a tarefa para si ou deixá-la disponível para a seção.')+'</small></div>':
+  inputField('responsavel','Responsável',t.responsavel||profile.nome,'text','required');
+ const html='<form data-form="task" data-id="'+esc(id||'')+'"><div class="form-grid">'+
+  inputField('titulo','Tarefa / providência',t.titulo,'text','required maxlength="180"')+
+  setorField+procSelect+assignee+
+  inputField('prazo','Prazo previsto',t.prazo,'date')+
   selectField('prioridade','Prioridade',PRIORITIES,t.prioridade)+
-  selectField('status','Situação',TASK_STATUSES,t.status)+
-  textareaField('descricao','Orientações e observações',t.descricao)+
+  selectField('status','Situação',TASK_STATUSES.filter(x=>x!=='Encaminhada'),t.status)+
+  textareaField('descricao','Orientações',t.descricao)+
   (id?textareaField('conclusao_observacao','Ao concluir: providência realizada (mín. 8 caracteres)',t.conclusao_observacao||''):'')+
- '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar tarefa</button></div></form>';
- openModal(id?'Editar tarefa':'Distribuir nova tarefa',id?'Atualize as informações da tarefa.':'Atribua um militar do setor e informe a prioridade e o prazo.',content,true);
+  '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar tarefa</button></div></form>';
+ openModal(id?'Editar tarefa':'Criar tarefa',id?'Atualize sua providência.':'Registre sua tarefa ou distribua para a fila da seção.',html,true);
 }
 
 function contractForm(id){if(!canFinance())return showToast('A edição financeira está restrita à SOFI e chefia.');
@@ -1251,6 +1257,11 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  if(type==='process'&&db.processos.some(p=>p.numero===d.numero&&p.id!==id))return showToast('Já existe outro processo com esse número.');
  if((type==='process'||type==='task')&&!canWrite(old?.setor||d.setor))return showToast('Você não pode editar registros do setor de origem.');
   if(type==='task'){
+   if(!id&&cloud()&&!isSectionChiefRole(profile.role)&&profile.role!=='admin'){
+    if(d.setor!==setorUsuario())return showToast('Cadastre tarefas somente no seu setor.');
+    if(d.responsavel_auth_id&&d.responsavel_auth_id!==currentAuthId())return showToast('Militar só pode cadastrar tarefa própria ou na fila da seção.');
+   }
+   if(old&&!canManageTask(old))return showToast('Somente o responsável pode atualizar esta tarefa.');
    if(old?.setor&&d.setor!==old.setor)return showToast('Para alterar o setor, utilize a tramitação do processo. A tarefa deve permanecer na seção de origem.');
    if(isSectionChiefRole(profile.role)&&d.setor!==profile.setor)return showToast('A chefia pode distribuir tarefas apenas na própria seção.');
    if(d.processo_id&&findProcess(d.processo_id)?.setor!==d.setor)return showToast('O processo relacionado deve pertencer à mesma seção.');
