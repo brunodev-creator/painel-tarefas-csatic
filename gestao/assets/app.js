@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
-const TABLES=['aipc','aipc_revisoes','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
+const TABLES=['licitacao_demo','aipc','aipc_revisoes','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
 const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
@@ -80,9 +80,9 @@ function seed(){
  const competencias_contratuais=[{id:'d-co1',contrato_id:'d-c1',competencia:today().slice(0,7)+'-01',valor_previsto:18200,valor_executado:0,status:'Prevista',documento_referencia:'',observacoes:'Previsão fictícia para demonstração.'},{id:'d-co2',contrato_id:'d-c2',competencia:today().slice(0,7)+'-01',valor_previsto:9500,valor_executado:2000,status:'Atestada',documento_referencia:'DEMO',observacoes:'Somente demonstração.'}];
  return {solicitacoes_empenho,competencias_contratuais,processos,tarefas,contratos,repasses,empenhos,eventos,tramites:[],usuarios:[{auth_id:'demo-compras',nome:'Analista Compras (demo)',role:'compras',setor:'Compras',ativo:true},{auth_id:'demo-licitacao',nome:'Analista Licitação (demo)',role:'licitacao',setor:'Licitação',ativo:true},{auth_id:'demo-sofi',nome:'Analista SOFI (demo)',role:'sofi',setor:'SOFI',ativo:true}]};
 }
-function storage(){try{const item=JSON.parse(localStorage.getItem(KEYS.data));return item&&['processos','tarefas','contratos','repasses','empenhos','eventos'].every(k=>Array.isArray(item[k]))?{...item,aipc:item.aipc||[],tramites:item.tramites||[],usuarios:item.usuarios||seed().usuarios,solicitacoes_empenho:item.solicitacoes_empenho||seed().solicitacoes_empenho,competencias_contratuais:item.competencias_contratuais||seed().competencias_contratuais}:seed()}catch{return seed()}}
+function storage(){try{const item=JSON.parse(localStorage.getItem(KEYS.data));return item&&['processos','tarefas','contratos','repasses','empenhos','eventos'].every(k=>Array.isArray(item[k]))?{...item,aipc:item.aipc||[],licitacao_demo:item.licitacao_demo||[],tramites:item.tramites||[],usuarios:item.usuarios||seed().usuarios,solicitacoes_empenho:item.solicitacoes_empenho||seed().solicitacoes_empenho,competencias_contratuais:item.competencias_contratuais||seed().competencias_contratuais}:seed()}catch{return seed()}}
 const SIG_DEFAULT_CONNECTION=Object.freeze({url:'https://nrcobonppfbqgarfoqgj.supabase.co',key:'sb_publishable_q7Lhoq9CbOSJH0llBi6w_A_L8Qabbyl'});
-let db=storage();db.aipc=db.aipc||[];db.notificacoes=db.notificacoes||[];db.solicitacoes_empenho=db.solicitacoes_empenho||[];db.competencias_contratuais=db.competencias_contratuais||[];let config=loadSettings();let session=loadSession();let profile={nome:'Demonstração',role:localStorage.getItem(KEYS.profile)||'admin',setor:'Todos',ativo:true};let v5Report=null;let v3UnreadSeen=0,v3NotificationsReady=false;let stallDays=Math.max(1,Math.min(30,Number(localStorage.getItem('sig-alert-days')||5)));let view='dashboard',filters={q:'',setor:'Todos',status:'Todos'},chat=[],busy=false,lastLoad=null,taskScope='mine',receiptScope='mine',adminUsers=[],adminLoaded=false,inviteActive=false;
+let db=storage();db.aipc=db.aipc||[];db.licitacao_demo=db.licitacao_demo||[];db.notificacoes=db.notificacoes||[];db.solicitacoes_empenho=db.solicitacoes_empenho||[];db.competencias_contratuais=db.competencias_contratuais||[];let config=loadSettings();let session=loadSession();let profile={nome:'Demonstração',role:localStorage.getItem(KEYS.profile)||'admin',setor:'Todos',ativo:true};let v5Report=null;let v3UnreadSeen=0,v3NotificationsReady=false;let stallDays=Math.max(1,Math.min(30,Number(localStorage.getItem('sig-alert-days')||5)));let view='dashboard',filters={q:'',setor:'Todos',status:'Todos'},chat=[],busy=false,lastLoad=null,taskScope='mine',receiptScope='mine',adminUsers=[],adminLoaded=false,inviteActive=false;
 /* Conexão institucional é o padrão. Configuração local vazia antiga não pode forçar demo.
  * Apenas mode:'demo' mantém a demonstração por escolha explícita do usuário.
  */
@@ -111,7 +111,7 @@ function reconnectInstitutional(){previewRole=null;
 }
 function loadSession(){try{return JSON.parse(sessionStorage.getItem(KEYS.session)||'null')}catch{return null}}
 const cloud=()=>!!(config.url&&config.key);
-const SIG_FAST_TABLES=['aipc','processos','tarefas','contratos','empenhos'];
+const SIG_FAST_TABLES=['licitacao_demo','aipc','processos','tarefas','contratos','empenhos'];
 // Prévia visual: não troca autenticação, sessão, JWT ou perfis do banco.
 const SIG_PREVIEW_ROLES=[
  {id:'compras',label:'Compras',desc:'Processos e tarefas de compras'},
@@ -831,6 +831,218 @@ function sharedProcessesView(){
   '</tbody></table></div></div>';
 }
 
+
+/* Central de Licitação — fluxo demonstrativo temporário.
+ * Um único modelo RP anexado, 1-50 números de especificações, envio direto à SOFI.
+ * Não emite contrato oficial ou documentos de empenho. */
+function licDemoGet(id){return(db.licitacao_demo||[]).find(x=>x.processo_id===id)||null;}
+function licDemoEditable(){
+ return !previewRole&&profile?.ativo&&profile.setor==='Licitação'&&
+ ['licitacao','chefe_licitacao','chefia','admin'].includes(profile.role);
+}
+function licDemoValid(p){return !!p&&p.setor==='Licitação'&&licDemoEditable()&&activeProcess(p);}
+function licDemoReady(id){
+ const x=licDemoGet(id),arr=x?.especificacoes;
+ return !!x?.contrato_gerado_em&&Array.isArray(arr)&&arr.length>=1&&arr.length<=50&&arr.every(n=>typeof n==='string'&&n.trim());
+}
+function licDemoStatus(id){
+ const d=licDemoGet(id);
+ if(!d?.contrato_gerado_em)return 'Aguardando contrato';
+ if(d.status==='encaminhado')return 'Encaminhado à SOFI';
+ if(licDemoReady(id))return 'Pronto para SOFI';
+ return 'Informar especificações';
+}
+function licDemoView(){
+ const list=db.processos.filter(p=>p.setor==='Licitação').filter(p=>
+  searchText(p.numero,p.objeto,p.modalidade,p.tipo_servico).includes(filters.q.toLocaleLowerCase('pt-BR')));
+ const cards='<div class="sig-lic-flow-cards">'+[
+  ['1','Contrato demonstrativo','Gerar o documento usando a minuta RP anexada'],
+  ['2','Especificações de empenho','Registrar de 1 a 50 números, sem campos adicionais'],
+  ['3','Encaminhar à SOFI','Enviar a aquisição e disponibilizar os documentos para consulta']
+ ].map(c=>'<div class="sig-lic-flow-card"><span>'+c[0]+'</span><strong>'+c[1]+'</strong><small>'+c[2]+'</small></div>').join('')+'</div>';
+ const rows=list.map(p=>
+  '<tr><td><strong>'+esc(p.numero)+'</strong><div class="cell-sub">'+esc(p.objeto)+'</div></td>'+
+   '<td>'+esc(p.tipo_servico||p.modalidade||'—')+'</td>'+
+   '<td>'+esc(p.responsavel||'Fila da Licitação')+'</td>'+
+   '<td>'+esc(licDemoStatus(p.id))+'</td>'+
+   '<td><button class="btn small primary" data-action="licDemoOpen" data-id="'+esc(p.id)+'">'+
+   (licDemoValid(p)?'Continuar formalização':'Consultar')+'</button></td></tr>').join('');
+ return heading('Fluxo demonstrativo','Central de Licitação',
+  'Contrato demonstrativo → números das especificações → encaminhamento à SOFI.')+
+  '<div class="info-note">Modelo de contrato temporário, baseado na minuta RP de bens anexada. O documento gerado não é contrato oficial, não substitui o SEI e não tem validade jurídica.</div>'+
+  cards+'<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar aquisição..." value="'+esc(filters.q)+'"></label></div>'+
+  '<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Processo</th><th>Modalidade</th><th>Responsável</th><th>Situação</th><th>Ações</th></tr></thead><tbody>'+
+  (rows||'<tr><td colspan="5" class="table-empty">Nenhuma demanda na Licitação.</td></tr>')+
+  '</tbody></table></div></div>';
+}
+function licDemoOpen(id){
+ const p=aipcProcess(id),d=licDemoGet(id);
+ if(!p)return showToast('Processo não localizado.');
+ const allowed=licDemoValid(p),finished=!!d?.contrato_gerado_em;
+ const num=d?.especificacoes?.length||0;
+ const specs=num?'<div class="sig-lic-spec-list">'+d.especificacoes.map((n,i)=>
+  '<div><span>Especificação '+(i+1)+'</span><strong>'+esc(n)+'</strong></div>').join('')+'</div>':
+  '<p class="sub">Nenhum número informado.</p>';
+ const html='<div class="sig-lic-demo-modal">'+
+  '<div class="info-note">Este contrato é <strong>exclusivamente demonstrativo</strong> e utiliza um modelo genérico de RP de computadores. A futura geração oficial por minuta de cada RP será desenvolvida separadamente.</div>'+
+  '<div class="sig-lic-demo-step"><div class="sig-lic-demo-step-heading"><strong>1. Contrato demonstrativo</strong>'+
+   '<span>'+esc(finished?'Gerado':'Não gerado')+'</span></div>'+
+   (finished?'<p class="sub">Modelo SEI 112570830 · Gerado em '+new Date(d.contrato_gerado_em).toLocaleString('pt-BR')+'</p>':'<p class="sub">Clique para gerar o documento com os dados disponíveis do processo e da AIPC.</p>')+
+   '<div class="sig-lic-demo-actions">'+
+   (allowed?'<button class="btn primary" data-action="licDemoGenerate" data-id="'+esc(id)+'">'+(finished?'Gerar novamente':'Gerar contrato demonstrativo')+'</button>':'')+
+   (finished?'<button class="btn" data-action="licDemoPreview" data-id="'+esc(id)+'">Visualizar / imprimir contrato</button>':'')+'</div></div>'+
+  '<div class="sig-lic-demo-step"><div class="sig-lic-demo-step-heading"><strong>2. Especificações de empenho</strong><span>'+num+'/50</span></div>'+
+   specs+(allowed&&finished?'<button class="btn primary" data-action="licDemoSpecs" data-id="'+esc(id)+'">'+(num?'Editar números':'Informar números')+'</button>':'')+
+   (!finished?'<p class="sub">Gere o contrato para habilitar esta etapa.</p>':'')+'</div>'+
+  '<div class="sig-lic-demo-step"><div class="sig-lic-demo-step-heading"><strong>3. Encaminhar à SOFI</strong><span>'+esc(licDemoStatus(id))+'</span></div>'+
+   (allowed&&licDemoReady(id)?'<button class="btn primary" data-action="licDemoSend" data-id="'+esc(id)+'">Encaminhar à SOFI</button>':
+    '<p class="sub">'+(p.setor==='SOFI'?'A demanda já está na SOFI.':'Gere o contrato e preencha todos os números das especificações para liberar o envio.')+'</p>')+
+   '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Fechar</button></div></div>';
+ openModal('Formalização demonstrativa',p.numero+' · '+(p.objeto||'Aquisição'),html,true);
+}
+async function licDemoSaveRecord(id,endpoint,body){
+ if(previewRole)throw Error('Prévia de perfil é somente leitura');
+ busy=true;
+ try{
+  const data=cloud()?await rest('/rest/v1/rpc/'+endpoint,'POST',body):null;
+  let rec=Array.isArray(data)?data[0]:data;
+  if(!cloud()){
+   const old=licDemoGet(id);
+   rec={...old,processo_id:id,contrato_gerado_em:endpoint==='gerar_contrato_demonstrativo'?nowIso():old?.contrato_gerado_em,
+    contrato_dados:endpoint==='gerar_contrato_demonstrativo'?{aipc:getAipc(id)?.dados||{},numero_sig:aipcProcess(id)?.numero,objeto:aipcProcess(id)?.objeto}:old?.contrato_dados||{},
+    especificacoes:endpoint==='salvar_especificacoes_demonstrativas'?body.p_numeros:old?.especificacoes||[],
+    status:endpoint==='salvar_especificacoes_demonstrativas'?'especificacoes_salvas':old?.especificacoes?.length?'especificacoes_salvas':'contrato_gerado',
+    atualizado_em:nowIso()};
+  }
+  if(!rec||rec.processo_id!==id)throw Error('O servidor não confirmou o registro.');
+  db.licitacao_demo=db.licitacao_demo||[];
+  const i=db.licitacao_demo.findIndex(r=>r.processo_id===id);
+  if(i>=0)db.licitacao_demo.splice(i,1,rec);else db.licitacao_demo.push(rec);
+  if(!cloud())saveLocal();
+  return rec;
+ }finally{busy=false}
+}
+async function licDemoGenerate(id){
+ const p=aipcProcess(id);
+ if(!licDemoValid(p))return showToast('Geração disponível apenas para a Licitação enquanto o processo está nessa seção.');
+ try{
+  await licDemoSaveRecord(id,'gerar_contrato_demonstrativo',{p_processo_id:id});
+  render();licDemoOpen(id);showToast('Contrato demonstrativo gerado. Não é documento oficial.');
+ }catch(e){showToast('Não foi possível gerar: '+errMsg(e))}
+}
+function licDemoSpecForm(id){
+ const p=aipcProcess(id),d=licDemoGet(id);
+ if(!licDemoValid(p)||!d?.contrato_gerado_em)return showToast('Gere o contrato demonstrativo primeiro.');
+ const values=Array.isArray(d.especificacoes)?d.especificacoes:[];
+ const count=Math.max(values.length,1);
+ const opts=Array.from({length:50},(_,i)=>i+1).map(i=>
+  '<option value="'+i+'"'+(count===i?' selected':'')+'>'+i+(i===1?' especificação':' especificações')+'</option>').join('');
+ const inputs=Array.from({length:50},(_,i)=>'<div class="form-row sig-lic-spec-input" data-lic-spec-row="'+(i+1)+'"'+(i>=count?' hidden':'')+'>'+
+  '<label for="lic-spec-'+i+'">Número da especificação '+(i+1)+'</label>'+
+  '<input id="lic-spec-'+i+'" name="lic_spec_'+i+'" maxlength="120"'+(i<count?' required':' disabled')+
+  ' value="'+esc(values[i]||'')+'" placeholder="Ex.: '+(i+1)+'/2026"></div>').join('');
+ const html='<form data-form="licDemoSpecs" data-id="'+esc(id)+'"><div class="info-note">Informe apenas os números das especificações de empenho, até o limite de 50. Nenhum outro campo é exigido.</div>'+
+  '<div class="form-row"><label for="lic-demo-count">Quantidade de especificações</label>'+
+  '<select id="lic-demo-count" name="quantidade">'+opts+'</select></div>'+
+  '<div class="sig-lic-specs-scroll">'+inputs+'</div>'+
+  '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button>'+
+  '<button type="submit" class="btn primary">Salvar números</button></div></form>';
+ openModal('Especificações de empenho',p.numero,html,true);
+}
+function licDemoSyncCount(form){
+ const n=Number(form.querySelector('#lic-demo-count')?.value||1);
+ form.querySelectorAll('[data-lic-spec-row]').forEach(row=>{
+  const shown=Number(row.dataset.licSpecRow)<=n;row.hidden=!shown;
+  row.querySelectorAll('input').forEach(input=>{input.disabled=!shown;input.required=shown;});
+ });
+}
+async function licDemoSaveSpecs(form){
+ const id=form.dataset.id,p=aipcProcess(id);
+ if(!licDemoValid(p))return showToast('Processo indisponível na Licitação.');
+ const count=Number(form.querySelector('#lic-demo-count')?.value);
+ if(!Number.isInteger(count)||count<1||count>50)return showToast('Selecione de 1 a 50 especificações.');
+ const values=Array.from({length:count},(_,i)=>String(form.querySelector('#lic-spec-'+i)?.value||'').trim());
+ if(values.some(x=>!x))return showToast('Informe todos os '+count+' números selecionados.');
+ if(new Set(values.map(x=>x.toLocaleLowerCase('pt-BR'))).size!==values.length)
+  return showToast('Existem números de especificação repetidos.');
+ try{
+  await licDemoSaveRecord(id,'salvar_especificacoes_demonstrativas',{p_processo_id:id,p_numeros:values});
+  closeModal();render();licDemoOpen(id);showToast('Números das especificações registrados com sucesso.');
+ }catch(e){showToast('Falha ao salvar especificações: '+errMsg(e))}
+}
+async function licDemoSend(id){
+ const p=findProcess(id);
+ if(!licDemoValid(p)||!licDemoReady(id))return showToast('Conclua o contrato e os números de especificações.');
+ if(!window.confirm('Encaminhar o processo '+p.numero+' à SOFI com o contrato demonstrativo e as especificações registradas?'))return;
+ busy=true;
+ try{
+  if(cloud()){
+   const task=db.tarefas.find(t=>t.processo_id===id&&t.setor==='Licitação'&&
+    isOpenTask(t)&&(assignedToMe(t)||profile.role==='admin'||isSectionChiefRole(profile.role)));
+   await rest('/rest/v1/rpc/encaminhar_demanda','POST',{
+    p_processo_id:id,p_destino:'SOFI',
+    p_motivo:'Contrato demonstrativo gerado; números das especificações de empenho registrados no SIG.',
+    p_proxima_acao:'Efetivar o empenho conforme as especificações registradas pela Licitação.',
+    p_prazo:null,p_versao:p.updated_at,p_tipo:'Encaminhamento',
+    p_tarefa_origem:task?.id||null
+   });
+   await fetchCloud();await loadSharedProcesses();
+  }else{
+   const rec=licDemoGet(id);rec.status='encaminhado';
+   const task=db.tarefas.find(t=>t.processo_id===id&&t.setor==='Licitação'&&isOpenTask(t));
+   if(task)task.status='Encaminhada';
+   p.setor='SOFI';p.status='Aguardando empenho';p.etapa='Recebido pela SOFI';p.updated_at=nowIso();
+   db.tarefas.unshift({id:uuid(),processo_id:id,titulo:'Efetivar empenhos de '+p.numero,
+    setor:'SOFI',responsavel:'Fila da SOFI',status:'Pendente',prioridade:p.prioridade});
+   saveLocal();
+  }
+  closeModal();render();showToast('Encaminhado à SOFI com os números das especificações.');
+ }catch(e){showToast('Encaminhamento não realizado: '+errMsg(e))}
+ finally{busy=false}
+}
+async function licDemoPreview(id){
+ const d=licDemoGet(id);
+ if(!d?.contrato_gerado_em)return showToast('Contrato demonstrativo ainda não gerado.');
+ const snapshot=d.contrato_dados||{},a=snapshot.aipc||{};
+ let source='';
+ try{
+  const response=await fetch('./assets/modelo-contrato-rp-demo.html');
+  if(!response.ok)throw Error('Arquivo de minuta não disponível');
+  source=await response.text();
+ }catch(e){return showToast('Falha ao carregar modelo do contrato: '+errMsg(e))}
+ const doc=new DOMParser().parseFromString(source,'text/html');
+ const section=doc.querySelector('section.sig-demo-template-body');
+ if(!section)return showToast('Modelo de contrato incompleto.');
+ const itemList=aipcItensPreenchidos(a);
+ const contentTable='<table class="sig-lic-template-table"><thead><tr><th>ITEM</th><th>LOTE</th><th>QTD</th><th>CÓDIGO SIAD</th><th>DESCRIÇÃO</th><th>UNITÁRIO</th><th>TOTAL</th></tr></thead><tbody>'+
+  itemList.map((item,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(item.lote)+'</td><td>'+esc(item.quantidade)+'</td><td>'+esc(item.siad)+'</td>'+
+   '<td>'+esc(item.descricao)+'</td><td>'+esc(item.unitario)+'</td><td>'+esc(item.total)+'</td></tr>').join('')+
+  '</tbody></table>';
+ const originalTable=[...section.querySelectorAll('table')].find(table=>
+  /CÓD\.\s*DO\s*ITEM|CÓDIGO\s*SIAD/i.test(table.textContent||''));
+ if(originalTable)originalTable.outerHTML=itemList.length?contentTable:
+  '<p><em>Itens não informados na AIPC — preencher no documento definitivo.</em></p>';
+ const head='<div class="sig-lic-template-cover"><strong>CONTRATO DEMONSTRATIVO — SEM VALIDADE JURÍDICA</strong>'+
+  '<div>Base: modelo de RP de bens, SEI 112570830 (v1.2025.01). Sem assinatura, autenticação, código verificador ou emissão oficial.</div>'+
+  '<div>Processo SIG: '+esc(snapshot.numero_sig||'—')+' · Processo de Compras: '+esc(snapshot.numero_processo_compras||'Não informado')+'</div>'+
+  '<div>Objeto cadastrado: '+esc(snapshot.objeto||'Não informado')+'</div>'+
+  '<div>Modalidade: '+esc(snapshot.modalidade||'Não informada')+'</div>'+
+  '<div>Este é um MODELO de referência para apresentação do SIG. Campos de contratante, contratada, preço, vigência e cláusulas devem ser revisados no documento oficial.</div></div>';
+ const html='<div class="sig-lic-doc-view">'+
+  '<div class="sig-lic-doc-actions"><button class="btn primary" data-action="licDemoPrint">Imprimir / salvar PDF</button>'+
+  '<button class="btn" data-action="licDemoOpen" data-id="'+esc(id)+'">Voltar à formalização</button>'+
+  '<button class="btn" data-action="closeModal">Fechar</button></div>'+
+  '<article class="sig-lic-template-paper">'+head+section.innerHTML+'</article></div>';
+ openModal('Contrato demonstrativo — sem validade jurídica',
+  (snapshot.numero_sig||'Processo')+' · modelo original de RP de bens',html,true);
+}
+function licDemoPrint(){
+ if(!document.querySelector('.sig-lic-template-paper'))return showToast('Abra o demonstrativo antes de imprimir.');
+ document.body.classList.add('sig-lic-demo-printing');
+ window.addEventListener('afterprint',()=>document.body.classList.remove('sig-lic-demo-printing'),{once:true});
+ window.print();
+}
+
 function processView(sector){if(sector==='Compras')return purchaseView();
  const all=sector?db.processos.filter(p=>p.setor===sector):db.processos;
  const arr=all.filter(p=>filters.setor==='Todos'||p.setor===filters.setor).filter(p=>filters.status==='Todos'||p.status===filters.status).filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.dotacao,p.proxima_acao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort((a,b)=>(a.status==='Concluído')-(b.status==='Concluído')||daysLeft(a.prazo)-daysLeft(b.prazo));
@@ -1356,6 +1568,8 @@ async function submitTransfer(form){
  const d=gather(form),p=findProcess(form.dataset.id);
  if(!p||!canWrite(p.setor)||previewRole)throw Error('Processo indisponível para encaminhamento.');
  if(requiresAipc(p)&&!isAipcReady(p.id))return showToast('Encaminhamento bloqueado: preencha a AIPC e informe o número do Processo de Compras.');
+ if(p.setor==='Licitação'&&d.destino==='SOFI'&&!licDemoReady(p.id))
+  return showToast('Antes de encaminhar à SOFI, gere o contrato demonstrativo e registre os números das especificações.');
  if(d.destino===p.setor||!SECTORS.includes(d.destino))return showToast('Selecione outra seção como destino.');
  if(!['Encaminhamento','Devolução','Consulta'].includes(d.tipo))return showToast('Tipo de tramitação inválido.');
  if((d.motivo||'').trim().length<8||(d.proxima_acao||'').trim().length<5)
@@ -1414,7 +1628,7 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
- let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=processView('Licitação');break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
+ let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
  if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
@@ -1680,7 +1894,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -1773,11 +1987,17 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
- if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','taskReadDetail','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','taskReadDetail','licDemoOpen','licDemoPreview','licDemoPrint','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'licDemoOpen':licDemoOpen(id);break;
+ case 'licDemoGenerate':await licDemoGenerate(id);break;
+ case 'licDemoSpecs':licDemoSpecForm(id);break;
+ case 'licDemoPreview':await licDemoPreview(id);break;
+ case 'licDemoPrint':licDemoPrint();break;
+ case 'licDemoSend':await licDemoSend(id);break;
  case 'taskReadDetail':taskReadDetail(id);break;
  case 'aipc':if(canEditAipc())aipcForm(id);else aipcVisualizar(id);break;
  case 'aipcView':aipcVisualizar(id);break;
@@ -1831,6 +2051,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
 function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{
+  if(e.target.id==='lic-demo-count'){licDemoSyncCount(e.target.closest('form[data-form="licDemoSpecs"]'));return;}
   if(e.target.closest('form[data-form="aipc"]')){
    const form=e.target.closest('form[data-form="aipc"]');
    if(e.target.id==='aipc-quantidade-itens')updateAipcItemCount(form);
