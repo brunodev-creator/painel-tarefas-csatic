@@ -117,7 +117,7 @@ body.sig-auth-mode .sig-auth-landscape {
   min-height:0;height:100dvh;position:relative;
   background-image:
     linear-gradient(90deg,rgba(5,14,27,.025) 45%,rgba(11,31,55,.18) 92%,rgba(11,31,55,.39) 100%),
-    url('./login-paisagem-hd.svg?v=20261018-hd-1');
+    url('./login-paisagem-hd.svg?v=20261018-fundo-limpo-1');
   background-repeat:no-repeat;background-size:cover;background-position:12% center;
 }
 body.sig-auth-mode .sig-auth-blue {height:100dvh;min-height:0;max-height:100dvh;padding:clamp(9px,2.0dvh,29px) clamp(12px,2vw,34px);overflow:visible;}
@@ -154,7 +154,7 @@ body.sig-auth-mode .sig-auth-settings {margin-top:clamp(4px,1.2dvh,11px);}
  body.sig-auth-mode .sig-auth-shell {position:relative;display:block;width:100%;height:100dvh;}
  body.sig-auth-mode .sig-auth-landscape {
   position:absolute;inset:0;width:100%;height:100dvh;min-height:0;max-height:none;
-  background-image:linear-gradient(180deg,rgba(8,27,52,.34),rgba(10,35,62,.32) 55%,rgba(6,27,53,.53)),url('./login-paisagem-hd.svg?v=20261018-hd-1');
+  background-image:linear-gradient(180deg,rgba(8,27,52,.34),rgba(10,35,62,.32) 55%,rgba(6,27,53,.53)),url('./login-paisagem-hd.svg?v=20261018-fundo-limpo-1');
   background-size:cover;background-position:27% center;
  }
  body.sig-auth-mode .sig-auth-blue {position:absolute;inset:0;width:100%;height:100dvh;min-height:0;max-height:100dvh;
@@ -187,16 +187,12 @@ body.sig-auth-mode .sig-auth-settings {margin-top:clamp(4px,1.2dvh,11px);}
 
 
 
-/* ====== Referência aprovada | continuidade da paisagem + vidro fosco ======
-   A composição completa preserva todos os detalhes externos, inclusive
-   relevo, céu, contornos topográficos e textura dourada do lado direito.
-   Os controles HTML reais permanecem à frente, operacionais e acessíveis.
-   Somente a tela de autenticação é modificada.
-*/
+/* Fundo independente do formulário: não utilizar arte de referência com
+   cartão e campos desenhados na própria imagem. O login HTML é o único painel. */
 body.sig-auth-mode .sig-auth-shell {
   isolation:isolate;
   position:relative;
-  background-image:url('./login-referencia-completa.svg?v=20261018-composicao-1');
+  background-image:url('./login-paisagem-hd.svg?v=20261018-fundo-limpo-1');
   background-color:#123552;
   background-size:cover;
   background-repeat:no-repeat;
@@ -230,8 +226,7 @@ body.sig-auth-mode .sig-auth-blue::before {
   opacity:1;
   mask-image:none;
 }
-/* A imagem já possui a composição de referência; a camada de vidro disfarça
-   qualquer impressão estática do card que existe na arte de fundo. */
+/* Cartão de autenticação real, legível sobre a paisagem sem formulários. */
 body.sig-auth-mode .sig-auth-card {
   position:relative;
   width:clamp(450px,33vw,660px);
@@ -300,13 +295,12 @@ body.sig-auth-mode .sig-auth-foot span {
   color:#1d3053;
 }
 body.sig-auth-mode .sig-auth-settings {opacity:.60;font-size:10px;}
-/* Ao mudar para telas estreitas, usar somente a paisagem, sem reproduzir
-   imagem estática do formulário no fundo. O painel permanece interativo. */
+/* A mesma paisagem limpa é utilizada em todas as larguras de tela. */
 @media(max-width:1170px) {
  body.sig-auth-mode .sig-auth-shell {
   background-image:
    linear-gradient(110deg,rgba(8,27,47,.16),rgba(8,28,55,.34)),
-   url('./login-paisagem-hd.svg?v=20261018-hd-1');
+   url('./login-paisagem-hd.svg?v=20261018-fundo-limpo-1');
   background-size:cover;
   background-position:36% center;
  }
@@ -323,7 +317,7 @@ body.sig-auth-mode .sig-auth-settings {opacity:.60;font-size:10px;}
  body.sig-auth-mode .sig-auth-shell {
   background-image:
    linear-gradient(180deg,rgba(8,26,48,.22),rgba(7,28,53,.48)),
-   url('./login-paisagem-hd.svg?v=20261018-hd-1');
+   url('./login-paisagem-hd.svg?v=20261018-fundo-limpo-1');
   background-position:27% center;
  }
  body.sig-auth-mode .sig-auth-blue {background:transparent!important;}
