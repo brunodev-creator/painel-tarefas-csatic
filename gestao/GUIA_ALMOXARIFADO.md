@@ -4,9 +4,10 @@
 
 Tela integrada no **SIG existente**; usa a navegação, sessão Supabase, perfis e estilo institucional. Não contém controle de estoque, distribuição, recebimento, entrega ou inventário. Os registros são **consultas RIPC**, não atestados de entrega.
 
-- `gestao/assets/almoxarifado.js`: mapa vetorial estadual, 17 seletores (RMBH + RPMs 4–19), filtros, pesquisa, ordenação, paginação e detalhes.
+- `gestao/assets/almoxarifado.js`: mapa vetorial aproximado com 17 áreas clicáveis (RMBH + RPMs 4–19), fallback IBGE, filtros, pesquisa, ordenação, paginação e detalhes.
 - `gestao/assets/institucional.css`: estilos institucionais e responsivos.
-- `gestao/assets/maps/mg-ibge-contorno.geojson`: único polígono do **estado** de Minas Gerais; derivado das malhas do IBGE pela coleção CC0 [br-geojson](https://github.com/henriquemalvar/br-geojson).
+- `gestao/assets/maps/rpm-regioes-aproximadas.json`: **17 polígonos SVG traçados da imagem fornecida**, sem georreferenciamento e sem homologação; selecionáveis por toda a área.
+- `gestao/assets/maps/mg-ibge-contorno.geojson`: polígono estadual do IBGE, usado como fallback se o traçado ilustrativo não carregar.
 - `gestao/assets/maps/rpm-limites-manifest.json`: pendência explícita de homologação das fronteiras das RPM.
 - `gestao/database/migrations/20261019_sig_almox_destinacoes_leitura.sql`: cria tabela exclusiva de consulta `sig_almox_destinacoes` (sem alteração de tabelas existentes) e sua primeira carga RIPC.
 - `gestao/database/migrations/20261019_sig_almox_enriquecer_processos.sql`: associa registros da aba `CONTROLE_PROCESSOS_COMPRA` por processo de compra e copia seu número completo e estado.
@@ -25,9 +26,9 @@ Dados são uma **fotografia importada** e **não sincronizam automaticamente** c
 
 ## Mapa e fonte cartográfica
 
-O estado é renderizado de **GeoJSON real do IBGE**, não da imagem de IA. Os 17 marcadores são **referências aproximadas das cidades-sede**, não áreas de responsabilidade. O usuário pode clicar ou usar a lista em qualquer tamanho de tela; zoom, deslocamento, foco e estado selecionado são independentes do painel de resultados.
+O mapa principal agora apresenta **17 formas vetoriais aproximadas**, desenhadas por segmentação das cores e contornos da imagem de referência enviada pelo usuário. Todas as formas podem ser clicadas, inclusive a RMBH unificada. São uma **representação ilustrativa**, não áreas homologadas ou um GeoJSON georreferenciado. O contorno real do estado derivado do IBGE fica como fallback, sem substituir o status de aproximação da camada regional. Zoom, deslocamento, foco e seleção foram mantidos.
 
-**Falta:** conjunto vetorial oficial/validado com **19 feições poligonais** (1 por RPM), sistema de referência declarado, revisão territorial e documento de homologação pela PMMG. Os municípios e eventuais sobreposições deverão ser revisados institucionalmente. Só depois de validar os polígonos contra o limite do estado e a cobertura das 19 RPM será possível desenhar as **17 áreas clicáveis reais**, mesclando visualmente a RMBH sem unir os cadastros. Até então, nenhuma imagem produzida por IA será convertida em limites oficiais.
+**Falta:** conjunto vetorial oficial/validado com **19 feições poligonais** (1 por RPM), sistema de referência declarado, revisão territorial e documento de homologação pela PMMG. Os municípios e eventuais sobreposições deverão ser revisados institucionalmente. Só depois de validar os polígonos contra o limite do estado e a cobertura das 19 RPM será possível desenhar as **17 áreas clicáveis reais**, mesclando visualmente a RMBH sem unir os cadastros. A vetorização de referência pode ser usada para navegação visual, mas **não** será designada como limite oficial, usada para geocodificar unidades ou determinar automaticamente RPM a partir de coordenadas.
 
 ## Segurança
 
@@ -38,7 +39,7 @@ O estado é renderizado de **GeoJSON real do IBGE**, não da imagem de IA. Os 17
 
 ## Testes realizados
 
-- Confirmação do GeoJSON de Minas Gerais e dos 17 pontos de referência **dentro** do limite estadual.
+- Confirmação da integridade dos 17 polígonos esquemáticos, com 17 IDs únicos, e do GeoJSON de contorno de Minas Gerais no fallback.
 - 19 RPM representadas por 17 seletores; RMBH 1–3, 12ª e 19ª individuais.
 - 43 chaves RIPC únicas, 17 classificadas, 26 não classificadas.
 - Filtros de ano, situação do processo de compra, tipo, destino, pesquisa e paginação, inclusive registros ausentes.
@@ -48,6 +49,6 @@ O estado é renderizado de **GeoJSON real do IBGE**, não da imagem de IA. Os 17
 
 ## Para a próxima etapa
 
-1. Obter um **GeoJSON/SVG georreferenciado e validado** para as 19 RPM atuais (não utilizar a captura fornecida como referência geométrica).
+1. Opcionalmente substituir a vetorização **aproximada** por GeoJSON/SVG **georreferenciado e validado** para as 19 RPM atuais, após conferência territorial institucional.
 2. Obter uma fonte oficial de **quantidade, empenho, entrega, recebimento e destino individual**, caso a organização autorize a integração.
 3. Implementar sincronização segura da nova tabela de leitura com a fonte primária, incluindo revisão de classificações e atualização de status.
