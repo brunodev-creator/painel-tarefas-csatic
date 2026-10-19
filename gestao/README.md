@@ -39,7 +39,7 @@ Perfis são guardados no banco e verificados por RLS e funções protegidas. O s
 
 - **Piloto somente com dados fictícios ou devidamente anonimizados.** Hospedagem externa de dados institucionais requer autorização da PMMG e revisão de segurança, backup, disponibilidade e privacidade.
 - Convites por e-mail e troca de senha dependem da configuração do Auth e do provedor de e-mail. Sucesso no formulário não significa que a mensagem já chegou à caixa de entrada.
-- A base financeira não foi importada da planilha; saldos dependem de conciliação com sistemas oficiais.
+- **Cota orçamentária**: há um snapshot autenticado do `DASHBOARD` da `agora vai - PLANILHA ATUAL`, separado dos dados operacionais. Os valores são históricos, não substituem a conciliação V6 nem demonstram saldo oficial do SIAFI-MG. Guia: [Cotas da PLANILHA ATUAL](./GUIA_COTAS_PLANILHA_ATUAL.md).
 - O assistente utiliza consultas programadas, não uma API paga de IA.
 - Regras de autorização protegem o banco; a versão 2 ainda precisa de testes de penetração e procedimento de recuperação de incidentes antes de uso operacional.
 
