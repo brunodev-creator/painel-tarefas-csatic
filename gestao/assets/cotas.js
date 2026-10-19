@@ -3,7 +3,7 @@
  * Nenhuma escrita ou publicação de dados financeiros pelo navegador. */
 (() => {
 'use strict';
-const state={q:'',tipo:'TODOS',conta:'TODAS',cloudPhase:'idle',cloudError:'',cloudReport:null};
+const state={q:'',tipo:'TODOS',conta:'TODAS',mostrarZeradas:false,cloudPhase:'idle',cloudError:'',cloudReport:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const fmt=cents=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(cents)/100);
@@ -79,7 +79,8 @@ function rows(){
 }
 function filtered(){
  const q=state.q.toUpperCase().trim().replace(/\s/g,''),normalized=q.replace(/(\d{2})XX/g,'$100');
- return rows().filter(d=>(state.tipo==='TODOS'||d._type===state.tipo)&&
+ return rows().filter(d=>(state.mostrarZeradas||d._balance!==0)&&
+ (state.tipo==='TODOS'||d._type===state.tipo)&&
  (state.conta==='TODAS'||d._account===state.conta)&&
  (!q||[d._code,d.dotacao,...(d.origens_bo||[]),d._account].some(v=>{
  const t=String(v||'').toUpperCase().replace(/\s/g,'');
@@ -100,6 +101,10 @@ function refresh(){
  const body=document.getElementById('cotas-tbody');if(!body)return;
  const list=filtered();body.innerHTML=list.length?list.map(rowHtml).join(''):'<tr><td colspan="7" class="budget-empty">Nenhuma dotação encontrada com esses filtros.</td></tr>';
  const count=document.getElementById('cotas-count');if(count)count.textContent=list.length+' de '+rows().length+' dotações';
+ const toggle=document.getElementById('cotas-toggle-zeradas');
+ if(toggle){toggle.textContent=state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas';toggle.setAttribute('aria-pressed',state.mostrarZeradas?'true':'false');}
+ const note=document.getElementById('cotas-zero-note');
+ if(note)note.textContent=state.mostrarZeradas?'Todas as dotações estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).';
 }
 const date=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||'')?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'não informada';
 function view(authorized,allowExport=false,allowImport=false){
@@ -133,7 +138,9 @@ function view(authorized,allowExport=false,allowImport=false){
  '<label class="budget-search"><span aria-hidden="true">⌕</span><input type="search" id="cotas-busca" placeholder="Buscar dotação, conta ou descrição..." value="'+esc(state.q)+'" aria-label="Buscar dotação ou conta"></label>'+
  '<label class="budget-filter">Tipo<select id="cotas-tipo">'+options(state.tipo,[['TODOS','Todos'],['Global','Global'],['Item definido','Item definido']])+'</select></label>'+
  '<label class="budget-filter">Conta<select id="cotas-conta">'+options(state.conta,[['TODAS','Todas'],['998020301','998020301'],['998020302','998020302']])+'</select></label>'+
+ '<button type="button" class="btn budget-toggle-zeros" id="cotas-toggle-zeradas" data-action="cotaToggleZeradas" aria-pressed="'+(state.mostrarZeradas?'true':'false')+'">'+(state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas')+'</button>'+
  '<button type="button" class="budget-clear" data-action="cotaClearFilters">Limpar filtros</button></div>'+
+ '<p class="budget-note" id="cotas-zero-note">'+(state.mostrarZeradas?'Todas as dotações estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).')+'</p>'+
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
@@ -145,7 +152,9 @@ function filter(name,value){
  if(name==='conta')state.conta=String(value);
  refresh();
 }
-function clear(){state.q='';state.tipo='TODOS';state.conta='TODAS';for(const [id,v] of [['cotas-busca',''],['cotas-tipo','TODOS'],['cotas-conta','TODAS']]){const el=document.getElementById(id);if(el)el.value=v}refresh();}
+function resetFilters(){state.q='';state.tipo='TODOS';state.conta='TODAS';state.mostrarZeradas=false;}
+function clear(){resetFilters();for(const [id,v] of [['cotas-busca',''],['cotas-tipo','TODOS'],['cotas-conta','TODAS']]){const el=document.getElementById(id);if(el)el.value=v}refresh();}
+function toggleZeradas(){state.mostrarZeradas=!state.mostrarZeradas;refresh();}
 function detail(key){
  const report=data(),d=rows().find(x=>String(x.dotacao||'')===String(key||''));
  if(!report||!d)return '<p>Dotação não encontrada neste relatório.</p>';
@@ -172,5 +181,5 @@ function exportCSV(){
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  return true;
 }
-window.SIG_COTAS=Object.freeze({view,filter,clear,detail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length});
+window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length});
 })();
