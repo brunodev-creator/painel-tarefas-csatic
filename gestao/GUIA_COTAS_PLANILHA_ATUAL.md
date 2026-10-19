@@ -1,41 +1,60 @@
-# Cota orçamentária — leitura do DASHBOARD da PLANILHA ATUAL
+# Cota orçamentária — Conciliação V6 na PLANILHA ATUAL
 
-## Fontes e significado
+## Posição conciliada de 19/10/2026
 
-- Planilha vinculada: `agora vai - PLANILHA ATUAL`, ID `1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA`.
-- Aba de origem: `DASHBOARD`, cabeçalho na linha 8, dotações a partir da linha 9.
-- Tela: SIG Online → **Cota orçamentária** → **Saldos por dotação**.
-- Somente os valores provenientes da planilha são apresentados. O snapshot no Supabase não é uma consulta em tempo real ao Google.
-- **Orçamentário** = soma de `Total_Repassado_Dotacao`.
-- **Valor empenhado** = soma de `TOTAL_EMPENHADO`.
-- **Saldo atual** = diferença entre as duas colunas anteriores, conferida contra `Saldo_A_Destinar`.
-- Conta global 998020301: `00EE` no BO é apresentado como `EEXX`. Conta de item definido: 998020302.
-- Filtros por dotação, tipo e conta; detalhe por dotação e exportação CSV para perfis financeiros.
-- O painel DASHBOARD possui cálculos próprios. **Não confundir `TOTAL_EMPENHADO` do DASHBOARD com `valor_abatido_gerencial_centavos` do relatório V6**, que usa regras distintas para abatimento, TDCO e dotações ambíguas.
-- Números de uma posição importada não comprovam saldo oficial disponível no SIAFI-MG.
+- Origem: planilha `agora vai - PLANILHA ATUAL`, ID `1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA`.
+- 43 dotações com cota, 192 empenhos indexados, 328 documentos de repasse, 43 RIPC (aba ITENS_AQUISICAO sem registros no momento).
+- Cota líquida BO: **R$ 88.250.822,15**.
+- Abatimento gerencial por regra V6: **R$ 85.299.157,14**, em 180 empenhos.
+- Diferença gerencial NÃO OFICIAL: **R$ 2.951.665,01**.
+- Duas correções históricas 0000→0001 aprovadas foram recuperadas da planilha anterior, conferidas por chave e contra as cotas atuais e copiadas para `SIG_V6_CORRECOES_APROVADAS`.
+- Dois TDCO (R$ 2.337.647,59) excluídos do abatimento, um empenho ambíguo não abatido e três empenhos sem cota correspondente após validar as correções.
+- 50 alertas para conferência, 0 bloqueios. A ausência dos itens de RIPC explica grande parte dos alertas; não significa que os empenhos estejam ausentes.
+- Backup anterior à alteração: `DASHBOARD_BACKUP_20261019` na mesma planilha.
 
-## Como visualizar (já importado)
+## Relação das abas
 
-1. Acesse `https://brunodev-creator.github.io/painel-tarefas-csatic/gestao/`.
-2. Entre no ambiente institucional com um perfil autorizado.
-3. Clique em **Cota orçamentária**. A página lê somente o snapshot `DASHBOARD` protegido no Supabase.
-4. Use **Atualizar consulta** para reler o snapshot do banco e conferir os valores, sem alterar a planilha.
+- `SIG_V6_RESUMO` — consolidação numérica e limites.
+- `SIG_V6_REPASSES` — repasse por ano, documento e dotação (sem repetir `Valor_Total_Repasse` do RIPC).
+- `SIG_V6_DOTACOES` — valor da cota, RIPC, empenhos, abatimento gerencial e diferença por dotação.
+- `SIG_V6_EMPENHOS` — índice normalizado e rastreabilidade dos empenhos.
+- `SIG_V6_ABATIMENTOS` — classificação de cada empenho como global, específica, TDCO, ambíguo, sem cota ou zero.
+- `SIG_V6_CONTINUOS` — referência auxiliar de serviços continuados.
+- `SIG_V6_ALERTAS` — inconsistências a conferir.
+- `SIG_V6_CORRECOES_APROVADAS` — correções documentadas por empenho; nunca deduzir correção automaticamente.
+- `DASHBOARD` — resumo legado com valores de abatimento e diferença agora atualizados pela V6, **não equivalentes a saldo oficial**.
 
-## Como atualizar os dados depois de novas alterações no Google Sheets
+**Atenção:** o `DASHBOARD` legado é reconstruído por outras rotinas da planilha, ainda fora do GitHub. Uma nova execução dessas rotinas pode sobrescrever os valores V6 até que o motor seja instalado/encadeado corretamente.
 
-1. No arquivo correto, abra **Extensões → Apps Script**.
-2. Abra/crie `SIG_FONTE_ATUAL_AppsScript.gs` e substitua o código pelo arquivo de mesmo nome existente em `gestao/integracao/` no GitHub.
-3. Salve e execute `sigFonteInstalarMenu` uma vez (autorizando o Google conforme necessário).
-4. Na planilha, clique **SIG — Fonte Oficial → Baixar snapshot JSON para SIG**.
-5. Entre como administrador no SIG, abra **Motor de Dados** e importe o novo JSON da fonte oficial. A versão V2 inclui seis abas, inclusive o DASHBOARD.
-6. Volte para **Cota orçamentária → Atualizar consulta**. Conferir quantidade, origem e posição temporal.
+## Instalação do motor V6 para atualizações futuras
 
-**Ainda é um processo de atualização manual**. A automação direta Google Sheets → Supabase requer configurar autenticação server-side, permissão Google institucional e disparador autorizado; não implementar endpoint público nem publicar credenciais no GitHub.
+O arquivo do motor preparado no GitHub é [SIG_V6_Conciliacao_Atual.gs](./integracao/SIG_V6_Conciliacao_Atual.gs). A conexão atual permite editar os dados do Google Sheets, mas **não instala arquivos Apps Script no projeto vinculado**.
 
-## Acesso e proteção
+1. Abra a PLANILHA ATUAL → **Extensões → Apps Script**.
+2. Crie arquivo `SIG_V6_Conciliacao_Atual.gs`. Cole o código do GitHub. Evite criar uma segunda definição `SIGV6` se já existir outra instalação V6 no mesmo projeto.
+3. Salve, selecione e execute `sigV6InstalarMenu` apenas uma vez e autorize as permissões do Google.
+4. Reabra a planilha e clique **SIG V6 (conciliação) → Gerar conciliação local**. Confira `SIG_V6_RESUMO`, `SIG_V6_ABATIMENTOS` e `SIG_V6_ALERTAS`.
+5. Compare a posição esperada com 43 dotações, 192 empenhos e 180 abatimentos da base de 19/10/2026. Em importações posteriores, esses números podem mudar legitimamente.
+6. Somente após conferência, use **SIG V6 (conciliação) → Publicar abatimentos no DASHBOARD (após conferência)**. A ação exige confirmação, verifica os códigos e os valores de cotas e cria backup antes de atualizar o Dashboard.
 
-- Banco: `public.sig_planilha_snapshots`, RLS habilitada.
-- Registro `DASHBOARD`: leitura somente por usuários autenticados, ativos e com perfil autorizado; os demais cinco snapshots seguem restritos aos perfis financeiros.
-- Atualizações em lote: RPC `sig_planilha_importar_snapshot`, somente administrador ativo.
-- Não incorporar este snapshot diretamente aos processos, tarefas, contratos ou empenhos operacionais.
-- A hospedagem de dados internos no piloto depende de aprovação institucional, avaliação de segurança e políticas da PMMG.
+A análise diária V6 é opcional. Ela atualiza apenas abas `SIG_V6_*`. A publicação no DASHBOARD permanece manual para evitar lançar resultados ambíguos automaticamente.
+
+## Atualização do SIG
+
+1. Execute a conciliação V6 e publique, com conferência, o Dashboard, se os controles permitirem.
+2. Na planilha correta, instale/atualize também [SIG_FONTE_ATUAL_AppsScript.gs](./integracao/SIG_FONTE_ATUAL_AppsScript.gs) e execute o menu **SIG — Fonte Oficial → Baixar snapshot JSON para SIG**.
+3. No SIG, como administrador, abra **Motor de Dados → Importar JSON da fonte oficial**. O formato V2 exige seis abas, inclusive `DASHBOARD`.
+4. Abra **Cota orçamentária → Atualizar consulta**. Verifique data, valores e alertas da planilha.
+
+O snapshot inicial de 19/10/2026 já foi atualizado diretamente no Supabase, portanto não exige importação manual adicional **para a posição atual**. Não existe sincronização contínua Google Sheets → Supabase; um clique em "Atualizar consulta" apenas consulta a última posição importada.
+
+## Regras e segurança
+
+- `SIG_V6` não altera abas de importação, `INDICE_EMPENHOS`, cadastros, tarefas, contratos nem históricos.
+- Dotação global BO `00EE` é normalizada `EE00` para chave, exibida `EEXX`; itens específicos `EE01..EE99` mantidos separados.
+- Empenhos com correspondente somente na específica abatem específica; somente na global, abatem global. Se ambas existirem, **nenhum abate automático**.
+- TDCO e empenhos fora da UE 1250070 não são abatidos.
+- Corrigir `0000` para `0001` apenas por registro aprovado, código original exato, alvo idêntico exceto pela mudança autorizada e cota existente.
+- Cada empenho é abatido no máximo uma vez; RIPC não é descontado novamente.
+- Valores gerenciais não substituem SIAFI-MG nem demonstram disponibilidade oficial para empenhar.
+- Supabase aplica RLS e perfis autorizados à leitura do snapshot. A edição de código e utilização de dados reais dependem de autorização institucional e avaliação de segurança.
