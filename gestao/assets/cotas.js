@@ -110,7 +110,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
  const s=report.resumo||{},budget=num(s.cota_liquida_centavos),spent=num(s.valor_abatido_gerencial_centavos),balance=budget-spent;
  const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · '+
- (report._dashboard?'DASHBOARD da PLANILHA ATUAL (extração '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Os números são os consolidados da planilha, não a conciliação V6.':
+ (report._dashboard?'DASHBOARD da PLANILHA ATUAL (extração '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Os números seguem a conciliação gerencial V6 (global/específica, TDCO e correções conferidas). Não representam saldo oficial.':
  'Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'.')+
  ' Consulte a posição atual no SIAFI-MG antes de decidir operacionalmente.'+
  (report._dashboard?' <button type="button" class="budget-link" data-action="cotaReload">Atualizar consulta</button>':'')+
@@ -123,7 +123,7 @@ function view(authorized,allowExport=false,allowImport=false){
  return '<div class="budget-page">'+
  '<div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> <b>Saldos por dotação</b></div>'+
  warning+
- '<div class="budget-hero">'+kpi('Orçamentário',icon1,budget)+kpi('Valor empenhado',icon2,spent)+kpi('Saldo atual',icon3,balance)+'</div>'+
+ '<div class="budget-hero">'+kpi('Cota líquida BO',icon1,budget)+kpi('Abatimento gerencial V6',icon2,spent)+kpi('Diferença gerencial (não oficial)',icon3,balance)+'</div>'+
  '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária'+(report._dashboard?' · Fonte: DASHBOARD da PLANILHA ATUAL':' · Fonte: Conciliação V6 local')+'</p></div>'+
  (allowExport?'<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button>':'')+'</div>'+
  '<div class="budget-toolbar">'+
@@ -131,7 +131,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<label class="budget-filter">Tipo<select id="cotas-tipo">'+options(state.tipo,[['TODOS','Todos'],['Global','Global'],['Item definido','Item definido']])+'</select></label>'+
  '<label class="budget-filter">Conta<select id="cotas-conta">'+options(state.conta,[['TODAS','Todas'],['998020301','998020301'],['998020302','998020302']])+'</select></label>'+
  '<button type="button" class="budget-clear" data-action="cotaClearFilters">Limpar filtros</button></div>'+
- '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Orçamentário</th><th>Valor empenhado</th><th>Saldo atual</th><th>Detalhes</th></tr></thead>'+
+ '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição '+esc(date(s.referencia_cotas_data))+'</span></div>'+
  '</section></div>';
@@ -150,15 +150,15 @@ function detail(key){
  '<div><span>Tipo</span><strong>'+esc(d._type)+'</strong></div>'+
  '<div><span>Conta de controle</span><strong>'+esc(d._account)+'</strong></div>'+
  '<div><span>Documentos de repasse relacionados</span><strong>'+num(d.documentos)+'</strong></div>'+
- '<div><span>Orçamentário</span><strong>'+fmt(d._budget)+'</strong></div>'+
- '<div><span>Valor empenhado</span><strong>'+fmt(d._spent)+'</strong></div>'+
- '<div><span>Saldo atual (posição histórica)</span><strong>'+fmt(d._balance)+'</strong></div>'+
+ '<div><span>Cota líquida BO</span><strong>'+fmt(d._budget)+'</strong></div>'+
+ '<div><span>Abatimento gerencial V6</span><strong>'+fmt(d._spent)+'</strong></div>'+
+ '<div><span>Diferença gerencial não oficial</span><strong>'+fmt(d._balance)+'</strong></div>'+
  '<div class="budget-detail-original"><span>Registro(s) original(is) da cota</span><small>'+esc((d.origens_bo||[]).join(' | ')||'Não informado')+'</small></div></div>'+
- '<p class="budget-note">'+(report._dashboard?'Valores do DASHBOARD importado da PLANILHA ATUAL, sem conciliação V6;':'Valores gerenciais calculados com base na posição importada;')+' consulte a posição oficial atual antes de decidir sobre empenhos.</p>';
+ '<p class="budget-note">'+(report._dashboard?'Consolidação gerencial V6 aplicada sobre o DASHBOARD da PLANILHA ATUAL;':'Valores gerenciais calculados com base na posição importada;')+' consulte a posição oficial atual antes de decidir sobre empenhos.</p>';
 }
 function exportCSV(){
  if(!data())return false;
- const columns=['Dotação','Tipo','Conta','Orçamentário (R$)','Valor empenhado (R$)','Saldo atual (R$)'];
+ const columns=['Dotação','Tipo','Conta','Cota líquida BO (R$)','Abatimento gerencial V6 (R$)','Diferença gerencial NÃO OFICIAL (R$)'];
  const quote=t=>'"'+String(t??'').replace(/"/g,'""')+'"';
  const lines=filtered().map(d=>[d._code,d._type,d._account,(d._budget/100).toFixed(2).replace('.',','),(d._spent/100).toFixed(2).replace('.',','),(d._balance/100).toFixed(2).replace('.',',')].map(quote).join(';'));
  const body='\uFEFF'+[columns.map(quote).join(';'),...lines].join('\r\n');
