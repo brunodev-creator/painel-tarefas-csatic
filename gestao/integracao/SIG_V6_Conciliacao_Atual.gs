@@ -31,6 +31,7 @@ function sigV6Menu(){
  SpreadsheetApp.getUi().createMenu('SIG V6 (conciliação)')
    .addItem('1. Gerar conciliação local','sigV6GerarRelatorio')
    .addItem('2. Baixar JSON para SIG (local)','sigV6BaixarRelatorio')
+   .addItem('3. Publicar abatimentos no DASHBOARD (após conferência)','sigV6PublicarDashboardAtual')
    .addSeparator()
    .addItem('3. Ativar análise automática diária','sigV6AtivarRotinaDiaria')
    .addItem('4. Desativar análise automática','sigV6DesativarRotina')
@@ -585,4 +586,48 @@ function sigV6Escrever_(r){
   fmt(x.reforco_sugerido_centavos),x.tipo_execucao,x.alerta]));
  sigV6CriarAba_(ss,n.alertas,['Gravidade','Código','Aba','Linha','Descrição'],
   r.alertas.map(x=>[x.nivel,x.codigo,x.aba,x.linha,x.mensagem]));
+}
+
+/** Publicação manual, com verificação dos valores, sem alterar as abas de origem. */
+function sigV6PublicarDashboardAtual(){
+ const ss=sigV6VerificarOrigemAtual_(),ui=SpreadsheetApp.getUi(),r=sigV6Construir_();
+ const blocking=r.alertas.filter(a=>a.nivel==='BLOQUEIO');
+ if(blocking.length)throw new Error('Relatório com '+blocking.length+' bloqueio(s). Confira SIG_V6_ALERTAS.');
+ const dash=ss.getSheetByName('DASHBOARD');
+ if(!dash)throw Error('Aba DASHBOARD ausente.');
+ const data=dash.getRange(8,1,Math.max(dash.getLastRow()-7,1),4).getDisplayValues();
+ if(data[0][0]!=='Dotacao'||data.length<2)throw Error('Cabeçalho DASHBOARD inesperado.');
+ const rows=data.slice(1).filter(x=>String(x[0]).trim());
+ const valid=r.dotacoes.filter(x=>x.documentos>0);
+ const byKey=new Map(valid.map(x=>[x.dotacao,x]));
+ if(valid.length!==rows.length||byKey.size!==rows.length)
+   throw Error('Conjuntos de dotações divergem entre DASHBOARD e V6.');
+ const amounts=[];
+ for(const row of rows){
+   const entry=byKey.get(sigV6Dot_(row[0]));
+   if(!entry)throw Error('Sem correspondência no V6: '+row[0]);
+   const original=sigV6Reais_(row[1]);
+   if(original===null||original!==entry.cotas_centavos)
+      throw Error('Cota original do DASHBOARD diferente da V6: '+row[0]);
+   amounts.push([entry.abatido_sig_centavos/100,entry.diferenca_gerencial_centavos/100]);
+ }
+ const totalCota=valid.reduce((s,x)=>s+x.cotas_centavos,0);
+ const totalAbate=valid.reduce((s,x)=>s+x.abatido_sig_centavos,0);
+ if(totalCota!==r.resumo.cota_liquida_centavos || totalAbate!==r.resumo.valor_abatido_gerencial_centavos
+ || amounts.some(p=>!p.every(Number.isFinite)))throw Error('Conferência de totais inválida.');
+ const chosen=ui.alert('Publicar posição gerencial V6',
+  'Dotações: '+rows.length+'; abatimento: R$ '+(totalAbate/100).toLocaleString('pt-BR',{minimumFractionDigits:2})+
+  '; alertas: '+r.alertas.length+
+  '. Será criada uma cópia do DASHBOARD. Os valores NÃO são saldo oficial SIAFI-MG. Continuar?',
+  ui.ButtonSet.YES_NO);
+ if(chosen!==ui.Button.YES)return;
+ const tz=ss.getSpreadsheetTimeZone(),stamp=Utilities.formatDate(new Date(),tz,'yyyyMMdd_HHmmss');
+ dash.copyTo(ss).setName('DASHBOARD_BACKUP_'+stamp);
+ dash.getRange(9,3,amounts.length,2).setValues(amounts);
+ dash.getRange('B5:C5').setValues([[totalAbate/100,(totalCota-totalAbate)/100]]);
+ dash.getRange('A4:C4').setValues([['Cota líquida BO','Abatimento gerencial V6','Diferença gerencial NÃO OFICIAL']]);
+ dash.getRange('A2').setValue('Conciliação gerencial V6: '+Utilities.formatDate(new Date(),tz,'dd/MM/yyyy HH:mm')+
+   ' | Fonte das cotas: '+r.resumo.referencia_cotas_data+
+   ' | Não é saldo oficial do SIAFI-MG. Importações automáticas do DASHBOARD legado podem substituir esta posição.');
+ ui.alert('Publicação concluída. Confira os alertas, a data da fonte e o backup do DASHBOARD.');
 }
