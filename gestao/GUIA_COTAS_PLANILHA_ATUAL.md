@@ -63,3 +63,29 @@ O snapshot da posição de 19/10/2026 já está sincronizado; dados operacionais
 **Não há sincronização Google Sheets → Supabase em tempo real**. O botão "Atualizar consulta" apenas relê o último conjunto importado no banco. Rotinas legadas da planilha podem recalcular o Dashboard sem passar pelo motor V6; em tal situação, o exportador V3 bloqueia a importação até que os relatórios sejam consistentes.
 
 A hospedagem e uso de dados institucionais devem seguir as autorizações e políticas de segurança aplicáveis da PMMG.
+
+
+## Exceção temporária: diárias (19/10/2026)
+
+Por decisão expressa do responsável, as dotações de diárias militares do elemento `3390.15` deixam de integrar **o quadro principal de cotas e o subtotal gerencial operacional do SIG**. Todas aparecem em uma **tabela específica de diárias**, inclusive a dotação `3390.1501` de cota zero.
+
+A única dotação de diárias presente no extrato contábil fornecido foi `1251.06.181.137.4365.0001.3390.15XX.60.2.0` (normalizada `12510618113743650001339015006020`), com referência provisória de **R$ 2.085,00**, consulta ao Portal Contábil de 19/10/2026 às 11h54. Esse valor está armazenado separadamente em `public.sig_cotas_diarias_referencia` com origem, justificativa, data e RLS. É uma **referência manual histórica**, não um abatimento nem uma atualização ao saldo oficial. A entrada pode se tornar desatualizada: conferir novamente no Portal Contábil.
+
+As dotações `2500 · 3390.15XX · 10.1.0` e `2061 · 3390.15XX · 60.2.0`, não visualizadas no extrato contábil apresentado, são exibidas na tabela de diárias como **não confirmadas**, sem presumir saldo de zero. A específica `4365 · 3390.1501` também fica separada e sem referência contábil confirmada.
+
+**Totais da visualização gerencial com posição da planilha em 19/10/2026:**
+
+| Indicador | Valor |
+| --- | ---: |
+| Cota BO original, inclusive diárias | R$ 88.250.822,15 |
+| Abatimento gerencial V6 original | R$ 85.819.873,38 |
+| Diferença gerencial V6 original (imutável) | R$ 2.430.948,77 |
+| Cota BO do quadro principal, **sem diárias** | R$ 87.993.199,35 |
+| Abatimento V6 do quadro principal, **sem diárias** | R$ 85.819.873,38 |
+| Diferença V6 do quadro principal, **sem diárias** | R$ 2.173.325,97 |
+| Referência manual de diárias considerada na consulta | R$ 2.085,00 |
+| **Referência total de conferência, NÃO OFICIAL** | **R$ 2.175.410,97** |
+
+O quadro principal passa a conter 39 dotações (23 com diferença distinta de zero na posição analisada). A tabela separada apresenta quatro dotações de `3390.15`. A opção "Mostrar todas" abrange apenas as 39 dotações **não-diárias**. O campo de pesquisa e o CSV do quadro principal também não trazem diárias.
+
+**Integridade:** a fonte `DASHBOARD`, as abas `SIG_V6_*`, os registros de empenhos e o snapshot original do Supabase são preservados. Nenhum abatimento artificial foi lançado ou apresentado como real. O ajuste é exclusivamente de **apresentação e referência de conferência**, até existir método verificável de tratamento das diárias.
