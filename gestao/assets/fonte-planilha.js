@@ -11,7 +11,13 @@ const SOURCE=[
  {key:'IMPORT_PROCESSOS_HOMOLOGADOS',title:'Processos homologados',cols:['Processo_Compra','Objeto_Processo','Procedimento_Detalhamento','Valor_Homologado','Situacao_Execucao']},
  {key:'IMPORT_EXECUCAO_DESPESA_BO',title:'Especificações e execução',cols:['Número Processo -  Formatado','Número do Empenho','Tipo da especificação','Nome Empresarial/Nome Fornecedor','Data Efetivação Especificação']},
  {key:'SALDO_ATUAL_DOTACOES_EMPENHOS',title:'Saldos dos empenhos',cols:[]},
- {key:'DASHBOARD',title:'Cota orçamentária',cols:['Dotacao','Total_Repassado_Dotacao','TOTAL_EMPENHADO','Saldo_A_Destinar']}
+ {key:'DASHBOARD',title:'Cota orçamentária',cols:['Dotacao','Total_Repassado_Dotacao','TOTAL_EMPENHADO','Saldo_A_Destinar']},
+ {key:'SIG_V6_RESUMO',title:'Conciliação V6 — Resumo',cols:['Indicador','Valor']},
+ {key:'SIG_V6_DOTACOES',title:'Conciliação V6 — Dotações',cols:['Dotação','Cota líquida (R$)','Abatido gerencial (R$)','Diferença gerencial NÃO OFICIAL (R$)']},
+ {key:'SIG_V6_ABATIMENTOS',title:'Conciliação V6 — Empenhos',cols:['Chave empenho','Processo','Dotação utilizada para abate','Valor líquido empenhado (R$)','Resultado']},
+ {key:'SIG_V6_ALERTAS',title:'Conciliação V6 — Alertas',cols:['Gravidade','Código','Descrição']},
+ {key:'SIG_V6_CORRECOES_APROVADAS',title:'Correções históricas autorizadas',cols:['Chave_Empenho','Dotacao_Original','Dotacao_Corrigida']},
+ {key:'SIG_V6_ALOCACOES_APROVADAS',title:'Alocações manuais aprovadas',cols:['Chave_Empenho','Dotacao_Selecionada','Justificativa_Aprovacao']}
 ];
 const E=x=>String(x??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 const state={phase:'idle',meta:[],chosen:null,query:'',error:'',loading:false};
@@ -28,7 +34,7 @@ function render({cloud=false,isAdmin=false}={}){
  if(state.meta.length){
   const total=state.meta.reduce((n,x)=>n+(Number(x.quantidade)||0),0);
   const latest=state.meta.map(x=>x.gerado_em).filter(Boolean).sort().slice(-1)[0];
-  text+='<div class="sig-fonte-overview"><div><span>Abas disponíveis</span><strong>'+state.meta.length+'/6</strong></div>'+
+  text+='<div class="sig-fonte-overview"><div><span>Abas disponíveis</span><strong>'+state.meta.length+'/12</strong></div>'+
   '<div><span>Linhas de origem</span><strong>'+total.toLocaleString('pt-BR')+'</strong></div>'+
   '<div><span>Extração mais recente</span><strong>'+E(iso(latest))+'</strong></div></div>'+
   '<div class="table-scroll"><table class="data-table"><thead><tr><th>Fonte</th><th>Linhas</th><th>Extração</th><th>Consulta</th></tr></thead><tbody>'+
@@ -87,8 +93,8 @@ async function importFile(file,rest){
  if(!file)throw Error('Selecione um arquivo JSON.');
  if(file.size>10000000)throw Error('Arquivo acima do limite de 10 MB.');
  const contents=JSON.parse(await file.text());
- if(contents?.formato!=='SIG_FONTE_ATUAL_V2'||contents?.origem_id!==ID||
-  !Array.isArray(contents.abas)||contents.abas.length!==6)throw Error('O arquivo não foi gerado pelo exportador da PLANILHA ATUAL.');
+ if(contents?.formato!=='SIG_FONTE_ATUAL_V3'||contents?.origem_id!==ID||
+  !Array.isArray(contents.abas)||contents.abas.length!==12)throw Error('O arquivo não foi gerado pelo exportador da PLANILHA ATUAL.');
  const response=await rest('/rest/v1/rpc/sig_planilha_importar_snapshot','POST',{p_documento:contents});
  state.chosen=null;state.phase='idle';
  await load(rest,true);
