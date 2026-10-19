@@ -2041,6 +2041,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'setRolePreview':setRolePreview(btn.dataset.role);break;
  case 'exitRolePreview':exitRolePreview();break;
  case 'cotaDetail':if(!canViewCota())return showToast('Cota orçamentária indisponível para o seu perfil.');openModal('Detalhes da dotação','Conferência gerencial V6 · consulta sem alterações no banco.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
+  case 'cotaDiariaDetail':if(!canViewCota())return showToast('Diárias indisponíveis para este perfil.');openModal('Diárias — referência temporária','Comparação contábil histórica · sem abatimento ou atualização do V6.',window.SIG_COTAS.diariaDetail(decodeURIComponent(btn.dataset.dot||'')),true);break;
   case 'cotaEmpDetail':if(!canViewCota())return showToast('Conciliação indisponível para o seu perfil.');openModal('Conferência de empenho','Regra e dotação atribuída na V6; não é posição oficial do SIAFI-MG.',window.SIG_COTAS_AUD.detail(btn.dataset.id||''),true);break;
   case 'cotaAuditExport':if(!canFinance())return showToast('Exportação financeira restrita.');window.SIG_COTAS_AUD.exportCSV();break;
   case 'cotaReload':if(!canViewCota()||!cloud()||!session)return showToast('Consulta institucional indisponível.');await window.SIG_COTAS.load(rest,true);render();break;
