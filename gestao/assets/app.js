@@ -2039,7 +2039,9 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'previewProfiles':previewProfileModal();break;
  case 'setRolePreview':setRolePreview(btn.dataset.role);break;
  case 'exitRolePreview':exitRolePreview();break;
- case 'cotaDetail':if(!canViewCota())return showToast('Cota orçamentária indisponível para o seu perfil.');openModal('Detalhes da dotação','Posição orçamentária da fonte disponível.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
+ case 'cotaDetail':if(!canViewCota())return showToast('Cota orçamentária indisponível para o seu perfil.');openModal('Detalhes da dotação','Conferência gerencial V6 · consulta sem alterações no banco.',window.SIG_COTAS.detail(decodeURIComponent(btn.dataset.dot||'')),true);break;
+  case 'cotaEmpDetail':if(!canViewCota())return showToast('Conciliação indisponível para o seu perfil.');openModal('Conferência de empenho','Regra e dotação atribuída na V6; não é posição oficial do SIAFI-MG.',window.SIG_COTAS_AUD.detail(btn.dataset.id||''),true);break;
+  case 'cotaAuditExport':if(!canFinance())return showToast('Exportação financeira restrita.');window.SIG_COTAS_AUD.exportCSV();break;
   case 'cotaReload':if(!canViewCota()||!cloud()||!session)return showToast('Consulta institucional indisponível.');await window.SIG_COTAS.load(rest,true);render();break;
  case 'cotaExport':if(!canFinance())return showToast('Acesso financeiro restrito.');window.SIG_COTAS.exportCSV();break;
  case 'cotaClearFilters':window.SIG_COTAS.clear();break;
@@ -2077,7 +2079,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
   if(results)results.innerHTML=window.SIG_FONTE.rowsHtml();
   return;
  }
- if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{
+ if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.id==='cota-audit-search'){window.SIG_COTAS_AUD.filter('search',e.target.value);return}if(e.target.id==='cota-accounting-input'){window.SIG_COTAS_AUD.compare(e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{
   if(e.target.id==='lic-demo-count'){licDemoSyncCount(e.target.closest('form[data-form="licDemoSpecs"]'));return;}
   if(e.target.closest('form[data-form="aipc"]')){
    const form=e.target.closest('form[data-form="aipc"]');
@@ -2116,7 +2118,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
     db.processos.filter(p=>p.setor===newSector).map(p=>'<option value="'+esc(p.id)+'">'+esc(p.numero+' — '+p.objeto.slice(0,55))+'</option>').join('');
    return;
   }
-  if(e.target.id==='cotas-tipo'||e.target.id==='cotas-conta'){window.SIG_COTAS.filter(e.target.id==='cotas-tipo'?'tipo':'conta',e.target.value);return}if(e.target.id==='v7-upload'){window.SIG_V7.load(e.target.files?.[0]).then(()=>{render();showToast('Auditoria V7 carregada localmente.');}).catch(err=>showToast('Arquivo V7: '+errMsg(err)));return}if(e.target.id==='v6-upload'){window.SIG_V6.load(e.target.files?.[0]).then(()=>{render();showToast('Conciliação V6 carregada localmente; nenhum dado foi enviado ao servidor.');}).catch(err=>showToast('Arquivo V6: '+errMsg(err)));return}if(e.target.id==='v6-filter'){window.SIG_V6.filter(e.target.value);render();return}if(e.target.id==='sig-fonte-json-file'){
+  if(e.target.id==='cotas-tipo'||e.target.id==='cotas-conta'){window.SIG_COTAS.filter(e.target.id==='cotas-tipo'?'tipo':'conta',e.target.value);return}if(e.target.id==='cota-audit-status'){window.SIG_COTAS_AUD.filter('status',e.target.value);return}if(e.target.id==='v7-upload'){window.SIG_V7.load(e.target.files?.[0]).then(()=>{render();showToast('Auditoria V7 carregada localmente.');}).catch(err=>showToast('Arquivo V7: '+errMsg(err)));return}if(e.target.id==='v6-upload'){window.SIG_V6.load(e.target.files?.[0]).then(()=>{render();showToast('Conciliação V6 carregada localmente; nenhum dado foi enviado ao servidor.');}).catch(err=>showToast('Arquivo V6: '+errMsg(err)));return}if(e.target.id==='v6-filter'){window.SIG_V6.filter(e.target.value);render();return}if(e.target.id==='sig-fonte-json-file'){
  const file=e.target.files?.[0];
  if(!file)return;
  if(!isAdmin())return showToast('Importação permitida somente para administradores.');
