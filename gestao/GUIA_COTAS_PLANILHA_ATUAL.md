@@ -89,3 +89,29 @@ As dotações `2500 · 3390.15XX · 10.1.0` e `2061 · 3390.15XX · 60.2.0`, nã
 O quadro principal passa a conter 39 dotações (23 com diferença distinta de zero na posição analisada). A tabela separada apresenta quatro dotações de `3390.15`. A opção "Mostrar todas" abrange apenas as 39 dotações **não-diárias**. O campo de pesquisa e o CSV do quadro principal também não trazem diárias.
 
 **Integridade:** a fonte `DASHBOARD`, as abas `SIG_V6_*`, os registros de empenhos e o snapshot original do Supabase são preservados. Nenhum abatimento artificial foi lançado ou apresentado como real. O ajuste é exclusivamente de **apresentação e referência de conferência**, até existir método verificável de tratamento das diárias.
+
+
+## Descrição resumida das dotações (interface)
+
+O menu **Cota orçamentária → Saldos por dotação** apresenta agora a coluna
+**Descrição da despesa** ao lado da classificação. O rótulo é derivado da
+**natureza/elemento-item** e a linha menor explica a **função/subfunção**
+(segurança pública, administração, saúde ou ensino fundamental).
+
+Exemplos: `3390.15XX` (diárias militares), `3390.3913` (tarifas de água e
+esgoto), `3390.3921` (reparos de equipamentos), `3390.4003` (serviços
+PRODEMGE), `3390.4004` (telecomunicações), `3390.4005` (Rede IP
+Multisserviços), `4490.5206` (comunicação e telefonia) e `4490.5207`
+(equipamentos de informática). Classificações globais mostram apenas o
+elemento, sem presumir um item ou bem específico.
+
+As descrições constam também da tabela separada de diárias, dos detalhes
+da dotação, da busca por texto sem acentos e do CSV de cotas. A tabela de
+empenhos continua indicando dotação original, dotação utilizada e processo.
+
+**Limite:** o código informa a *natureza orçamentária*, mas não permite
+determinar fornecedor, contrato, item comprado, destino da aquisição ou
+saldo oficial. As descrições são auxiliares e não alteram nenhuma regra
+de abatimento da V6, o snapshot, ou a apresentação separada das diárias.
+O catálogo de leitura pode ser atualizado em
+[`cotas-descricoes.js`](./assets/cotas-descricoes.js).
