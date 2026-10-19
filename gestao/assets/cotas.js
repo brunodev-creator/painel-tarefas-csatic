@@ -149,7 +149,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>'+ (allowImport?'Para visualizar dados reais, importe um relatório V6 no módulo de conciliação.':'Nenhum relatório de cotas está disponível nesta sessão. A consulta exibirá os saldos quando houver um relatório V6 disponível neste navegador.') +'</p>'+
  (allowImport?'<button type="button" class="btn primary" data-view="conciliacao">Abrir Conciliação V6</button>':'')+
  '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
- const original=report.resumo||{},grossBudget=num(original.cota_liquida_centavos),
+ const s=report.resumo||{},original=s,grossBudget=num(original.cota_liquida_centavos),
    grossSpent=num(original.valor_abatido_gerencial_centavos),grossBalance=grossBudget-grossSpent;
  const overviewS=overview(),budget=overviewS.mainBudget,spent=overviewS.mainSpent,
    balance=overviewS.mainBalance;
