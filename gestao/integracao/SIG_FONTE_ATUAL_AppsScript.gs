@@ -16,7 +16,8 @@ const SIG_FONTE_ATUAL = Object.freeze({
     'IMPORT_PROCESSOS_COMPRA',
     'IMPORT_PROCESSOS_HOMOLOGADOS',
     'IMPORT_EXECUCAO_DESPESA_BO',
-    'SALDO_ATUAL_DOTACOES_EMPENHOS'
+    'SALDO_ATUAL_DOTACOES_EMPENHOS',
+    'DASHBOARD'
   ],
   maxLinhas: 3000,
   maxColunas: 60
@@ -48,18 +49,19 @@ function sigFonteBaixarJSON() {
     const sheet=ss.getSheetByName(nome);
     if(!sheet)throw new Error('Aba não encontrada: '+nome);
     const lastRow=sheet.getLastRow(),lastCol=sheet.getLastColumn();
-    if(lastRow<1||lastCol<1||lastCol>SIG_FONTE_ATUAL.maxColunas ||
-      lastRow-1>SIG_FONTE_ATUAL.maxLinhas) {
+    const firstRow=nome==='DASHBOARD'?8:1;
+    if(lastRow<firstRow||lastCol<1||lastCol>SIG_FONTE_ATUAL.maxColunas ||
+      lastRow-firstRow>SIG_FONTE_ATUAL.maxLinhas) {
       throw new Error('Limite ou cabeçalho inválido na aba '+nome+
         ' (máximo de '+SIG_FONTE_ATUAL.maxLinhas+' linhas e 60 colunas).');
     }
-    const contents=sheet.getRange(1,1,lastRow,lastCol).getDisplayValues();
+    const contents=sheet.getRange(firstRow,1,lastRow-firstRow+1,lastCol).getDisplayValues();
     const cabecalhos=contents.shift();
     const linhas=contents.filter(row=>row.some(value=>String(value).trim()!==''));
     return {aba:nome,cabecalhos,linhas};
   });
   const snapshot={
-    formato:'SIG_FONTE_ATUAL_V1',origem_id:SIG_FONTE_ATUAL.id,
+    formato:'SIG_FONTE_ATUAL_V2',origem_id:SIG_FONTE_ATUAL.id,
     origem_nome:SIG_FONTE_ATUAL.nome,gerado_em:new Date().toISOString(),abas
   };
   const raw=JSON.stringify(snapshot);
