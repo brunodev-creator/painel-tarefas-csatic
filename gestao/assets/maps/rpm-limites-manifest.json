@@ -1,5 +1,5 @@
 {
-  "status": "pendente_homologacao",
+  "status": "representacao_aproximada_disponivel",
   "nome": "Limites territoriais das 19 Regiões da Polícia Militar de Minas Gerais",
   "arquivoGeoJSON": null,
   "rpmEsperadas": [
@@ -29,5 +29,7 @@
     3
   ],
   "orgaoValidador": "PMMG",
-  "observacao": "O contorno de Minas Gerais está disponível e deriva da malha IBGE. Não há polígonos RPM vetoriais homologados neste repositório. Mostrar apenas marcadores de referência, nunca regiões inventadas."
+  "observacao": "As 17 áreas visuais (16 RPM + RMBH) foram vetorizadas da imagem de referência fornecida pelo usuário. Falta homologação geográfica; o contorno do estado deriva da malha IBGE.",
+  "arquivoReferencia": "rpm-regioes-aproximadas.json",
+  "uso": "Somente navegação visual; não oficial, não georreferenciado, não apropriado para classificação automática ou fiscalização de limites."
 }
