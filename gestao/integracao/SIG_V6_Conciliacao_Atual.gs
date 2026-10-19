@@ -15,7 +15,7 @@ const SIGV6 = Object.freeze({
  names:{
   cotas:'IMPORT_SALDOS_BO',ripc:'DESTINACAO_REPASSES',itens:'ITENS_AQUISICAO',
   empenhos:'INDICE_EMPENHOS',continuos:'CONTROLE_SERVICOS_CONTINUOS',
-  processos:'CONTROLE_PROCESSOS_COMPRA',correcoes:'SIG_V6_CORRECOES_APROVADAS'},
+  processos:'CONTROLE_PROCESSOS_COMPRA',correcoes:'SIG_V6_CORRECOES_APROVADAS',alocacoes:'SIG_V6_ALOCACOES_APROVADAS'},
  outputs:{resumo:'SIG_V6_RESUMO',repasses:'SIG_V6_REPASSES',dotacoes:'SIG_V6_DOTACOES',
  empenhos:'SIG_V6_EMPENHOS',continuos:'SIG_V6_CONTINUOS',alertas:'SIG_V6_ALERTAS',
  abatimentos:'SIG_V6_ABATIMENTOS'}
@@ -182,7 +182,7 @@ function sigV6DotEmpenhoParaAbate_(emp, cotasConhecidas) {
  // A correção histórica foi aprovada e validada contra a cota na construção
  // do índice. Não voltar ao valor bruto nesta segunda etapa.
  if(emp.normalizacao_dotacao==='FUNCIONAL_0000_PARA_0001_APROVADA'&&
-    sigV6DotFromDigits_(emp.dotacao)&&cotasConhecidas.has(emp.dotacao))return emp.dotacao;
+    sigV6DotFromDigits_(emp.dotacao)&&(cotasConhecidas.has(emp.dotacao)||cotasConhecidas.has(sigV6GlobalDoItem_(emp.dotacao))))return emp.dotacao;
  const raw=sigV6Dot_(emp.dotacao_orig||emp.dotacao);
  if(sigV6DotFromDigits_(raw))return raw;
  if(raw.length===31&&raw.startsWith('12516')){
@@ -206,7 +206,7 @@ function sigV6ValidarCorrecoes_(registros,cotasConhecidas,alert){
   const antiga=sigV6DotFromDigits_(origem),nova=sigV6DotFromDigits_(destino);
   const correta=antiga&&nova&&antiga[5]==='0000'&&nova[5]==='0001'&&
    antiga.every((v,i)=>i===5||v===nova[i])&&
-   cotasConhecidas.has(destino)&&!cotasConhecidas.has(origem);
+   (cotasConhecidas.has(destino)||cotasConhecidas.has(sigV6GlobalDoItem_(destino)))&&!cotasConhecidas.has(origem);
   if(!id||!correta||aprovadas[id]){
    alert('ATENCAO','CORRECAO_HISTORICA_NAO_VALIDADA',SIGV6.names.correcoes,r.linha,
     'Correção não aplicada: '+(id||'identificador ausente')+
@@ -220,7 +220,7 @@ function sigV6ValidarCorrecoes_(registros,cotasConhecidas,alert){
 function sigV6CorrigirFuncionalHistorica_(chave,dotOrigem,dotacoesCotas,aprovadas){
  const origem=sigV6Dot_(dotOrigem),regra=aprovadas[chave];
  if(!regra)return {dotacao:origem,normalizacao:'',detalhe:''};
- if(origem!==regra.original||!dotacoesCotas.has(regra.correto)){
+ if(origem!==regra.original||!(dotacoesCotas.has(regra.correto)||dotacoesCotas.has(sigV6GlobalDoItem_(regra.correto)))){
   return {dotacao:origem,normalizacao:'',
    detalhe:'Correção aprovada não aplicada porque o valor original ou a cota já não corresponde ao registro autorizado.'};
  }
@@ -242,7 +242,7 @@ function sigV6DataISO_(raw){
  * - nenhuma: SEM_COTA
  * Um empenho positivo é atribuído uma só vez, não se desconta RIPC novamente.
  */
-function sigV6ConciliarAbatimentos_(repasses, empenhos, alert){
+function sigV6ConciliarAbatimentos_(repasses, empenhos, alert, alocacoesAprovadas={}){
  const cotas=new Set(repasses.filter(x=>x.quantidade_movimentos>0).map(x=>x.dotacao));
  const totals=Object.create(null),out=[];
  for(const e of empenhos){
@@ -257,7 +257,22 @@ function sigV6ConciliarAbatimentos_(repasses, empenhos, alert){
   else if(value===0){status='SEM_VALOR_LIQUIDO';descricao='Empenho sem valor líquido positivo.';}
   else if(value<0){status='VALOR_NEGATIVO_CONFERIR';descricao='Valor líquido negativo: exige conferência.';}
   else if(!sigV6DotFromDigits_(dot)){status='CODIGO_INCOMPLETO';descricao='Dotação não normalizada com segurança.';}
-  else if(exact&&viaGlobal){status='AMBIGUA_SEM_ABATE';descricao='Cota específica e global coexistem: aguardar escolha.';}
+  else if(exact&&viaGlobal){
+    const decisao=alocacoesAprovadas[e.chave_empenho];
+    const permitida=decisao&&decisao.original===sigV6Dot_(e.dotacao_orig)&&decisao.valor===value&&
+      ((decisao.tipo==='MANUAL_ESPECIFICA'&&decisao.escolhida===dot)||
+       (decisao.tipo==='MANUAL_GLOBAL'&&decisao.escolhida===global));
+    if(permitida){
+      status=decisao.tipo==='MANUAL_ESPECIFICA'?'ABATIDO_ESPECIFICA':'ABATIDO_GLOBAL';
+      target=decisao.escolhida;
+      descricao='Ambiguidade resolvida por alocação manual aprovada: '+(decisao.justificativa||'Sem observação adicional.');
+    }else{
+      status='AMBIGUA_SEM_ABATE';
+      descricao='Cota específica e global coexistem: confirmar alocação.';
+      if(decisao)alert('ATENCAO','ALOCACAO_MANUAL_DESATUALIZADA',SIGV6.names.alocacoes,0,
+        'Decisão manual sem correspondência exata: '+e.chave_empenho);
+    }
+   }
   else if(exact){status='ABATIDO_ESPECIFICA';target=dot;descricao='Somente a dotação específica existe no conjunto de cotas.';}
   else if(viaGlobal){status='ABATIDO_GLOBAL';target=global;descricao='Somente a dotação global do mesmo elemento e demais campos existe.';}
   else {status='SEM_COTA';descricao='Nenhuma dotação específica ou global correspondente.';}
@@ -321,6 +336,12 @@ function sigV6Construir_(){
  const correcaoSheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SIGV6.names.correcoes);
  const registrosCorrecao=correcaoSheet?
   sigV6Ler_(SIGV6.names.correcoes,['Chave_Empenho','Dotacao_Original','Dotacao_Corrigida','Status','Justificativa'],alert):[];
+ const alocSheet=SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SIGV6.names.alocacoes);
+ const registrosAlocacao=alocSheet?
+  sigV6Ler_(SIGV6.names.alocacoes,
+     ['Chave_Empenho','Dotacao_Original','Dotacao_Selecionada','Valor_Abatimento_R$',
+      'Tipo_Alocacao','Status','Justificativa_Aprovacao'],alert):[];
+ const alocacoesAprovadas=sigV6ValidarAlocacoes_(registrosAlocacao,alert);
  const byCota=Object.create(null),byRipc=Object.create(null),byDot=Object.create(null),byEmp=Object.create(null);
  const itemByRipc=Object.create(null),continuosOut=[],processosOut=[];const dotacaoCotasConhecidas=new Set();let empenhosNormalizados=0,empenhosComCota=0;
  const ensureDot=(key)=>byDot[key]||(byDot[key]={dotacao:key,cotas_centavos:0,ripc_centavos:0,empenhado_liquido_centavos:0,
@@ -445,7 +466,7 @@ function sigV6Construir_(){
    status:r.get('Status_Processo'),controle:r.get('Tipo_Controle_Orcamentario'),
    valor_homologado_centavos:sigV6Reais_(r.get('Valor_Final_Homologado'))});
  }
- const retornoAbate=sigV6ConciliarAbatimentos_(repasses,empenhos,alert);
+ const retornoAbate=sigV6ConciliarAbatimentos_(repasses,empenhos,alert,alocacoesAprovadas);
  const abatimentos=retornoAbate.registros,abatidoPorDot=retornoAbate.abatidoPorDot;
  // Presença de cotas só pode ser apurada na posição importada.
  // A data de processamento do relatório NÃO demonstra existência de saldo naquela data.
@@ -631,4 +652,26 @@ function sigV6PublicarDashboardAtual(){
    ' | Fonte das cotas: '+r.resumo.referencia_cotas_data+
    ' | Não é saldo oficial do SIAFI-MG. Importações automáticas do DASHBOARD legado podem substituir esta posição.');
  ui.alert('Publicação concluída. Confira os alertas, a data da fonte e o backup do DASHBOARD.');
+}
+
+
+function sigV6ValidarAlocacoes_(registros,alert){
+ const aprovadas=Object.create(null);
+ for(const r of registros){
+  if(r.get('Status').toUpperCase()!=='APROVADO')continue;
+  const key=r.get('Chave_Empenho'),original=sigV6Dot_(r.get('Dotacao_Original'));
+  const escolhida=sigV6Dot_(r.get('Dotacao_Selecionada'));
+  const tipo=r.get('Tipo_Alocacao').trim().toUpperCase();
+  const valor=sigV6Reais_(r.get('Valor_Abatimento_R$'));
+  const valido=key&&original&&escolhida&&sigV6DotFromDigits_(original)&&
+    sigV6DotFromDigits_(escolhida)&&Number.isInteger(valor)&&valor>0&&
+    (tipo==='MANUAL_ESPECIFICA'||tipo==='MANUAL_GLOBAL')&&!aprovadas[key];
+  if(!valido){
+    alert('ATENCAO','ALOCACAO_MANUAL_INVALIDA',SIGV6.names.alocacoes,r.linha,
+      'Aprovação incompleta, duplicada ou sem valor: '+(key||'sem chave'));
+    continue;
+  }
+  aprovadas[key]={original,escolhida,tipo,valor,justificativa:r.get('Justificativa_Aprovacao')};
+ }
+ return aprovadas;
 }
