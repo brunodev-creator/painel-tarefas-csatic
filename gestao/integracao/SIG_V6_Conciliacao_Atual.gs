@@ -395,7 +395,7 @@ function sigV6Construir_(){
  for(const r of emps){
   const id=r.get('Chave_Empenho'),dotOrigem=sigV6Dot_(r.get('Dotacao'));
   const tipoExecucao=r.get('Tipo_Execucao_Contabil')||'';
-  const unidade=sigV6Digits_(r.get('Unidade_Contabil_Executora'));
+  const unidade=r.get('Unidade_Contabil_Executora').trim(); // Preservar lista de UEs para rastreabilidade.
   const ehTdco=r.get('Eh_TDCO').trim().toUpperCase()==='SIM'||tipoExecucao.trim().toUpperCase()==='TDCO';
   const foraUE=!!unidade&&unidade!==SIGV6_UE_COTAS;
   const correcao=sigV6CorrigirFuncionalHistorica_(id,dotOrigem,dotacaoCotasConhecidas,correcoesAprovadas);
