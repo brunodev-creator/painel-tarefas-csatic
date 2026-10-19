@@ -113,7 +113,7 @@ function filter(field,value){
  if(field==='status')state.status=String(value||'TODOS');
  refresh();
 }
-function view(){
+function view(canExport=false){
  const r=state.report;if(!r)return '';
  const counts=r.counts;
  const opts=[['TODOS','Todos'],['ABATIDOS','Abatidos'],['EXCLUIDOS','Não abatidos'],
@@ -134,7 +134,7 @@ function view(){
  const ledger=decisions.length?'<details class="budget-audit-details"><summary>Ver decisões manuais aprovadas ('+decisions.length+')</summary>'+
  decisions.map(d=>'<p><strong>'+esc(d.Chave_Empenho)+'</strong> · '+esc(d.Dotacao_Selecionada)+'<br>'+esc(d.Justificativa_Aprovacao||'')+'</p>').join('')+'</details>':'';
  return '<section class="card budget-panel budget-audit"><div class="budget-panel-head"><div><h2>Conciliação por empenho · V6</h2><p>Rastreabilidade dos abatimentos, decisões e exclusões</p></div>'+
- '<button type="button" class="btn budget-export" data-action="cotaAuditExport">↓ Exportar empenhos</button></div>'+
+ (canExport?'<button type="button" class="btn budget-export" data-action="cotaAuditExport">↓ Exportar empenhos</button>':'')+'</div>'+
  info+notes+risk+'<div class="budget-toolbar"><label class="budget-search">⌕ <input id="cota-audit-search" type="search" placeholder="Empenho, processo ou dotação" value="'+esc(state.search)+'"></label>'+
  '<label class="budget-filter">Resultado<select id="cota-audit-status">'+opts+'</select></label></div>'+
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Empenho / processo</th><th>Dotação de origem</th><th>Dotação de abatimento</th><th>Valor líquido</th><th>Resultado</th><th></th></tr></thead>'+
@@ -176,7 +176,7 @@ function compare(value){
  const dot=state.report.dots.find(d=>d.key===state.comparisonDot);if(!dot)return;
  if(!String(value).trim()){el.textContent='O valor de comparação não será gravado.';return;}
  const n=Number(String(value).replace(',','.'));
- if(!Number.isFinite(n)||n<0||!Number.isSafeInteger(Math.round(n*100))){el.textContent='Informe um valor contábil válido.';return;}
+ if(!Number.isFinite(n)||!Number.isSafeInteger(Math.round(n*100))){el.textContent='Informe um valor contábil válido.';return;}
  const diff=Math.round(n*100)-dot.diferenca;
  el.textContent='Valor contábil informado: '+fmt(Math.round(n*100))+' · diferença (contábil − SIG): '+fmt(diff)+'. Apenas nesta janela; valor não salvo.';
 }
