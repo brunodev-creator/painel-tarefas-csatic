@@ -10,9 +10,9 @@ const fmt=cents=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}
 const data=()=>state.cloudReport||window.SIG_V6?.getData?.()||null;
 const FONTE_ID='1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA';
 function money(v){
- const s=String(v??'').trim(),m=s.match(/^(-)?(?:R\\$\\s*)?(\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:,(\\d{1,2}))?$/);
+ const s=String(v??'').trim(),m=s.match(/^(-)?(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/);
  if(!m)return null;
- const n=Number(m[2].replace(/\\./g,''))*100+Number((m[3]||'').padEnd(2,'0'));
+ const n=Number(m[2].replace(/\./g,''))*100+Number((m[3]||'').padEnd(2,'0'));
  return Number.isSafeInteger(n)?(m[1]?-n:n):null;
 }
 function dashboardReport(item){
@@ -38,7 +38,7 @@ function dashboardReport(item){
  const t=item.gerado_em||item.importado_em||'';
  return {_dashboard:true,gerado_em:t,
    resumo:{cota_liquida_centavos:budget,valor_abatido_gerencial_centavos:spent,
-     referencia_cotas_data:/^\\d{4}-\\d{2}-\\d{2}/.test(t)?t.slice(0,10):''},
+     referencia_cotas_data:/^\d{4}-\d{2}-\d{2}/.test(t)?t.slice(0,10):''},
    dotacoes};
 }
 async function load(rest,force=false){
