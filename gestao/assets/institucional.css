@@ -694,3 +694,15 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
  .almox-details-grid{grid-template-columns:1fr}
 }
 @media(max-width:450px){.almox-kpis{grid-template-columns:1fr 1fr}.almox-kpi-icon{display:none}.almox-top-actions .almox-outline-btn{flex:1}}
+
+
+/* Áreas vetoriais ilustrativas por RPM: 17 regiões de clique, com RMBH agrupada. */
+.almox-map-stage svg#almox-map-svg{aspect-ratio:900/737;min-height:0;max-width:100%;background:radial-gradient(circle at 53% 40%,#faf9f3,#efece2)}
+.almox-rpm-region{cursor:pointer;stroke:#fff6e7;stroke-width:2;stroke-linejoin:round;paint-order:stroke fill;transition:filter .15s ease,stroke-width .15s ease,opacity .15s ease;filter:drop-shadow(0 1px 1px #213b3626)}
+.almox-rpm-region:hover,.almox-rpm-region:focus-visible{stroke:#fffef7;stroke-width:5;filter:brightness(1.18) drop-shadow(0 0 6px #ba913e95);outline:none}
+.almox-rpm-region.selected{stroke:#edc778;stroke-width:6;filter:brightness(1.09) drop-shadow(0 0 8px #d6a446a6)}
+.almox-rpm-label{pointer-events:none}
+.almox-rpm-label rect{fill:#21352ce3;stroke:#f4e9cbba;stroke-width:1}
+.almox-rpm-label text{font:800 14px Manrope,Arial,sans-serif;fill:#fff;letter-spacing:.15px}
+.almox-rpm-label.selected rect{fill:#aa7c2d;stroke:#fff8e3;stroke-width:2}
+.almox-rpm-count-dot{fill:#d7b66a;stroke:#fff;stroke-width:1.5}
