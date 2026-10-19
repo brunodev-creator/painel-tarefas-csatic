@@ -12,6 +12,23 @@ Tela integrada no **SIG existente**; usa a navegação, sessão Supabase, perfis
 - `gestao/database/migrations/20261019_sig_almox_destinacoes_leitura.sql`: cria tabela exclusiva de consulta `sig_almox_destinacoes` (sem alteração de tabelas existentes) e sua primeira carga RIPC.
 - `gestao/database/migrations/20261019_sig_almox_enriquecer_processos.sql`: associa registros da aba `CONTROLE_PROCESSOS_COMPRA` por processo de compra e copia seu número completo e estado.
 
+## Revisão de UX/UI (19/10/2026)
+
+Fluxo principal em até dois passos: **buscar ou escolher a região → ver a lista** (detalhes no terceiro, sem sair da página).
+
+- **Cabeçalho compacto** com 4 indicadores reais: RPMs representadas (x de 19), processos de aquisição distintos (processo compartilhado conta uma vez), destinações vinculadas a RPM e registros sem classificação territorial. Os dois últimos abrem a lista correspondente. Os antigos cartões de “entregues/pendências” (sempre “—”) foram removidos.
+- **Busca única** sem acento e sem diferenciar maiúsculas (`radio` acha `RÁDIO`), em material, processo, documento de repasse, unidade, tipo, RPM e sede. Vários termos são combinados (`impressora 18ª rpm`). “12ª RPM”, “12a rpm” ou “rpm 12” filtram exatamente a 12ª RPM. Números isolados casam só no início de um número: `52` acha o processo `000052/2026` e o documento 52, mas `12` não acha `1250071`. Atalho: tecla `/`; `Esc` limpa a busca.
+- **Filtros essenciais** visíveis (Região, Ano, Situação, Tipo); Unidade destinatária fica em “Mais filtros”. Os filtros ativos aparecem como chips removíveis, com contagem de resultados e “Limpar tudo”.
+- **Seletor de Região** com contagem por área e digitação direta (digitar `12` leva a “12ª RPM — Ipatinga”). Inclui RMBH, 1ª, 2ª e 3ª RPM individualmente, “Com RPM identificada” e “Sem RPM identificada”.
+- **Visão inicial = todos os registros** (com e sem RPM), para que a busca por processo encontre também destinos genéricos (PMMG, DTS…). Antes, a visão geral escondia os 26 registros sem RPM.
+- **Mapa**: paleta harmonizada, rótulos legíveis, contorno destacado da região selecionada e demais atenuadas, selos com o número de registros que atendem à busca/filtros (o mapa responde à pesquisa) e áreas sem resultado esmaecidas. Dica flutuante (nome, sede e contagem), zoom pelos botões, Ctrl + roda do mouse ou pinça, arraste quando ampliado; a roda simples não sequestra mais a rolagem da página e arrastar não seleciona região por engano. Novo clique na região selecionada volta à visão geral. Os polígonos **não foram redesenhados**: continuam aproximados e não oficiais.
+- **Painel de resultados** ao lado do mapa (mapa fixo na rolagem): título “Aquisições destinadas à 8ª RPM”, resumo (registros, processos distintos e soma das destinações RIPC), segmentação 1ª/2ª/3ª na RMBH e tabela com 5 colunas — Processo (+ situação), Material, Unidade destinatária (+ RPM), Valor RIPC, Detalhes — com ordenação por coluna, linhas clicáveis e paginação. As colunas sempre vazias (quantidade, data de aquisição, entrega) saíram da tabela e ficaram no detalhamento, marcadas “Sem dados na fonte”.
+- **Detalhamento** agrupado em Identificação, Destino, Informações administrativas e Informações logísticas.
+- **Estados** de carregamento (esqueleto), erro com “Tentar novamente”, nenhum resultado (com atalho para limpar filtros), região sem registros e ambiente demonstrativo (nenhum dado real ou fictício é exibido).
+- **Celular**: alternância **Mapa | Resultados**; tocar numa região abre os resultados. A tabela vira cartões, sem rolagem horizontal; os filtros secundários ficam em “Filtros”.
+- **Modo apresentação**: tela cheia com indicadores, mapa e resultados; sai com `Esc` ou pelo botão. Usa a mesma sessão e as mesmas permissões — não abre acesso nem expõe dados a quem não está autenticado.
+- Respeita `prefers-reduced-motion`. Os novos controles (`data-almox`) são só de interface; `app.js` não foi alterado.
+
 ## Origem, classificação e limitação dos dados
 
 Origem: planilha [agora vai - PLANILHA ATUAL](https://docs.google.com/spreadsheets/d/1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA/edit), abas **DESTINACAO_REPASSES** e **CONTROLE_PROCESSOS_COMPRA**. A consulta de 19/10/2026 encontrou **43 linhas RIPC únicas**. Dessas, **17** continham menção textual explícita a uma RPM na coluna `Destino`; **26** não identificavam RPM, e **permanecem sem classificação**. Não se infere RPM pelo local de compras, unidade executora, município sozinho ou região da dotação.
