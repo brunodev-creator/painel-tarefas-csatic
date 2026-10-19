@@ -3,7 +3,7 @@
  * Nenhuma escrita ou publicação de dados financeiros pelo navegador. */
 (() => {
 'use strict';
-const state={q:'',tipo:'TODOS',conta:'TODAS',mostrarZeradas:false,cloudPhase:'idle',cloudError:'',cloudReport:null};
+const state={q:'',tipo:'TODOS',conta:'TODAS',mostrarZeradas:false,dailyRefs:[],dailyError:'',cloudPhase:'idle',cloudError:'',cloudReport:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const fmt=cents=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(cents)/100);
@@ -50,11 +50,21 @@ async function load(rest,force=false){
    const parsed=dashboardReport(items[0]);
    if(!window.SIG_COTAS_AUD)throw Error('Módulo de conciliação contábil não foi carregado. Atualize a página.');
    await window.SIG_COTAS_AUD.load(rest,parsed);
+   // Referências manuais de diárias são registradas separadamente do snapshot V6.
+   const dailies=await rest('/rest/v1/sig_cotas_diarias_referencia?ativo=eq.true&select=dotacao_normalizada,saldo_informado_centavos,observado_em,origem,justificativa');
+   if(!Array.isArray(dailies))throw Error('Referência das diárias não está disponível. Não é seguro usar os saldos V6 como se fossem contábeis.');
+   for(const d of dailies){
+     if(!/^[0-9]{32}$/.test(String(d.dotacao_normalizada))||
+        !Number.isSafeInteger(Number(d.saldo_informado_centavos))||Number(d.saldo_informado_centavos)<0||
+        !Number.isFinite(Date.parse(d.observado_em||'')))throw Error('Cadastro da referência de diárias inválido.');
+   }
+   if(new Set(dailies.map(d=>d.dotacao_normalizada)).size!==dailies.length)throw Error('Referências de diárias duplicadas.');
+   state.dailyRefs=dailies;state.dailyError='';
    state.cloudReport=parsed;state.cloudPhase='ready';
- }catch(e){state.cloudReport=null;state.cloudPhase='error';state.cloudError=e.message||String(e);}
+ }catch(e){state.cloudReport=null;state.dailyRefs=[];state.dailyError=e.message||String(e);state.cloudPhase='error';state.cloudError=state.dailyError;}
  return true;
 }
-function resetCloud(){state.cloudPhase='idle';state.cloudError='';state.cloudReport=null;window.SIG_COTAS_AUD?.reset();}
+function resetCloud(){state.cloudPhase='idle';state.cloudError='';state.cloudReport=null;state.dailyRefs=[];state.dailyError='';window.SIG_COTAS_AUD?.reset();}
 function isLoaded(){return state.cloudPhase!=='idle';}
 const own=(d,k)=>Object.prototype.hasOwnProperty.call(d,k);
 const dotString=d=>d.dotacao_exibicao||formatDot(d.dotacao);
@@ -66,7 +76,7 @@ function formatDot(value){
  if(parts[7].slice(2)==='00')parts[7]=parts[7].slice(0,2)+'XX';
  return parts.join('.');
 }
-function rows(){
+function allRows(){
  const r=data();if(!r||!Array.isArray(r.dotacoes))return [];
  return r.dotacoes.filter(d=>Number(d.documentos||0)>0).map(d=>{
    const p=dotString(d).split('.'),item=p[7]||'',global=d.tipo_dotacao==='GLOBAL'||item.endsWith('XX');
@@ -76,6 +86,29 @@ function rows(){
     _group:p.slice(0,7).join('.')+'.'+item.slice(0,2)};
  }).sort((a,b)=>a._group.localeCompare(b._group,'pt-BR',{numeric:true})||
   Number(a._global)-Number(b._global)||a._code.localeCompare(b._code,'pt-BR',{numeric:true}));
+}
+// 3390.15 (global ou item definido) não compõe a consulta principal.
+function isDiaria(d){
+ const p=String(d._code||'').split('.'),item=p[7]||'';
+ return p[6]==='3390'&&(item==='15XX'||/^15\d{2}$/.test(item));
+}
+function dailyRows(){return allRows().filter(isDiaria);}
+function rows(){return allRows().filter(d=>!isDiaria(d));}
+function dailyRef(d){
+ const p=String(d.dotacao||'').split('.');
+ if(p.length!==11)return null;
+ if(/^00\d{2}$/.test(p[7]))p[7]=p[7].slice(2)+'00';
+ const code=p.join('');
+ return state.dailyRefs.find(x=>x.dotacao_normalizada===code)||null;
+}
+function overview(){
+ const active=rows(),daily=dailyRows();
+ const mainBudget=active.reduce((t,d)=>t+d._budget,0);
+ const mainSpent=active.reduce((t,d)=>t+d._spent,0);
+ const known= daily.reduce((t,d)=>{const ref=dailyRef(d);return t+(ref?Number(ref.saldo_informado_centavos):0);},0);
+ return {mainBudget,mainSpent,mainBalance:mainBudget-mainSpent,
+   dayKnown:known,comparison:mainBudget-mainSpent+known,dailyCount:daily.length,
+   referenced:daily.filter(d=>!!dailyRef(d)).length};
 }
 function filtered(){
  const q=state.q.toUpperCase().trim().replace(/\s/g,''),normalized=q.replace(/(\d{2})XX/g,'$100');
@@ -116,7 +149,10 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>'+ (allowImport?'Para visualizar dados reais, importe um relatório V6 no módulo de conciliação.':'Nenhum relatório de cotas está disponível nesta sessão. A consulta exibirá os saldos quando houver um relatório V6 disponível neste navegador.') +'</p>'+
  (allowImport?'<button type="button" class="btn primary" data-view="conciliacao">Abrir Conciliação V6</button>':'')+
  '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
- const s=report.resumo||{},budget=num(s.cota_liquida_centavos),spent=num(s.valor_abatido_gerencial_centavos),balance=budget-spent;
+ const original=report.resumo||{},grossBudget=num(original.cota_liquida_centavos),
+   grossSpent=num(original.valor_abatido_gerencial_centavos),grossBalance=grossBudget-grossSpent;
+ const overviewS=overview(),budget=overviewS.mainBudget,spent=overviewS.mainSpent,
+   balance=overviewS.mainBalance;
  const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · '+
  (report._dashboard?'DASHBOARD + conciliação V6 da PLANILHA ATUAL (snapshot '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Valores conciliados com empenhos e decisões manuais da V6. Não representam saldo oficial.':
  'Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'.')+
@@ -131,7 +167,15 @@ function view(authorized,allowExport=false,allowImport=false){
  return '<div class="budget-page">'+
  '<div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> <b>Saldos por dotação</b></div>'+
  warning+
- '<div class="budget-hero">'+kpi('Cota líquida BO',icon1,budget)+kpi('Abatimento gerencial V6',icon2,spent)+kpi('Diferença gerencial (não oficial)',icon3,balance)+'</div>'+
+ '<div class="budget-hero budget-hero-diarias">'+
+ kpi('Cota BO · sem diárias',icon1,budget)+
+ kpi('Abatimento V6 · sem diárias',icon2,spent)+
+ kpi('Diferença V6 · sem diárias',icon3,balance)+
+ kpi('Referência para conferência · inclui diárias informadas',icon3,overviewS.comparison)+
+ '</div>'+
+ '<p class="budget-note budget-diarias-explanation">O valor de conferência soma apenas as referências de diárias documentadas. '+ 
+ 'A posição V6 original é preservada: cota '+fmt(grossBudget)+'; abatimento '+fmt(grossSpent)+
+ '; diferença '+fmt(grossBalance)+'. Não se trata de saldo oficial atualizado.</p>'+
  '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária'+(report._dashboard?' · Fonte: DASHBOARD da PLANILHA ATUAL':' · Fonte: Conciliação V6 local')+'</p></div>'+
  (allowExport?'<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button>':'')+'</div>'+
  '<div class="budget-toolbar">'+
@@ -144,7 +188,57 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
- '</section>'+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
+ '</section>'+dailySection()+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
+}
+
+function dailySection(){
+ const daily=dailyRows();
+ if(!daily.length)return '';
+ const dates=state.dailyRefs.map(r=>r.observado_em);
+ const textNote='Diárias (elemento 3390.15) são exibidas somente para conferência, fora da tabela e das cotas gerenciais principais. '+
+   'Dotações que não constaram do extrato contábil não recebem saldo presumido de R$ 0,00. '+
+   'A única referência informada é histórica e poderá divergir da posição contábil atual.';
+ const table=daily.map(d=>{
+   const ref=dailyRef(d);
+   const pos=ref?new Date(ref.observado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',
+      day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+   return '<tr><td class="budget-dot">'+esc(d._code)+'</td>'+
+   '<td class="budget-account">'+esc(d._account)+'</td>'+
+   '<td class="budget-value">'+fmt(d._budget)+'</td>'+
+   '<td class="budget-value">'+fmt(d._balance)+'</td>'+
+   '<td class="budget-value">'+(ref?'<strong>'+fmt(Number(ref.saldo_informado_centavos))+'</strong>':'<span class="budget-unconfirmed">Não confirmado</span>')+'</td>'+
+   '<td>'+ (ref?'<strong>Informado no Portal Contábil</strong><span class="budget-daily-date">'+esc(pos)+'</span>':
+   '<span class="budget-unconfirmed">Não exibido no extrato recebido. Excluído da soma.</span>')+'</td>'+
+   '<td><button type="button" class="budget-link" data-action="cotaDiariaDetail" data-dot="'+
+      esc(encodeURIComponent(String(d.dotacao)))+'">Ver origem →</button></td></tr>';
+ }).join('');
+ return '<section class="card budget-panel budget-diarias"><div class="budget-panel-head">'+
+  '<div><h2>Diárias · conferência separada</h2>'+
+  '<p>Elemento 3390.15 · fora da lista de cotas gerenciais para compras e serviços</p></div></div>'+
+  '<p class="budget-note">'+esc(textNote)+'</p>'+
+  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr>'+
+  '<th>Dotação</th><th>Conta</th><th>Cota BO histórica</th><th>Diferença V6 bruta</th>'+
+  '<th>Saldo de referência</th><th>Conferência contábil</th><th></th></tr></thead>'+
+  '<tbody>'+table+'</tbody></table></div>'+
+  '<p class="budget-note">Referência conhecida de diárias incluída SOMENTE no indicador “Referência para conferência”: '+
+  '<strong>'+fmt(overview().dayKnown)+'</strong>. O abatimento das diárias segue pendente de metodologia e não foi lançado como empenho.</p>'+
+  '</section>';
+}
+function diariaDetail(key){
+ const d=dailyRows().find(x=>String(x.dotacao||'')===String(key||''));
+ if(!d)return '<p>Dotação de diárias não encontrada na posição da fonte.</p>';
+ const ref=dailyRef(d),fields=[
+ ['Dotação original',d.dotacao],['Conta de controle',d._account],
+ ['Cota BO original',fmt(d._budget)],['Abatimento V6 original',fmt(d._spent)],
+ ['Diferença V6 bruta',fmt(d._balance)],
+ ['Referência temporária para o SIG',ref?fmt(Number(ref.saldo_informado_centavos)):'Não confirmada']
+ ];
+ return '<div class="budget-detail-grid">'+fields.map(([key,val])=>'<div><span>'+esc(key)+'</span><strong>'+esc(val)+'</strong></div>').join('')+'</div>'+
+ '<p class="budget-note">'+(ref?'<strong>Fonte: </strong>'+esc(ref.origem)+
+ '. <strong>Data: </strong>'+esc(new Date(ref.observado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}))+
+ '. '+esc(ref.justificativa):
+ 'Esta dotação não foi identificada no extrato contábil enviado. Não foi considerado saldo zero nem confirmada disponibilidade financeira.')+
+ '</p><p class="budget-note">Dados originais da V6 foram preservados e não houve abatimento fictício.</p>';
 }
 function filter(name,value){
  if(name==='q')state.q=String(value||'').slice(0,100);
@@ -181,5 +275,5 @@ function exportCSV(){
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  return true;
 }
-window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length});
+window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,diariaDetail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length,getOverview:overview});
 })();
