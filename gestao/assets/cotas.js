@@ -81,7 +81,9 @@ function allRows(){
  return r.dotacoes.filter(d=>Number(d.documentos||0)>0).map(d=>{
    const p=dotString(d).split('.'),item=p[7]||'',global=d.tipo_dotacao==='GLOBAL'||item.endsWith('XX');
    const budget=num(d.cotas_centavos),spent=num(d.abatido_sig_centavos);
+   const descricao=window.SIG_COTAS_DESC.descrever(p);
    return {...d,_code:dotString(d),_global:global,_type:global?'Global':'Item definido',
+    _descTitle:descricao.titulo,_descArea:descricao.area,
     _account:d.conta_controle||(global?'998020301':'998020302'),_budget:budget,_spent:spent,_balance:budget-spent,
     _group:p.slice(0,7).join('.')+'.'+item.slice(0,2)};
  }).sort((a,b)=>a._group.localeCompare(b._group,'pt-BR',{numeric:true})||
@@ -111,18 +113,19 @@ function overview(){
    referenced:daily.filter(d=>!!dailyRef(d)).length};
 }
 function filtered(){
- const q=state.q.toUpperCase().trim().replace(/\s/g,''),normalized=q.replace(/(\d{2})XX/g,'$100');
+ const q=window.SIG_COTAS_DESC.textoBusca(state.q),normalized=q.replace(/(\d{2})XX/g,'$100');
  return rows().filter(d=>(state.mostrarZeradas||d._balance!==0)&&
  (state.tipo==='TODOS'||d._type===state.tipo)&&
  (state.conta==='TODAS'||d._account===state.conta)&&
- (!q||[d._code,d.dotacao,...(d.origens_bo||[]),d._account].some(v=>{
- const t=String(v||'').toUpperCase().replace(/\s/g,'');
+ (!q||[d._code,d.dotacao,...(d.origens_bo||[]),d._account,d._descTitle,d._descArea].some(v=>{
+ const t=window.SIG_COTAS_DESC.textoBusca(v);
  return t.includes(q)||t.replace(/(\d{2})XX/g,'$100').replace(/\D/g,'').includes(normalized.replace(/\D/g,''));
  })));
 }
 function rowHtml(d){
  const encoded=encodeURIComponent(String(d.dotacao||''));
  return '<tr><td class="budget-dot">'+esc(d._code)+'</td>'+
+ '<td class="budget-description"><strong>'+esc(d._descTitle)+'</strong><small>'+esc(d._descArea)+'</small></td>'+
  '<td><span class="budget-tag '+(d._global?'global':'specific')+'">'+esc(d._type)+'</span></td>'+
  '<td class="budget-account">'+esc(d._account)+'</td>'+
  '<td class="budget-value">'+fmt(d._budget)+'</td>'+
@@ -132,7 +135,7 @@ function rowHtml(d){
 }
 function refresh(){
  const body=document.getElementById('cotas-tbody');if(!body)return;
- const list=filtered();body.innerHTML=list.length?list.map(rowHtml).join(''):'<tr><td colspan="7" class="budget-empty">Nenhuma dotação encontrada com esses filtros.</td></tr>';
+ const list=filtered();body.innerHTML=list.length?list.map(rowHtml).join(''):'<tr><td colspan="8" class="budget-empty">Nenhuma dotação encontrada com esses filtros.</td></tr>';
  const count=document.getElementById('cotas-count');if(count)count.textContent=list.length+' de '+rows().length+' dotações';
  const toggle=document.getElementById('cotas-toggle-zeradas');
  if(toggle){toggle.textContent=state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas';toggle.setAttribute('aria-pressed',state.mostrarZeradas?'true':'false');}
@@ -184,8 +187,9 @@ function view(authorized,allowExport=false,allowImport=false){
  '<label class="budget-filter">Conta<select id="cotas-conta">'+options(state.conta,[['TODAS','Todas'],['998020301','998020301'],['998020302','998020302']])+'</select></label>'+
  '<button type="button" class="btn budget-toggle-zeros" id="cotas-toggle-zeradas" data-action="cotaToggleZeradas" aria-pressed="'+(state.mostrarZeradas?'true':'false')+'">'+(state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas')+'</button>'+
  '<button type="button" class="budget-clear" data-action="cotaClearFilters">Limpar filtros</button></div>'+
+ '<p class="budget-note budget-description-note">Descrições indicativas pela classificação orçamentária. O objeto real deve ser conferido no empenho ou contrato.</p>'+
  '<p class="budget-note" id="cotas-zero-note">'+(state.mostrarZeradas?'Todas as dotações estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).')+'</p>'+
- '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
+ '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Descrição da despesa</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
  '</section>'+dailySection()+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
@@ -203,6 +207,7 @@ function dailySection(){
    const pos=ref?new Date(ref.observado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',
       day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
    return '<tr><td class="budget-dot">'+esc(d._code)+'</td>'+
+   '<td class="budget-description"><strong>'+esc(d._descTitle)+'</strong><small>'+esc(d._descArea)+'</small></td>'+
    '<td class="budget-account">'+esc(d._account)+'</td>'+
    '<td class="budget-value">'+fmt(d._budget)+'</td>'+
    '<td class="budget-value">'+fmt(d._balance)+'</td>'+
@@ -217,7 +222,7 @@ function dailySection(){
   '<p>Elemento 3390.15 · fora da lista de cotas gerenciais para compras e serviços</p></div></div>'+
   '<p class="budget-note">'+esc(textNote)+'</p>'+
   '<div class="table-scroll"><table class="data-table budget-table"><thead><tr>'+
-  '<th>Dotação</th><th>Conta</th><th>Cota BO histórica</th><th>Diferença V6 bruta</th>'+
+  '<th>Dotação</th><th>Descrição da despesa</th><th>Conta</th><th>Cota BO histórica</th><th>Diferença V6 bruta</th>'+
   '<th>Saldo de referência</th><th>Conferência contábil</th><th></th></tr></thead>'+
   '<tbody>'+table+'</tbody></table></div>'+
   '<p class="budget-note">Referência conhecida de diárias incluída SOMENTE no indicador “Referência para conferência”: '+
@@ -228,7 +233,8 @@ function diariaDetail(key){
  const d=dailyRows().find(x=>String(x.dotacao||'')===String(key||''));
  if(!d)return '<p>Dotação de diárias não encontrada na posição da fonte.</p>';
  const ref=dailyRef(d),fields=[
- ['Dotação original',d.dotacao],['Conta de controle',d._account],
+ ['Dotação original',d.dotacao],['Descrição da despesa',d._descTitle],
+ ['Área funcional',d._descArea],['Conta de controle',d._account],
  ['Cota BO original',fmt(d._budget)],['Abatimento V6 original',fmt(d._spent)],
  ['Diferença V6 bruta',fmt(d._balance)],
  ['Referência temporária para o SIG',ref?fmt(Number(ref.saldo_informado_centavos)):'Não confirmada']
@@ -253,6 +259,8 @@ function detail(key){
  const report=data(),d=rows().find(x=>String(x.dotacao||'')===String(key||''));
  if(!report||!d)return '<p>Dotação não encontrada neste relatório.</p>';
  return '<div class="budget-detail-grid"><div><span>Dotação normalizada</span><strong>'+esc(d._code)+'</strong></div>'+
+ '<div><span>Descrição da despesa</span><strong>'+esc(d._descTitle)+'</strong></div>'+
+ '<div><span>Área funcional</span><strong>'+esc(d._descArea)+'</strong></div>'+
  '<div><span>Tipo</span><strong>'+esc(d._type)+'</strong></div>'+
  '<div><span>Conta de controle</span><strong>'+esc(d._account)+'</strong></div>'+
  '<div><span>Documentos de repasse relacionados</span><strong>'+num(d.documentos)+'</strong></div>'+
@@ -265,9 +273,9 @@ function detail(key){
 }
 function exportCSV(){
  if(!data())return false;
- const columns=['Dotação','Tipo','Conta','Cota líquida BO (R$)','Abatimento gerencial V6 (R$)','Diferença gerencial NÃO OFICIAL (R$)'];
+ const columns=['Dotação','Descrição da despesa','Área funcional','Tipo','Conta','Cota líquida BO (R$)','Abatimento gerencial V6 (R$)','Diferença gerencial NÃO OFICIAL (R$)'];
  const quote=t=>'"'+String(t??'').replace(/"/g,'""')+'"';
- const lines=filtered().map(d=>[d._code,d._type,d._account,(d._budget/100).toFixed(2).replace('.',','),(d._spent/100).toFixed(2).replace('.',','),(d._balance/100).toFixed(2).replace('.',',')].map(quote).join(';'));
+ const lines=filtered().map(d=>[d._code,d._descTitle,d._descArea,d._type,d._account,(d._budget/100).toFixed(2).replace('.',','),(d._spent/100).toFixed(2).replace('.',','),(d._balance/100).toFixed(2).replace('.',',')].map(quote).join(';'));
  const body='\uFEFF'+[columns.map(quote).join(';'),...lines].join('\r\n');
  const blob=new Blob([body],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob);
@@ -275,5 +283,5 @@ function exportCSV(){
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  return true;
 }
-window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,diariaDetail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length,getOverview:overview});
+window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,diariaDetail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length,getOverview:overview,getDescription:key=>{const d=allRows().find(x=>x.dotacao===key||x._code===key);return d?{titulo:d._descTitle,area:d._descArea}:null;}});
 })();
