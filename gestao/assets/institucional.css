@@ -591,3 +591,106 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .budget-description-note{margin:0 0 10px!important;color:#68736c}
 .budget-diarias .budget-table td.budget-description{min-width:190px}
 @media(max-width:850px){.budget-table td.budget-description{min-width:170px;max-width:220px}}
+
+
+/* SIG CSA-TIC — Almoxarifado: consulta regional sem polígonos RPM não homologados. */
+.almox-page{max-width:1760px;margin:0 auto;padding-bottom:28px;color:#172a33}
+.almox-page *{box-sizing:border-box}
+.almox-top{display:flex;justify-content:space-between;align-items:center;gap:22px;margin:1px 0 21px}
+.almox-top>div:first-child>span,.almox-eyebrow{font-size:11px;font-weight:800;color:#967c46;letter-spacing:2px}
+.almox-top h1{font:800 clamp(28px,3vw,40px)/1.12 Manrope,Arial,sans-serif;margin:5px 0 6px;color:#162739;letter-spacing:-1px}
+.almox-top p,.almox-panel-heading p{font-size:14px;color:#687b82;margin:0}
+.almox-top-actions{display:flex;flex-wrap:wrap;gap:8px}
+.almox-outline-btn{font:700 12px Manrope,Arial,sans-serif;min-height:39px;border:1px solid #d9d5ca;border-radius:9px;background:#fff;color:#6a582f;padding:0 12px;cursor:pointer}
+.almox-outline-btn:hover{background:#f7f1e4;border-color:#b4985d}
+.almox-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px;margin-bottom:16px}
+.almox-kpi{background:#fff;box-shadow:0 2px 16px #293b4010;border:1px solid #e5e5e0;border-radius:14px;display:flex;align-items:center;gap:14px;min-height:111px;padding:17px}
+.almox-kpi-icon{flex:0 0 55px;height:55px;border-radius:14px;display:grid;place-items:center;font-size:25px;font-weight:800;background:#f5ebd8;color:#9d7739}
+.almox-kpi-1 .almox-kpi-icon{background:#e4f2e9;color:#2b845a}.almox-kpi-2 .almox-kpi-icon{background:#e7eaf9;color:#4a56a5}.almox-kpi-3 .almox-kpi-icon{background:#ffeadf;color:#c65f32}
+.almox-kpi span{font-size:12px;font-weight:750;color:#344651}.almox-kpi strong{display:block;font:800 clamp(21px,2.1vw,31px)/1.15 Manrope,Arial,sans-serif;color:#1a2b43;margin:4px 0}
+.almox-kpi small{font-size:11px;color:#667789}
+.almox-alert{border:1px solid #dccaa1;background:linear-gradient(100deg,#fbf7e9,#fdfbf6);color:#705e37;border-radius:11px;padding:12px 15px;margin-bottom:16px;font-size:12px;line-height:1.7}
+.almox-alert strong{color:#4e462c}
+.almox-unclassified{margin-left:11px;background:transparent;border:0;text-decoration:underline;font:750 12px Manrope,Arial,sans-serif;color:#62542f;cursor:pointer}
+.almox-layout{display:grid;grid-template-columns:minmax(370px,1.1fr) minmax(500px,1fr);gap:14px;align-items:stretch}
+.almox-map-card,.almox-data-card{min-width:0;background:#fff;border-radius:13px;border:1px solid #e5e4de;box-shadow:0 2px 16px #293b4010;padding:16px}
+.almox-map-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.almox-map-heading h2,.almox-panel-heading h2{margin:0;font:800 18px/1.25 Manrope,Arial,sans-serif;color:#182c3f}
+.almox-map-heading p{font-size:11px;color:#718089;margin:5px 0}
+.almox-map-zoom{display:flex;gap:3px;padding:3px;border-radius:9px;background:#f1f1ed}
+.almox-map-zoom button{width:31px;height:31px;border:0;background:#fff;cursor:pointer;border-radius:6px;color:#3d4f53;font-weight:800;font-size:17px}
+.almox-map-zoom button:hover{background:#efe3c9}
+.almox-map-stage{position:relative;min-height:390px;margin:12px 0 3px;border:1px solid #e8e5d8;border-radius:11px;overflow:hidden;background:
+ radial-gradient(circle at 24% 35%,#f9f5e8 0%,transparent 46%),
+ radial-gradient(circle at 70% 60%,#e6e8e0 0%,transparent 70%),#f7f6f1}
+.almox-map-stage:before{content:"";pointer-events:none;position:absolute;inset:0;background-image:linear-gradient(#8d9f9117 1px,transparent 1px),linear-gradient(90deg,#8d9f9117 1px,transparent 1px);background-size:31px 31px;opacity:.38}
+.almox-map-stage svg{display:block;width:100%;height:auto;min-height:390px;aspect-ratio:760/570;touch-action:none;position:relative}
+.almox-map-pin{cursor:pointer;outline:none}.almox-map-pin .almox-pin-halo{fill:#fff;stroke:#ac925d;stroke-width:1.5;opacity:.92}
+.almox-pin-disc{stroke:#fff;stroke-width:2}.almox-map-pin text{font:800 11px Manrope,Arial,sans-serif;fill:#fff;pointer-events:none}
+.almox-map-pin .almox-data-dot{fill:#e4b650;stroke:#fff;stroke-width:1.2}
+.almox-map-pin:hover .almox-pin-halo,.almox-map-pin:focus .almox-pin-halo{stroke:#a07b37;stroke-width:3;fill:#fff4ce}
+.almox-map-pin.selected .almox-pin-halo{fill:#fff0be;stroke:#a07b37;stroke-width:4}
+.almox-map-pin.selected .almox-pin-disc{stroke:#fffbdc;stroke-width:3}
+.almox-map-pin:focus-visible{outline:none}
+.almox-map-wait{height:390px;display:grid;place-items:center;text-align:center;color:#7a786d;padding:28px}
+.almox-map-disclaimer{font-size:11px;line-height:1.6;padding:11px 12px;border-radius:8px;border:1px solid #e9dec3;background:#fffaf0;color:#806a42}
+.almox-map-disclaimer strong{color:#594a31}
+.almox-region-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:13px}
+.almox-region-choice{display:flex;align-items:center;gap:7px;padding:7px;background:#fafaf8;border:1px solid #e7e5dc;border-radius:8px;min-width:0;text-align:left;cursor:pointer}
+.almox-region-choice:hover{border-color:#c3ac78;background:#fcf8ef}
+.almox-region-choice.active{border-color:#9f7c3d;background:#f9f0d9;box-shadow:inset 0 0 0 1px #d3bc89}
+.almox-region-choice i{width:9px;height:9px;border-radius:50%;flex:none}
+.almox-region-choice span{display:block;min-width:0;flex:1}.almox-region-choice b{display:block;color:#34434a;font-size:10px}.almox-region-choice small{display:block;font-size:9px;color:#748082;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.almox-region-choice em{font-size:10px;font-style:normal;font-weight:800;color:#806638;background:#efe7d7;border-radius:5px;padding:2px 4px}
+.almox-data-card{display:flex;flex-direction:column;min-height:630px;padding:17px}
+.almox-panel-heading{display:flex;justify-content:space-between;gap:11px;align-items:start;margin-bottom:13px}
+.almox-panel-heading h2{font-size:20px;margin:4px 0 5px}.almox-panel-heading p{font-size:12px}
+.almox-count{flex:none;padding:8px 10px;border-radius:9px;background:#e9eff9;color:#2e558b;font-size:11px;font-weight:800}
+.almox-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-bottom:13px}
+.almox-filters label{display:flex;flex-direction:column;gap:5px;min-width:0;color:#354955;font-size:11px;font-weight:750}
+.almox-filters select,.almox-filters input{background:#fcfcfc;border:1px solid #dbe0e2;border-radius:8px;padding:9px 8px;font-size:12px;color:#263d4a;min-width:0;outline-color:#ae8b4b}
+.almox-filters .almox-q{grid-column:span 2}
+.almox-table-scroll{overflow-x:auto;border:1px solid #e6e9ea;border-radius:9px;max-width:100%;min-height:170px}
+.almox-table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+.almox-table th{text-align:left;background:#f2f5f6;color:#344758;padding:12px 8px;font-size:10px;font-weight:800;border-bottom:1px solid #e1e8ea}
+.almox-table td{padding:10px 8px;border-bottom:1px solid #e8eded;color:#526778;vertical-align:top}
+.almox-table tr:hover td{background:#fff9ed}
+.almox-table td b,.almox-table td strong{color:#243a54;font-weight:750}
+.almox-table td small{display:block;font-size:10px;color:#89949b;margin-top:4px}
+.almox-value{text-align:right;font-variant-numeric:tabular-nums}
+.almox-neutral-status{display:inline-block;background:#f2f2ef;color:#777d7b;border:1px solid #e5e8e4;border-radius:20px;padding:5px 8px}
+.almox-view{white-space:nowrap;background:none;border:0;font-weight:800;color:#9a7a39;font-size:11px;cursor:pointer}
+.almox-view:hover{text-decoration:underline}
+.almox-state{border:1px dashed #cfd8d5;padding:30px 14px;text-align:center;color:#78827f;font-size:12px;border-radius:9px;margin:10px 0}
+.almox-state .btn{display:block;margin:12px auto 0}
+.almox-panel-footer{display:flex;justify-content:space-between;align-items:center;gap:9px;margin-top:12px;color:#788889;font-size:11px}
+.almox-panel-footer button{background:#fff;border:1px solid #e0e5e6;border-radius:7px;padding:5px 12px;cursor:pointer;color:#657273;font-size:19px}
+.almox-panel-footer button:disabled{opacity:.4;cursor:default}
+.almox-panel-note{color:#78877d;font-size:10px;line-height:1.65;border-top:1px solid #eef0ec;margin-top:15px;padding-top:12px}
+.almox-foot-source{margin-top:13px;font-size:11px;color:#7b8989}
+.almox-details-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:12px}
+.almox-details-grid div{background:#f9f9f5;border:1px solid #e7e9e1;padding:12px;border-radius:9px;min-width:0}
+.almox-details-grid small{display:block;color:#7d8989;font-size:10px;margin-bottom:5px}
+.almox-details-grid strong{font-size:12px;color:#293e49;line-height:1.5;overflow-wrap:anywhere}
+@media(max-width:1450px){
+ .almox-layout{grid-template-columns:minmax(320px,1fr) minmax(420px,1fr)}
+ .almox-region-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:1150px){
+ .almox-layout{grid-template-columns:minmax(0,1fr)}
+ .almox-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .almox-region-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:720px){
+ .almox-top{flex-direction:column;align-items:stretch}
+ .almox-kpis{gap:8px}
+ .almox-kpi{padding:12px;min-height:95px;gap:9px}
+ .almox-kpi-icon{flex-basis:39px;height:39px;font-size:19px}
+ .almox-kpi strong{font-size:22px}.almox-kpi span{font-size:11px}.almox-kpi small{font-size:10px}
+ .almox-region-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .almox-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .almox-data-card,.almox-map-card{padding:12px}
+ .almox-map-heading h2{font-size:15px}
+ .almox-details-grid{grid-template-columns:1fr}
+}
+@media(max-width:450px){.almox-kpis{grid-template-columns:1fr 1fr}.almox-kpi-icon{display:none}.almox-top-actions .almox-outline-btn{flex:1}}
