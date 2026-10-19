@@ -17,7 +17,13 @@ const SIG_FONTE_ATUAL = Object.freeze({
     'IMPORT_PROCESSOS_HOMOLOGADOS',
     'IMPORT_EXECUCAO_DESPESA_BO',
     'SALDO_ATUAL_DOTACOES_EMPENHOS',
-    'DASHBOARD'
+    'DASHBOARD',
+    'SIG_V6_RESUMO',
+    'SIG_V6_DOTACOES',
+    'SIG_V6_ABATIMENTOS',
+    'SIG_V6_ALERTAS',
+    'SIG_V6_CORRECOES_APROVADAS',
+    'SIG_V6_ALOCACOES_APROVADAS'
   ],
   maxLinhas: 3000,
   maxColunas: 60
@@ -60,8 +66,24 @@ function sigFonteBaixarJSON() {
     const linhas=contents.filter(row=>row.some(value=>String(value).trim()!==''));
     return {aba:nome,cabecalhos,linhas};
   });
+  // Não permitir exportar um dashboard sem relatório V6 completo e correspondente.
+  const find=n=>abas.find(a=>a.aba===n);
+  const resumo=find('SIG_V6_RESUMO'),dash=find('DASHBOARD'),abat=find('SIG_V6_ABATIMENTOS');
+  const resumoK=Object.fromEntries(resumo.linhas.map(r=>[r[0],r[1]]));
+  const cents=v=>{
+    const t=String(v||'').trim().replace(/^R\\$\\s*/,'');
+    if(!/^-?(?:\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:,\\d{1,2})?$/.test(t))
+      throw new Error('Valor monetário inválido: '+v);
+    return Math.round(Number(t.replace(/\\./g,'').replace(',','.'))*100);
+  };
+  const col=Object.fromEntries(dash.cabecalhos.map((v,i)=>[v,i]));
+  const qtd=abat.linhas.filter(r=>r[7]==='ABATIDO_GLOBAL'||r[7]==='ABATIDO_ESPECIFICA').length;
+  const gasto=dash.linhas.reduce((n,r)=>n+cents(r[col.TOTAL_EMPENHADO]),0);
+  const informado=cents(resumoK['Abatimento gerencial (R$)']);
+  if(qtd!==Number(resumoK['Empenhos atribuídos segundo regra V6'])||gasto!==informado)
+    throw new Error('Snapshot recusado: DASHBOARD difere da conciliação V6. Gere e publique novamente a conciliação.');
   const snapshot={
-    formato:'SIG_FONTE_ATUAL_V2',origem_id:SIG_FONTE_ATUAL.id,
+    formato:'SIG_FONTE_ATUAL_V3',origem_id:SIG_FONTE_ATUAL.id,
     origem_nome:SIG_FONTE_ATUAL.nome,gerado_em:new Date().toISOString(),abas
   };
   const raw=JSON.stringify(snapshot);
