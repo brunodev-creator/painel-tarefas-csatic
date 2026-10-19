@@ -1,7 +1,7 @@
 /**
  * SIG CSA-TIC V5 — extrator local e independente do importador atual.
  * NÃO acessa o Gmail, NÃO envia dados para servidores externos, NÃO modifica as 39 abas originais.
- * Instale como arquivo NOVO (.gs) em Extensões > Apps Script da planilha saldos_2_0.
+ * Instale como arquivo NOVO (.gs) em Extensões > Apps Script da planilha agora vai - PLANILHA ATUAL.
  *
  * Depois de executar sigV5InstalarMenu() uma vez: Menu SIG V5 (prévia) -> Gerar análise / Registrar versão / Baixar prévia JSON.
  * A análise somente escreve a aba SIG_V5_PREVIA. Registrar versão é opt-in.
