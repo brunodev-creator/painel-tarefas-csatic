@@ -567,3 +567,19 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .budget-toolbar .budget-toggle-zeros{align-self:flex-end;min-height:42px;padding:0 16px;white-space:nowrap}
 #cotas-zero-note{margin:-6px 0 14px;font-size:11px;color:#6d726d}
 @media(max-width:480px){.budget-toolbar .budget-toggle-zeros{flex:1 1 100%}}
+
+/* Diárias: classificação e referência contábil separadas da conciliação de cotas */
+.budget-hero-diarias{grid-template-columns:repeat(4,minmax(0,1fr))}
+.budget-hero-diarias .budget-card{padding:16px;min-height:120px;gap:12px}
+.budget-hero-diarias .budget-icon{width:52px;height:52px}
+.budget-hero-diarias .budget-label{font-size:13px;line-height:1.45}
+.budget-hero-diarias .budget-card strong{font-size:clamp(18px,1.45vw,24px)}
+.budget-diarias-explanation{margin:-6px 0 18px}
+.budget-diarias{margin-top:18px}
+.budget-diarias .budget-panel-head{margin-bottom:8px}
+.budget-diarias .budget-panel-head h2{font:800 22px Manrope,Arial,sans-serif;color:#182123}
+.budget-diarias .budget-note{margin:10px 0 16px}
+.budget-daily-date{display:block;margin-top:4px;font-size:11px;color:#65726b}
+.budget-unconfirmed{color:#7b7162;font-size:12px}
+@media(max-width:1300px){.budget-hero-diarias{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.budget-hero-diarias{grid-template-columns:1fr}}
