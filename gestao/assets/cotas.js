@@ -7,7 +7,7 @@ const state={q:'',tipo:'TODOS',conta:'TODAS',cloudPhase:'idle',cloudError:'',clo
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const fmt=cents=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(cents)/100);
-const data=()=>state.cloudReport||window.SIG_V6?.getData?.()||null;
+const data=()=>['loading','error'].includes(state.cloudPhase)?null:(state.cloudReport||window.SIG_V6?.getData?.()||null);
 const FONTE_ID='1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA';
 function money(v){
  const s=String(v??'').trim(),m=s.match(/^(-)?(?:R\$\s*)?(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/);
