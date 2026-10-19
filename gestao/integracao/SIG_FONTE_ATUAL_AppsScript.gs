@@ -71,10 +71,10 @@ function sigFonteBaixarJSON() {
   const resumo=find('SIG_V6_RESUMO'),dash=find('DASHBOARD'),abat=find('SIG_V6_ABATIMENTOS');
   const resumoK=Object.fromEntries(resumo.linhas.map(r=>[r[0],r[1]]));
   const cents=v=>{
-    const t=String(v||'').trim().replace(/^R\\$\\s*/,'');
-    if(!/^-?(?:\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:,\\d{1,2})?$/.test(t))
+    const t=String(v||'').trim().replace(/^R\$\s*/,'');
+    if(!/^-?(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{1,2})?$/.test(t))
       throw new Error('Valor monetário inválido: '+v);
-    return Math.round(Number(t.replace(/\\./g,'').replace(',','.'))*100);
+    return Math.round(Number(t.replace(/\./g,'').replace(',','.'))*100);
   };
   const col=Object.fromEntries(dash.cabecalhos.map((v,i)=>[v,i]));
   const qtd=abat.linhas.filter(r=>r[7]==='ABATIDO_GLOBAL'||r[7]==='ABATIDO_ESPECIFICA').length;
