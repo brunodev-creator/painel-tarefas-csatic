@@ -21,7 +21,7 @@ const SIGV6 = Object.freeze({
  abatimentos:'SIG_V6_ABATIMENTOS'}
 });
 function sigV6InstalarMenu(){
- const ss=SpreadsheetApp.getActiveSpreadsheet();
+ const ss=sigV6VerificarOrigemAtual_();
  const exists=ScriptApp.getProjectTriggers().some(t=>
    t.getHandlerFunction()==='sigV6Menu' && t.getEventType()===ScriptApp.EventType.ON_OPEN);
  if(!exists)ScriptApp.newTrigger('sigV6Menu').forSpreadsheet(ss).onOpen().create();
@@ -306,6 +306,7 @@ function sigV6Sha_(v){
  return bytes.map(b=>('0'+(b<0?b+256:b).toString(16)).slice(-2)).join('');
 }
 function sigV6Construir_(){
+ sigV6VerificarOrigemAtual_();
  const now=new Date().toISOString(),notices=[],max=SIGV6.maxAlerts;
  const alert=(nivel,codigo,aba,linha,mensagem)=>{
   if(notices.length<max)notices.push({nivel,codigo,aba,linha,mensagem});
