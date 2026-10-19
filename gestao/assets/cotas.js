@@ -137,7 +137,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
- '</section>'+(report._dashboard?(window.SIG_COTAS_AUD?.view()||''):'')+'</div>';
+ '</section>'+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
 }
 function filter(name,value){
  if(name==='q')state.q=String(value||'').slice(0,100);
