@@ -47,11 +47,14 @@ async function load(rest,force=false){
  try{
    const items=await rest('/rest/v1/sig_planilha_snapshots?aba=eq.DASHBOARD&select=aba,origem_id,cabecalhos,linhas,quantidade,gerado_em,importado_em&limit=1');
    if(!items?.[0])throw Error('DASHBOARD ainda não foi importado para o SIG.');
-   state.cloudReport=dashboardReport(items[0]);state.cloudPhase='ready';
+   const parsed=dashboardReport(items[0]);
+   if(!window.SIG_COTAS_AUD)throw Error('Módulo de conciliação contábil não foi carregado. Atualize a página.');
+   await window.SIG_COTAS_AUD.load(rest,parsed);
+   state.cloudReport=parsed;state.cloudPhase='ready';
  }catch(e){state.cloudReport=null;state.cloudPhase='error';state.cloudError=e.message||String(e);}
  return true;
 }
-function resetCloud(){state.cloudPhase='idle';state.cloudError='';state.cloudReport=null;}
+function resetCloud(){state.cloudPhase='idle';state.cloudError='';state.cloudReport=null;window.SIG_COTAS_AUD?.reset();}
 function isLoaded(){return state.cloudPhase!=='idle';}
 const own=(d,k)=>Object.prototype.hasOwnProperty.call(d,k);
 const dotString=d=>d.dotacao_exibicao||formatDot(d.dotacao);
@@ -110,7 +113,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
  const s=report.resumo||{},budget=num(s.cota_liquida_centavos),spent=num(s.valor_abatido_gerencial_centavos),balance=budget-spent;
  const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · '+
- (report._dashboard?'DASHBOARD da PLANILHA ATUAL (extração '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Os números seguem a conciliação gerencial V6 (global/específica, TDCO e correções conferidas). Não representam saldo oficial.':
+ (report._dashboard?'DASHBOARD + conciliação V6 da PLANILHA ATUAL (snapshot '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Valores conciliados com empenhos e decisões manuais da V6. Não representam saldo oficial.':
  'Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'.')+
  ' Consulte a posição atual no SIAFI-MG antes de decidir operacionalmente.'+
  (report._dashboard?' <button type="button" class="budget-link" data-action="cotaReload">Atualizar consulta</button>':'')+
@@ -133,8 +136,8 @@ function view(authorized,allowExport=false,allowImport=false){
  '<button type="button" class="budget-clear" data-action="cotaClearFilters">Limpar filtros</button></div>'+
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
- '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição '+esc(date(s.referencia_cotas_data))+'</span></div>'+
- '</section></div>';
+ '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
+ '</section>'+(report._dashboard?(window.SIG_COTAS_AUD?.view()||''):'')+'</div>';
 }
 function filter(name,value){
  if(name==='q')state.q=String(value||'').slice(0,100);
@@ -154,7 +157,8 @@ function detail(key){
  '<div><span>Abatimento gerencial V6</span><strong>'+fmt(d._spent)+'</strong></div>'+
  '<div><span>Diferença gerencial não oficial</span><strong>'+fmt(d._balance)+'</strong></div>'+
  '<div class="budget-detail-original"><span>Registro(s) original(is) da cota</span><small>'+esc((d.origens_bo||[]).join(' | ')||'Não informado')+'</small></div></div>'+
- '<p class="budget-note">'+(report._dashboard?'Consolidação gerencial V6 aplicada sobre o DASHBOARD da PLANILHA ATUAL;':'Valores gerenciais calculados com base na posição importada;')+' consulte a posição oficial atual antes de decidir sobre empenhos.</p>';
+ '<p class="budget-note">'+(report._dashboard?'Consolidação gerencial V6 aplicada sobre o DASHBOARD da PLANILHA ATUAL;':'Valores gerenciais calculados com base na posição importada;')+' consulte a posição oficial atual antes de decidir sobre empenhos.</p>'+
+ (report._dashboard?(window.SIG_COTAS_AUD?.dotDetail(key)||''):'');
 }
 function exportCSV(){
  if(!data())return false;
