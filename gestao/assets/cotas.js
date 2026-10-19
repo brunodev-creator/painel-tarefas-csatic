@@ -1,13 +1,58 @@
-/* Tela institucional de cotas. Consome SOMENTE o relatório V6 já carregado em memória.
- * Não utiliza fetch, localStorage ou serviços externos.
- */
+/* Saldos por dotação. Fonte prioritária: DASHBOARD autenticado da PLANILHA ATUAL
+ * (snapshot protegido no Supabase). A conciliação V6 permanece separada e local.
+ * Nenhuma escrita ou publicação de dados financeiros pelo navegador. */
 (() => {
 'use strict';
-const state={q:'',tipo:'TODOS',conta:'TODAS'};
+const state={q:'',tipo:'TODOS',conta:'TODAS',cloudPhase:'idle',cloudError:'',cloudReport:null};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const num=v=>Number.isFinite(Number(v))?Number(v):0;
 const fmt=cents=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(num(cents)/100);
-const data=()=>window.SIG_V6?.getData?.()||null;
+const data=()=>state.cloudReport||window.SIG_V6?.getData?.()||null;
+const FONTE_ID='1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA';
+function money(v){
+ const s=String(v??'').trim(),m=s.match(/^(-)?(?:R\\$\\s*)?(\\d{1,3}(?:\\.\\d{3})+|\\d+)(?:,(\\d{1,2}))?$/);
+ if(!m)return null;
+ const n=Number(m[2].replace(/\\./g,''))*100+Number((m[3]||'').padEnd(2,'0'));
+ return Number.isSafeInteger(n)?(m[1]?-n:n):null;
+}
+function dashboardReport(item){
+ if(!item||item.aba!=='DASHBOARD'||item.origem_id!==FONTE_ID)throw Error('Origem do DASHBOARD não corresponde à PLANILHA ATUAL.');
+ const h=item.cabecalhos||[], source=item.linhas||[];
+ const cols=['Dotacao','Total_Repassado_Dotacao','TOTAL_EMPENHADO','Saldo_A_Destinar','Qtd_Docs_Repasse'];
+ const idx=cols.map(k=>h.indexOf(k));
+ if(idx.some(i=>i<0)||!Array.isArray(source)||source.length!==Number(item.quantidade))throw Error('Estrutura do DASHBOARD incompleta.');
+ const dotacoes=source.map((row,k)=>{
+   const raw=String(row[idx[0]]||'').trim(),p=raw.split('.');
+   if(p.length!==11||!/^[0-9]{4}$/.test(p[7]))throw Error('Dotação inválida na linha '+(k+9)+'.');
+   const glob=/^00[0-9]{2}$/.test(p[7])||p[7].slice(2)==='00';
+   const display=p.slice();if(glob)display[7]=(/^00/.test(p[7])?p[7].slice(2):p[7].slice(0,2))+'XX';
+   const vals=[idx[1],idx[2],idx[3]].map(i=>money(row[i]));
+   if(vals.some(n=>n===null)||Math.abs(vals[0]-vals[1]-vals[2])>1)throw Error('Valores divergentes na dotação '+raw+'.');
+   return {dotacao:raw,dotacao_exibicao:display.join('.'),tipo_dotacao:glob?'GLOBAL':'ITEM_DEFINIDO',
+     conta_controle:glob?'998020301':'998020302',
+     cotas_centavos:vals[0],abatido_sig_centavos:vals[1],
+     documentos:Number(row[idx[4]]||0),origens_bo:[raw]};
+ });
+ const budget=dotacoes.reduce((n,x)=>n+x.cotas_centavos,0);
+ const spent=dotacoes.reduce((n,x)=>n+x.abatido_sig_centavos,0);
+ const t=item.gerado_em||item.importado_em||'';
+ return {_dashboard:true,gerado_em:t,
+   resumo:{cota_liquida_centavos:budget,valor_abatido_gerencial_centavos:spent,
+     referencia_cotas_data:/^\\d{4}-\\d{2}-\\d{2}/.test(t)?t.slice(0,10):''},
+   dotacoes};
+}
+async function load(rest,force=false){
+ if(state.cloudPhase==='loading'||(state.cloudPhase==='ready'&&!force))return false;
+ state.cloudPhase='loading';state.cloudError='';
+ try{
+   const items=await rest('/rest/v1/sig_planilha_snapshots?aba=eq.DASHBOARD&select=aba,origem_id,cabecalhos,linhas,quantidade,gerado_em,importado_em&limit=1');
+   if(!items?.[0])throw Error('DASHBOARD ainda não foi importado para o SIG.');
+   state.cloudReport=dashboardReport(items[0]);state.cloudPhase='ready';
+ }catch(e){state.cloudReport=null;state.cloudPhase='error';state.cloudError=e.message||String(e);}
+ return true;
+}
+function resetCloud(){state.cloudPhase='idle';state.cloudError='';state.cloudReport=null;}
+function isLoaded(){return state.cloudPhase!=='idle';}
 const own=(d,k)=>Object.prototype.hasOwnProperty.call(d,k);
 const dotString=d=>d.dotacao_exibicao||formatDot(d.dotacao);
 function formatDot(value){
@@ -57,12 +102,19 @@ const date=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||'')?iso.slice(8,10)+'/'+iso.slic
 function view(authorized,allowExport=false,allowImport=false){
  if(!authorized)return '<div class="card section"><h2>Acesso restrito</h2><p class="sub">A consulta de cotas orçamentárias não está habilitada para este perfil.</p></div>';
  const report=data();
+ if(!report&&state.cloudPhase==='loading')return '<div class="budget-page"><div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> Saldos por dotação</div><div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>Carregando os dados autorizados da PLANILHA ATUAL...</p></div></div>';
+ if(!report&&state.cloudPhase==='error')return '<div class="budget-page"><div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> Saldos por dotação</div><div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>Falha ao consultar o DASHBOARD protegido: '+esc(state.cloudError)+'</p><button type="button" class="btn primary" data-action="cotaReload">Tentar novamente</button></div></div>';
  if(!report)return '<div class="budget-page"><div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> Saldos por dotação</div>'+
  '<div class="card budget-empty-state"><h1>Saldos por dotação</h1><p>'+ (allowImport?'Para visualizar dados reais, importe um relatório V6 no módulo de conciliação.':'Nenhum relatório de cotas está disponível nesta sessão. A consulta exibirá os saldos quando houver um relatório V6 disponível neste navegador.') +'</p>'+
  (allowImport?'<button type="button" class="btn primary" data-view="conciliacao">Abrir Conciliação V6</button>':'')+
  '<p class="budget-note">Os relatórios V6 são atualmente locais ao navegador e não são compartilhados automaticamente entre usuários. Nenhum valor fictício será exibido como saldo oficial.</p></div></div>';
  const s=report.resumo||{},budget=num(s.cota_liquida_centavos),spent=num(s.valor_abatido_gerencial_centavos),balance=budget-spent;
- const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'. Consulte a posição atual do SIAFI-MG antes de decidir operacionalmente.</div></div>';
+ const warning='<div class="budget-alert"><span class="budget-alert-icon" aria-hidden="true">i</span><div><strong>Posição histórica</strong> · '+
+ (report._dashboard?'DASHBOARD da PLANILHA ATUAL (extração '+esc(report.gerado_em?new Date(report.gerado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):'não informada')+'). Os números são os consolidados da planilha, não a conciliação V6.':
+ 'Última importação de cotas: '+esc(date(s.referencia_cotas_data))+'.')+
+ ' Consulte a posição atual no SIAFI-MG antes de decidir operacionalmente.'+
+ (report._dashboard?' <button type="button" class="budget-link" data-action="cotaReload">Atualizar consulta</button>':'')+
+ '</div></div>';
  const kpi=(type,ico,val)=>'<div class="card budget-card"><div class="budget-icon">'+ico+'</div><div><div class="budget-label">'+type+'</div><strong>'+fmt(val)+'</strong></div></div>';
  const icon1='<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v6c0 4 16 4 16 0v-6"/></svg>';
  const icon2='<svg viewBox="0 0 24 24" width="25" height="25" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h6"/></svg>';
@@ -72,7 +124,7 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> <b>Saldos por dotação</b></div>'+
  warning+
  '<div class="budget-hero">'+kpi('Orçamentário',icon1,budget)+kpi('Valor empenhado',icon2,spent)+kpi('Saldo atual',icon3,balance)+'</div>'+
- '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária</p></div>'+
+ '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária'+(report._dashboard?' · Fonte: DASHBOARD da PLANILHA ATUAL':' · Fonte: Conciliação V6 local')+'</p></div>'+
  (allowExport?'<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button>':'')+'</div>'+
  '<div class="budget-toolbar">'+
  '<label class="budget-search"><span aria-hidden="true">⌕</span><input type="search" id="cotas-busca" placeholder="Buscar dotação, conta ou descrição..." value="'+esc(state.q)+'" aria-label="Buscar dotação ou conta"></label>'+
@@ -102,7 +154,7 @@ function detail(key){
  '<div><span>Valor empenhado</span><strong>'+fmt(d._spent)+'</strong></div>'+
  '<div><span>Saldo atual (posição histórica)</span><strong>'+fmt(d._balance)+'</strong></div>'+
  '<div class="budget-detail-original"><span>Registro(s) original(is) da cota</span><small>'+esc((d.origens_bo||[]).join(' | ')||'Não informado')+'</small></div></div>'+
- '<p class="budget-note">Valores gerenciais calculados com base na posição importada. Consulte a posição oficial atual antes de decidir sobre empenhos.</p>';
+ '<p class="budget-note">'+(report._dashboard?'Valores do DASHBOARD importado da PLANILHA ATUAL, sem conciliação V6;':'Valores gerenciais calculados com base na posição importada;')+' consulte a posição oficial atual antes de decidir sobre empenhos.</p>';
 }
 function exportCSV(){
  if(!data())return false;
@@ -116,5 +168,5 @@ function exportCSV(){
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  return true;
 }
-window.SIG_COTAS=Object.freeze({view,filter,clear,detail,exportCSV,getCount:()=>rows().length});
+window.SIG_COTAS=Object.freeze({view,filter,clear,detail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length});
 })();
