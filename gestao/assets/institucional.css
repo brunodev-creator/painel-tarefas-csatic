@@ -583,3 +583,11 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .budget-unconfirmed{color:#7b7162;font-size:12px}
 @media(max-width:1300px){.budget-hero-diarias{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.budget-hero-diarias{grid-template-columns:1fr}}
+
+/* Cotas: breve interpretação contábil por natureza, item e área funcional. */
+.budget-table td.budget-description{min-width:195px;max-width:250px;vertical-align:middle}
+.budget-description strong{display:block;font-weight:700;font-size:12px;line-height:1.45;color:#263833}
+.budget-description small{display:block;margin-top:4px;font-size:11px;line-height:1.4;color:#68756d}
+.budget-description-note{margin:0 0 10px!important;color:#68736c}
+.budget-diarias .budget-table td.budget-description{min-width:190px}
+@media(max-width:850px){.budget-table td.budget-description{min-width:170px;max-width:220px}}
