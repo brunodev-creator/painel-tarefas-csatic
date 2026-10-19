@@ -21,7 +21,7 @@ const REGIOES=Object.freeze([
  {id:'18',nome:'18ª RPM',sede:'Poços de Caldas',lon:-46.5628,lat:-21.7801,cor:'#b56d42'},
  {id:'19',nome:'19ª RPM',sede:'Sete Lagoas',lon:-44.2467,lat:-19.4663,cor:'#b0984e'}
 ]);
-const state={phase:'idle',error:'',registros:[],geo:null,geoStatus:'idle',selected:null,
+const state={phase:'idle',error:'',registros:[],geo:null,territory:null,geoStatus:'idle',selected:null,
  year:'TODOS',status:'TODOS',type:'TODOS',destination:'TODOS',q:'',subrpm:'TODOS',
  sort:'novo',page:1,pageSize:8,zoom:1,x:0,y:0};
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
@@ -54,14 +54,28 @@ function normalize(row){
 async function loadMap(force=false){
  if(state.geoStatus==='loading'||(state.geoStatus==='ready'&&!force))return false;
  state.geoStatus='loading';
- try{
-  const response=await fetch('./assets/maps/mg-ibge-contorno.geojson',{cache:'force-cache'});
-  if(!response.ok)throw Error('Falha HTTP '+response.status);
-  const shape=await response.json(),features=shape?.features||[];
-  const mg=features.find(f=>f.properties?.sigla==='MG'||f.properties?.cd_geocuf==='31');
-  if(!mg||!['Polygon','MultiPolygon'].includes(mg.geometry?.type))throw Error('O contorno MG não passou pela validação GeoJSON.');
-  state.geo=mg.geometry;state.geoStatus='ready';
- }catch(e){state.geo=null;state.geoStatus='error';}
+ // Primeiro carregar polígonos esquemáticos traçados sobre a referência do usuário.
+ // Caso a camada não seja carregada, conservar o contorno IBGE e os seletores originais.
+ const [schematic,stateBorder]=await Promise.allSettled([
+   fetch('./assets/maps/rpm-regioes-aproximadas.json',{cache:'no-store'}).then(async res=>{
+     if(!res.ok)throw Error('Regiões não disponíveis: '+res.status);
+     const d=await res.json(),ids=['RMBH',...Array.from({length:16},(_,i)=>String(i+4))];
+     if(d.viewBox!=='0 0 900 737'||Object.keys(d.polygons||{}).length!==17||
+       ids.some(id=>!/^M[0-9,\s]+Z$/.test(d.polygons[id]||'')||
+       !Array.isArray(d.centers?.[id])||d.centers[id].length!==2))
+        throw Error('A camada esquemática não contém as 17 áreas esperadas.');
+     return d;
+   }),
+   fetch('./assets/maps/mg-ibge-contorno.geojson',{cache:'force-cache'}).then(async res=>{
+     if(!res.ok)throw Error('Limite estadual indisponível');
+     const d=await res.json(),mg=(d.features||[]).find(f=>f.properties?.sigla==='MG'||f.properties?.cd_geocuf==='31');
+     if(!mg||!['Polygon','MultiPolygon'].includes(mg.geometry?.type))throw Error('GeoJSON estadual inválido');
+     return mg.geometry;
+   })
+ ]);
+ state.territory=schematic.status==='fulfilled'?schematic.value:null;
+ state.geo=stateBorder.status==='fulfilled'?stateBorder.value:null;
+ state.geoStatus=state.territory||state.geo?'ready':'error';
  return true;
 }
 async function load(rest,force=false){
@@ -148,38 +162,58 @@ function boundary(){
  return {path:polys,project};
 }
 function mapHtml(){
- const geo=boundary(),points=pointRows();
- const pins=state.geo?points.map(r=>{
-  const [x,y]=geo.project([r.lon,r.lat]);const selected=state.selected===r.id,has=r.count>0;
-  const sign=r.id==='RMBH'?'BH':r.id;
-  return '<g class="almox-map-pin'+(selected?' selected':'')+(has?' has-data':'')+
-   '" data-action="almoxPick" data-rpm="'+escape(r.id)+'" role="button" tabindex="0" aria-label="'+escape(r.nome+' · '+r.sede+' · '+r.count+' registros')+
-   '" transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+')">'+
-   '<title>'+escape(r.nome+' — referência de localização: '+r.sede+' · '+r.count+' registros vinculados')+'</title>'+
+ const points=pointRows(),approx=state.territory;
+ const fallback=boundary();
+ const fallbackPins=state.geo?points.map(r=>{
+  const [x,y]=fallback.project([r.lon,r.lat]),selected=state.selected===r.id;
+  return '<g class="almox-map-pin'+(selected?' selected':'')+
+   '" data-action="almoxPick" data-rpm="'+escape(r.id)+'" role="button" tabindex="0" aria-label="'+escape(r.nome)+'" transform="translate('+x.toFixed(1)+' '+y.toFixed(1)+')">'+
+   '<title>'+escape(r.nome+' · '+r.sede+' · '+r.count+' registros')+'</title>'+
    '<circle class="almox-pin-halo" r="18"/><circle class="almox-pin-disc" r="14" fill="'+escape(r.cor)+'"/>'+
-   '<text text-anchor="middle" dy="4">'+escape(sign)+'</text>'+
-   (has?'<circle r="4.5" class="almox-data-dot" cx="12" cy="-12"/>':'')+'</g>';
+   '<text text-anchor="middle" dy="4">'+escape(r.id==='RMBH'?'BH':r.id)+'</text></g>';
  }).join(''):'';
- return '<div class="almox-map-card"><div class="almox-map-heading"><div><h2>Mapa das Regiões de Polícia Militar</h2>'+
- '<p>Contorno de Minas Gerais · referências das sedes regionais</p></div>'+
- '<div class="almox-map-zoom"><button type="button" data-action="almoxZoomIn" aria-label="Aproximar mapa">+</button>'+
- '<button type="button" data-action="almoxZoomOut" aria-label="Afastar mapa">−</button>'+
- '<button type="button" data-action="almoxZoomReset" aria-label="Reenquadrar mapa">⤢</button></div></div>'+
- '<div class="almox-map-stage">'+
- (state.geo?'<svg id="almox-map-svg" viewBox="0 0 760 570" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Contorno geográfico real de Minas Gerais, com marcadores de referência das sedes das 17 seleções regionais">'+
- '<defs><linearGradient id="almox-map-fill" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="#eee3c6"/><stop offset="100%" stop-color="#b9c5ad"/></linearGradient>'+
- '<filter id="almox-map-shadow"><feDropShadow dx="1" dy="7" stdDeviation="8" flood-color="#1c3328" flood-opacity=".3"/></filter></defs>'+
- '<g id="almox-map-transform">'+
- '<path d="'+escape(geo.path)+'" fill="url(#almox-map-fill)" stroke="#637263" stroke-width="1.6" stroke-linejoin="round" filter="url(#almox-map-shadow)"/>'+
- '<path d="'+escape(geo.path)+'" fill="none" stroke="#fff9ea" stroke-width=".8" opacity=".9"/>'+
- pins+'</g></svg>':
- '<div class="almox-map-wait">'+(state.geoStatus==='error'?'Contorno geográfico indisponível. Use a lista regional abaixo.':'Carregando contorno geográfico verificado…')+'</div>')+
- '</div>'+
- '<div class="almox-map-disclaimer"><strong>Limites das RPM ainda não homologados.</strong> Os pontos permitem a seleção, mas não representam áreas ou fronteiras de policiamento. '+
- 'A geometria exibida é somente o limite estadual derivado da malha IBGE.</div>'+
- '<div class="almox-region-grid">'+points.map(p=>'<button type="button" data-action="almoxPick" data-rpm="'+escape(p.id)+'" class="almox-region-choice'+(state.selected===p.id?' active':'')+'">'+
- '<i style="background:'+escape(p.cor)+'"></i><span><b>'+escape(p.id==='RMBH'?'RMBH':p.id+'ª RPM')+'</b><small>'+escape(p.sede)+'</small></span><em>'+p.count+'</em></button>').join('')+'</div>'+
- '</div>';
+ // Os polígonos não são georreferenciados: são vetorizados da imagem referencial.
+ // As 17 formas são clicáveis; RMBH preserva [1,2,3] no filtro/banco.
+ const regions=approx?points.map(r=>{
+  const id=r.id,selected=state.selected===id,[x,y]=approx.centers[id];
+  const name=id==='RMBH'?'RMBH':id+'ª RPM';
+  return '<path class="almox-rpm-region'+(selected?' selected':'')+(r.count?' has-data':'')+
+   '" d="'+escape(approx.polygons[id])+'" fill="'+escape(r.cor)+'"'+
+   ' data-action="almoxPick" data-rpm="'+escape(id)+'" role="button" tabindex="0"'+
+   ' aria-label="'+escape(name+', '+r.sede+', '+r.count+' destinações')+'">'+
+   '<title>'+escape(name+' — '+r.sede+' · '+r.count+' destinações identificadas')+'</title></path>';
+ }).join(''):'';
+ const labels=approx?points.map(r=>{
+  const [x,y]=approx.centers[r.id],name=r.id==='RMBH'?'RMBH':r.id+'ª';
+  const selected=state.selected===r.id;
+  const w=r.id==='RMBH'?59:40;
+  return '<g class="almox-rpm-label'+(selected?' selected':'')+'" data-region-label="'+escape(r.id)+'" transform="translate('+x+' '+y+')">'+
+   '<rect x="'+(-w/2)+'" y="-14" width="'+w+'" height="28" rx="7"/>'+
+   '<text text-anchor="middle" dy="4.5">'+escape(name)+'</text>'+
+   (r.count?'<circle cx="'+(w/2-2)+'" cy="-11" r="4" class="almox-rpm-count-dot"/>':'')+'</g>';
+ }).join(''):'';
+ const shape=approx?
+  '<svg id="almox-map-svg" viewBox="0 0 900 737" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Mapa esquemático com 17 áreas aproximadas das RPM e RMBH clicáveis">'+
+  '<defs><filter id="almox-map-shadow"><feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#143b31" flood-opacity=".24"/></filter></defs>'+
+  '<g id="almox-map-transform">'+regions+labels+'</g></svg>':
+  state.geo?
+  '<svg id="almox-map-svg" viewBox="0 0 760 570" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Contorno estadual, com seleção regional por marcadores">'+
+  '<g id="almox-map-transform"><path d="'+escape(fallback.path)+'" fill="#d1dabb" stroke="#718373" stroke-width="2"/>'+fallbackPins+'</g></svg>':
+  '<div class="almox-map-wait">'+(state.geoStatus==='error'?'Camada cartográfica indisponível. Use a lista regional abaixo.':'Carregando o mapa das regiões…')+'</div>';
+ return '<div class="almox-map-card"><div class="almox-map-heading"><div><h2>Mapa das Regiões da Polícia Militar</h2>'+
+  '<p>17 áreas selecionáveis · RMBH = 1ª, 2ª e 3ª RPM</p></div>'+
+  '<div class="almox-map-zoom"><button type="button" data-action="almoxZoomIn" aria-label="Aproximar mapa">+</button>'+
+  '<button type="button" data-action="almoxZoomOut" aria-label="Afastar mapa">−</button>'+
+  '<button type="button" data-action="almoxZoomReset" aria-label="Reenquadrar mapa">⤢</button></div></div>'+
+  '<div class="almox-map-stage">'+shape+'</div>'+
+  '<div class="almox-map-disclaimer"><strong>'+(approx?'Divisões regionais ilustrativas.':'Divisões regionais indisponíveis.')+'</strong> '+
+  (approx?'Áreas vetorizadas de uma imagem de referência, com limites aproximados. Não representam a delimitação oficial nem substituem o mapa homologado pela PMMG.':
+  'Mostrando apenas o contorno estadual. As divisões das RPM não puderam ser carregadas.')+
+  ' As aquisições são filtradas pelo número de RPM cadastrado no registro, não pela posição cartográfica.</div>'+
+  '<div class="almox-region-grid">'+points.map(p=>'<button type="button" data-action="almoxPick" data-rpm="'+escape(p.id)+
+   '" class="almox-region-choice'+(state.selected===p.id?' active':'')+'">'+
+   '<i style="background:'+escape(p.cor)+'"></i><span><b>'+escape(p.id==='RMBH'?'RMBH':p.id+'ª RPM')+
+   '</b><small>'+escape(p.sede)+'</small></span><em>'+p.count+'</em></button>').join('')+'</div></div>';
 }
 function panelHtml(){
  const raw=selectionRows(),list=filtered(),years=unique(state.registros.map(x=>x.ano).filter(Boolean)).map(String),
@@ -241,14 +275,15 @@ function view(authorized=true){
  'Esses registros permanecem sem classificação; indicadores de entrega e quantidade só serão preenchidos com dados verificados.'+
  '<button type="button" class="almox-unclassified" data-action="almoxPick" data-rpm="UNCLASSIFIED">Ver não classificados ('+unclassified+') →</button></div>'+
  '<div class="almox-layout">'+mapHtml()+'<section class="almox-data-card" id="almox-panel">'+panelHtml()+'</section></div>'+
- '<p class="almox-foot-source">Geometria estadual: IBGE, via base vetorial CC0 derivada de suas malhas. Marcadores aproximados de sedes da PMMG; limites das 19 RPM ainda aguardam arquivo vetorial homologado.</p>'+
+ '<p class="almox-foot-source">Divisões regionais aproximadas vetorizadas da imagem de referência enviada pelo usuário; não homologadas. O contorno estadual IBGE permanece como fallback. Filtros por RPM usam exclusivamente o cadastro de destino.</p>'+
  '</div>';
 }
 function refreshPanel(){
  const e=document.getElementById('almox-panel');
  if(e)e.innerHTML=panelHtml();
  document.querySelectorAll('.almox-region-choice').forEach(x=>x.classList.toggle('active',x.dataset.rpm===state.selected));
- document.querySelectorAll('.almox-map-pin').forEach(x=>x.classList.toggle('selected',x.dataset.rpm===state.selected));
+ document.querySelectorAll('.almox-map-pin,.almox-rpm-region').forEach(x=>x.classList.toggle('selected',x.dataset.rpm===state.selected));
+ document.querySelectorAll('.almox-rpm-label').forEach(x=>x.classList.toggle('selected',x.dataset.regionLabel===state.selected));
 }
 function pick(rpm){
  if(!['UNCLASSIFIED','RMBH',...REGIOES.map(r=>r.id)].includes(rpm))return;
@@ -308,21 +343,22 @@ function zoom(v){
 function resetZoom(){state.zoom=1;state.x=0;state.y=0;updateTransform();}
 function updateTransform(){
  const el=document.getElementById('almox-map-transform');if(!el)return;
- const x=Math.max(-430,Math.min(430,state.x)),y=Math.max(-320,Math.min(320,state.y));
+ const svg=document.getElementById('almox-map-svg'),W=svg?.viewBox?.baseVal?.width||900,H=svg?.viewBox?.baseVal?.height||737;
+ const x=Math.max(-W*.6,Math.min(W*.6,state.x)),y=Math.max(-H*.6,Math.min(H*.6,state.y));
  state.x=x;state.y=y;
- el.setAttribute('transform','translate('+(380-state.zoom*380+x)+' '+(285-state.zoom*285+y)+') scale('+state.zoom+')');
+ el.setAttribute('transform','translate('+(W/2-state.zoom*W/2+x)+' '+(H/2-state.zoom*H/2+y)+') scale('+state.zoom+')');
 }
 function afterRender(){
  const svg=document.getElementById('almox-map-svg');if(!svg||svg.dataset.ready)return;
  svg.dataset.ready='1';updateTransform();
  svg.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY<0?1:-1)},{passive:false});
  let start=null;
- svg.addEventListener('pointerdown',e=>{if(e.target.closest('.almox-map-pin'))return;start={px:e.clientX,py:e.clientY,x:state.x,y:state.y};svg.setPointerCapture?.(e.pointerId)});
- svg.addEventListener('pointermove',e=>{if(!start)return;const bb=svg.getBoundingClientRect();state.x=start.x+(e.clientX-start.px)*760/bb.width;state.y=start.y+(e.clientY-start.py)*570/bb.height;updateTransform()});
+ svg.addEventListener('pointerdown',e=>{if(e.target.closest('.almox-map-pin,.almox-rpm-region'))return;start={px:e.clientX,py:e.clientY,x:state.x,y:state.y};svg.setPointerCapture?.(e.pointerId)});
+ svg.addEventListener('pointermove',e=>{if(!start)return;const bb=svg.getBoundingClientRect();state.x=start.x+(e.clientX-start.px)*svg.viewBox.baseVal.width/bb.width;state.y=start.y+(e.clientY-start.py)*svg.viewBox.baseVal.height/bb.height;updateTransform()});
  for(const t of ['pointerup','pointercancel'])svg.addEventListener(t,()=>{start=null});
  svg.addEventListener('keydown',e=>{const p=e.target.closest('[data-rpm]');if(p&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pick(p.dataset.rpm)}});
 }
 window.SIG_ALMOX=Object.freeze({view,load,loadMap,isLoaded,reset,pick,clear,input,paginate,detail,zoom,resetZoom,afterRender,
  getStats:()=>({records:state.registros.length,classified:state.registros.filter(x=>x.rpm!==null).length,
- unclassified:state.registros.filter(x=>x.rpm===null).length,pins:REGIOES.length,selected:state.selected})});
+ unclassified:state.registros.filter(x=>x.rpm===null).length,pins:REGIOES.length,areas:state.territory?Object.keys(state.territory.polygons).length:0,selected:state.selected})});
 })();
