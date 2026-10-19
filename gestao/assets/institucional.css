@@ -562,3 +562,8 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .budget-accounting-compare input:focus{outline:2px solid #278369;outline-offset:1px}
 .budget-accounting-compare p{margin-bottom:0}
 @media(max-width:640px){.budget-audit-summary{gap:6px}.budget-audit-summary span{flex:1 1 42%}.budget-accounting-compare input{max-width:100%}}
+
+/* Cotas: exibir por padrão somente diferenças gerenciais não zeradas. */
+.budget-toolbar .budget-toggle-zeros{align-self:flex-end;min-height:42px;padding:0 16px;white-space:nowrap}
+#cotas-zero-note{margin:-6px 0 14px;font-size:11px;color:#6d726d}
+@media(max-width:480px){.budget-toolbar .budget-toggle-zeros{flex:1 1 100%}}
