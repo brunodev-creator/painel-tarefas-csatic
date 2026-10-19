@@ -543,3 +543,22 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
 .sig-fonte-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .sig-fonte-toolbar label.btn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
 @media(max-width:650px){.sig-fonte-overview{grid-template-columns:1fr}.sig-fonte-toolbar .btn{width:100%}}
+
+/* Conciliação V6: leitura e confronto com sistema contábil, sem persistência. */
+.budget-audit{margin-top:18px}
+.budget-audit-summary{display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0 14px}
+.budget-audit-summary span{display:inline-flex;gap:5px;align-items:center;padding:7px 10px;border:1px solid var(--border,#dce3e7);border-radius:8px;font-size:12px}
+.budget-audit .budget-toolbar{margin-bottom:12px}
+.budget-audit .budget-table td{vertical-align:top}
+.budget-audit .budget-dot{max-width:250px;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px}
+.budget-audit-details{margin:16px 0 0;border-top:1px solid var(--border,#dce3e7);padding-top:12px}
+.budget-audit-details>summary{cursor:pointer;font-weight:700}
+.budget-audit-details .table-scroll{margin-top:12px}
+.budget-audit-linked{margin-top:18px}
+.budget-audit-linked h3{font-size:15px;margin:8px 0}
+.budget-accounting-compare{margin-top:14px;padding:14px;border:1px solid var(--border,#dce3e7);border-radius:10px}
+.budget-accounting-compare label{display:block;margin-bottom:8px}
+.budget-accounting-compare input{width:100%;max-width:400px;padding:10px;border:1px solid #c8d4dc;border-radius:8px;font:inherit}
+.budget-accounting-compare input:focus{outline:2px solid #278369;outline-offset:1px}
+.budget-accounting-compare p{margin-bottom:0}
+@media(max-width:640px){.budget-audit-summary{gap:6px}.budget-audit-summary span{flex:1 1 42%}.budget-accounting-compare input{max-width:100%}}
