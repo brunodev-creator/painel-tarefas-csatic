@@ -119,7 +119,8 @@ function filtered(){
  (state.conta==='TODAS'||d._account===state.conta)&&
  (!q||[d._code,d.dotacao,...(d.origens_bo||[]),d._account,d._descTitle,d._descArea].some(v=>{
  const t=window.SIG_COTAS_DESC.textoBusca(v);
- return t.includes(q)||t.replace(/(\d{2})XX/g,'$100').replace(/\D/g,'').includes(normalized.replace(/\D/g,''));
+ const digits=normalized.replace(/\D/g,'');
+ return t.includes(q)||(digits!==''&&t.replace(/(\d{2})XX/g,'$100').replace(/\D/g,'').includes(digits));
  })));
 }
 function rowHtml(d){
