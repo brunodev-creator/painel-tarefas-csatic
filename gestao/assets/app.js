@@ -578,7 +578,7 @@ async function v4HandleCompetence(form){
 function v5Count(num){return new Intl.NumberFormat('pt-BR').format(Number(num)||0)}
 function v5FormatCents(num){return Number.isFinite(Number(num))?new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(num)/100):'—'}
 function v5View(){
- if(window.SIG_FONTE&&cloud()&&session&&!window.SIG_FONTE.isLoaded()){
+ if(window.SIG_FONTE&&cloud()&&session&&canFinance()&&!window.SIG_FONTE.isLoaded()){
   window.SIG_FONTE.load(rest).then(()=>{if(view==='importacoes')render();}).catch(()=>{});
  }
  if(!canFinance())return heading('Acesso restrito','Motor de Dados','A conferência financeira é exclusiva de administradores, chefia e SOFI.');
