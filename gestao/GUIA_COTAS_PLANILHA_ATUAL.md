@@ -1,60 +1,65 @@
-# Cota orçamentária — Conciliação V6 na PLANILHA ATUAL
+# SIG — Conferência contábil-gerencial V6
 
-## Posição conciliada de 19/10/2026
+## Posição publicada (BO de 19/10/2026)
 
-- Origem: planilha `agora vai - PLANILHA ATUAL`, ID `1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA`.
-- 43 dotações com cota, 192 empenhos indexados, 328 documentos de repasse, 43 RIPC (aba ITENS_AQUISICAO sem registros no momento).
-- Cota líquida BO: **R$ 88.250.822,15**.
-- Abatimento gerencial por regra V6: **R$ 85.299.157,14**, em 180 empenhos.
-- Diferença gerencial NÃO OFICIAL: **R$ 2.951.665,01**.
-- Duas correções históricas 0000→0001 aprovadas foram recuperadas da planilha anterior, conferidas por chave e contra as cotas atuais e copiadas para `SIG_V6_CORRECOES_APROVADAS`.
-- Dois TDCO (R$ 2.337.647,59) excluídos do abatimento, um empenho ambíguo não abatido e três empenhos sem cota correspondente após validar as correções.
-- 50 alertas para conferência, 0 bloqueios. A ausência dos itens de RIPC explica grande parte dos alertas; não significa que os empenhos estejam ausentes.
-- Backup anterior à alteração: `DASHBOARD_BACKUP_20261019` na mesma planilha.
+Planilha vinculada: [agora vai - PLANILHA ATUAL](https://docs.google.com/spreadsheets/d/1dxzDySXU1h5BKJkW1_mHpNX9KRwgX6Ol5b_kRqeRrJA/edit).
 
-## Relação das abas
+| Indicador | Valor |
+| --- | ---: |
+| Dotações com cota | 43 |
+| Documentos de repasse | 328 |
+| Empenhos indexados | 192 |
+| Abatidos na global (conta 998020301) | 105 |
+| Abatidos na específica (conta 998020302) | 79 |
+| TDCO excluídos do abatimento | 2 |
+| Valor líquido zero — não abatidos | 6 |
+| Empenhos com valor positivo sem alocação | 0 |
+| Correções históricas de dotação 0000 → 0001 aprovadas | 5 |
+| Alocações manuais aprovadas | 1 |
+| Alertas pendentes de conferência | 46 |
+| Cota líquida BO | R$ 88.250.822,15 |
+| Abatimento gerencial V6 | R$ 85.819.873,38 |
+| Diferença gerencial **NÃO OFICIAL** | R$ 2.430.948,77 |
 
-- `SIG_V6_RESUMO` — consolidação numérica e limites.
-- `SIG_V6_REPASSES` — repasse por ano, documento e dotação (sem repetir `Valor_Total_Repasse` do RIPC).
-- `SIG_V6_DOTACOES` — valor da cota, RIPC, empenhos, abatimento gerencial e diferença por dotação.
-- `SIG_V6_EMPENHOS` — índice normalizado e rastreabilidade dos empenhos.
-- `SIG_V6_ABATIMENTOS` — classificação de cada empenho como global, específica, TDCO, ambíguo, sem cota ou zero.
-- `SIG_V6_CONTINUOS` — referência auxiliar de serviços continuados.
-- `SIG_V6_ALERTAS` — inconsistências a conferir.
-- `SIG_V6_CORRECOES_APROVADAS` — correções documentadas por empenho; nunca deduzir correção automaticamente.
-- `DASHBOARD` — resumo legado com valores de abatimento e diferença agora atualizados pela V6, **não equivalentes a saldo oficial**.
+O empenho **19/2026** foi alocado **manualmente à cota específica 3921**, no valor de R$ 96.469,63. Resta R$ 352,78 nesta cota. A cota global 39XX de R$ 21.400,00 continua atribuída ao empenho 215/2026 e não houve duplo abatimento. Essa decisão está documentada em `SIG_V6_ALOCACOES_APROVADAS`.
 
-**Atenção:** o `DASHBOARD` legado é reconstruído por outras rotinas da planilha, ainda fora do GitHub. Uma nova execução dessas rotinas pode sobrescrever os valores V6 até que o motor seja instalado/encadeado corretamente.
+As correções históricas dos empenhos 18, 56, 169, 212 e 217 estão registradas em `SIG_V6_CORRECOES_APROVADAS`; as dotações importadas originais não foram substituídas.
 
-## Instalação do motor V6 para atualizações futuras
+## O que o SIG permite conferir
 
-O arquivo do motor preparado no GitHub é [SIG_V6_Conciliacao_Atual.gs](./integracao/SIG_V6_Conciliacao_Atual.gs). A conexão atual permite editar os dados do Google Sheets, mas **não instala arquivos Apps Script no projeto vinculado**.
+Acesse [SIG CSA-TIC](https://brunodev-creator.github.io/painel-tarefas-csatic/gestao/) → **Cota orçamentária**.
 
-1. Abra a PLANILHA ATUAL → **Extensões → Apps Script**.
-2. Crie arquivo `SIG_V6_Conciliacao_Atual.gs`. Cole o código do GitHub. Evite criar uma segunda definição `SIGV6` se já existir outra instalação V6 no mesmo projeto.
-3. Salve, selecione e execute `sigV6InstalarMenu` apenas uma vez e autorize as permissões do Google.
-4. Reabra a planilha e clique **SIG V6 (conciliação) → Gerar conciliação local**. Confira `SIG_V6_RESUMO`, `SIG_V6_ABATIMENTOS` e `SIG_V6_ALERTAS`.
-5. Compare a posição esperada com 43 dotações, 192 empenhos e 180 abatimentos da base de 19/10/2026. Em importações posteriores, esses números podem mudar legitimamente.
-6. Somente após conferência, use **SIG V6 (conciliação) → Publicar abatimentos no DASHBOARD (após conferência)**. A ação exige confirmação, verifica os códigos e os valores de cotas e cria backup antes de atualizar o Dashboard.
+- Visão geral com 43 dotações, cotas, abatimentos gerenciais e diferenças.
+- Detalhe de cada dotação: lista dos empenhos que abateram aquela cota e respectivos valores.
+- Relação de 192 empenhos, com filtros por número, processo, dotação e resultado; veja os oito excluídos e as regras aplicadas.
+- Resumos de global/específica, TDCO, correções históricas, alocação manual e alertas de conciliação.
+- No detalhe de uma dotação, campo opcional para informar o valor obtido em outro sistema contábil e visualizar a diferença **(contábil − gerencial SIG)**. Esse valor não é transmitido nem gravado.
+- Exportação de dotações e, para perfis financeiros, dos empenhos em CSV.
+- Identificação separada de **data da posição BO** e **data da extração/importação no SIG**.
 
-A análise diária V6 é opcional. Ela atualiza apenas abas `SIG_V6_*`. A publicação no DASHBOARD permanece manual para evitar lançar resultados ambíguos automaticamente.
+**Os valores V6 são gerenciais.** Não são saldo disponível no SIAFI-MG, não comprovam a posição atual de um documento de repasse nem substituem a conferência da unidade contábil.
 
-## Atualização do SIG
+## Proteção e rastreabilidade
 
-1. Execute a conciliação V6 e publique, com conferência, o Dashboard, se os controles permitirem.
-2. Na planilha correta, instale/atualize também [SIG_FONTE_ATUAL_AppsScript.gs](./integracao/SIG_FONTE_ATUAL_AppsScript.gs) e execute o menu **SIG — Fonte Oficial → Baixar snapshot JSON para SIG**.
-3. No SIG, como administrador, abra **Motor de Dados → Importar JSON da fonte oficial**. O formato V2 exige seis abas, inclusive `DASHBOARD`.
-4. Abra **Cota orçamentária → Atualizar consulta**. Verifique data, valores e alertas da planilha.
+O Supabase guarda 12 snapshots em `public.sig_planilha_snapshots`: as seis fontes anteriores mais `SIG_V6_RESUMO`, `SIG_V6_DOTACOES`, `SIG_V6_ABATIMENTOS`, `SIG_V6_ALERTAS`, `SIG_V6_CORRECOES_APROVADAS` e `SIG_V6_ALOCACOES_APROVADAS`.
 
-O snapshot inicial de 19/10/2026 já foi atualizado diretamente no Supabase, portanto não exige importação manual adicional **para a posição atual**. Não existe sincronização contínua Google Sheets → Supabase; um clique em "Atualizar consulta" apenas consulta a última posição importada.
+Acesso de leitura condicionado à autenticação e perfil autorizado, com RLS. A importação utiliza RPC de uso exclusivo de administradores ativos. A versão V3 exige **todas as 12 abas no mesmo arquivo**, verifica quantidades de empenhos e os totais entre resumo, dotações e Dashboard e grava os registros atomicamente. O SIG exibe erro, e não totais parciais, caso a conciliação não corresponda ao Dashboard.
 
-## Regras e segurança
+O snapshot da posição de 19/10/2026 já está sincronizado; dados operacionais (compras, licitações, contratos, empenhos editáveis) não foram sobrescritos.
 
-- `SIG_V6` não altera abas de importação, `INDICE_EMPENHOS`, cadastros, tarefas, contratos nem históricos.
-- Dotação global BO `00EE` é normalizada `EE00` para chave, exibida `EEXX`; itens específicos `EE01..EE99` mantidos separados.
-- Empenhos com correspondente somente na específica abatem específica; somente na global, abatem global. Se ambas existirem, **nenhum abate automático**.
-- TDCO e empenhos fora da UE 1250070 não são abatidos.
-- Corrigir `0000` para `0001` apenas por registro aprovado, código original exato, alvo idêntico exceto pela mudança autorizada e cota existente.
-- Cada empenho é abatido no máximo uma vez; RIPC não é descontado novamente.
-- Valores gerenciais não substituem SIAFI-MG nem demonstram disponibilidade oficial para empenhar.
-- Supabase aplica RLS e perfis autorizados à leitura do snapshot. A edição de código e utilização de dados reais dependem de autorização institucional e avaliação de segurança.
+## Como atualizar após novos lançamentos
+
+**O motor está atualizado no GitHub, mas os arquivos Apps Script ainda precisam ser instalados ou substituídos no projeto vinculado à planilha.** Não foram automaticamente implantados no editor do Google.
+
+1. Abra a planilha → **Extensões → Apps Script**.
+2. Atualize o conteúdo de [SIG_V6_Conciliacao_Atual.gs](./integracao/SIG_V6_Conciliacao_Atual.gs) no projeto. O motor preserva correções 0000→0001 com cota global ou específica e decisões manuais aprovadas com dotação e valor idênticos.
+3. Execute `sigV6InstalarMenu` apenas se o menu ainda não estiver instalado; depois **SIG V6 (conciliação) → Gerar conciliação local**.
+4. Confira `SIG_V6_RESUMO`, `SIG_V6_DOTACOES`, `SIG_V6_ABATIMENTOS`, `SIG_V6_ALERTAS`. Resolva os alertas pertinentes.
+5. Quando estiver validado, execute **Publicar abatimentos no DASHBOARD (após conferência)**. A ação faz backup do Dashboard, verifica dotações e exige confirmação.
+6. Atualize também [SIG_FONTE_ATUAL_AppsScript.gs](./integracao/SIG_FONTE_ATUAL_AppsScript.gs), que agora gera `SIG_FONTE_ATUAL_V3` com 12 abas e recusa totals divergentes.
+7. Exporte o JSON no Google Sheets, entre como administrador no SIG → **Motor de Dados → Importar JSON da fonte oficial**. Não use o exportador V2 antigo.
+8. Volte à **Cota orçamentária → Atualizar consulta**, verificando data BO, número de registros, totais e decisões.
+
+**Não há sincronização Google Sheets → Supabase em tempo real**. O botão "Atualizar consulta" apenas relê o último conjunto importado no banco. Rotinas legadas da planilha podem recalcular o Dashboard sem passar pelo motor V6; em tal situação, o exportador V3 bloqueia a importação até que os relatórios sejam consistentes.
+
+A hospedagem e uso de dados institucionais devem seguir as autorizações e políticas de segurança aplicáveis da PMMG.
