@@ -3,7 +3,7 @@
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['licitacao_demo','aipc','aipc_revisoes','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
-const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['almoxarifado','⬡','Almoxarifado'],['tarefas','☑','Minhas tarefas'],['processos','▤','Processos'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
 const SIG_CHIEF_ROLES=['chefia',...Object.keys(SIG_CHIEF_SECTIONS)];
@@ -20,13 +20,13 @@ function syncUserRoleSetor(){
  else{sector.disabled=false;if(hidden){hidden.name='';hidden.value='';}}
 }
 const SIG_ROLE_MENUS=Object.freeze({
- compras:['notificacoes','tarefas','compras','cotas','processos','assistente'],
- licitacao:['notificacoes','tarefas','licitacao','cotas','processos','assistente'],
- sofi:['notificacoes','tarefas','sofi','cotas','processos','assistente'],
- chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','cotas','processos','assistente'],
- chefe_compras:['notificacoes','chefia','tarefas','compras','cotas','processos','assistente'],
- chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','cotas','processos','assistente'],
- chefe_sofi:['notificacoes','chefia','tarefas','sofi','cotas','processos','assistente'],
+ compras:['notificacoes','tarefas','compras','almoxarifado','cotas','processos','assistente'],
+ licitacao:['notificacoes','tarefas','licitacao','almoxarifado','cotas','processos','assistente'],
+ sofi:['notificacoes','tarefas','sofi','almoxarifado','cotas','processos','assistente'],
+ chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','almoxarifado','cotas','processos','assistente'],
+ chefe_compras:['notificacoes','chefia','tarefas','compras','almoxarifado','cotas','processos','assistente'],
+ chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','almoxarifado','cotas','processos','assistente'],
+ chefe_sofi:['notificacoes','chefia','tarefas','sofi','almoxarifado','cotas','processos','assistente'],
  leitura:['notificacoes','tarefas','processos','assistente']
 });
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
@@ -219,6 +219,7 @@ function navigate(v){
  if(!canVisitMenu(v))return showToast('Este módulo não está disponível para o seu perfil.');
  if(v==='cotas')window.SIG_COTAS?.resetFilters();
  view=v;filters={q:'',setor:'Todos',status:'Todos'};if(v==='compras'){purchaseFilter='all';purchaseLimit=12;serviceFilter='Todos';}
+ if(v==='almoxarifado'&&!cloud())window.SIG_ALMOX?.loadMap().then(()=>{if(view==='almoxarifado')render();}).catch(()=>{});
  updateChrome();render();
  document.getElementById('sidebar').classList.remove('open');
  document.getElementById('shade').classList.remove('visible');
@@ -1637,13 +1638,17 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
- let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':
+ let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'almoxarifado':
+  if(cloud()&&session&&canVisitMenu('almoxarifado')&&window.SIG_ALMOX&&!window.SIG_ALMOX.isLoaded()){
+    window.SIG_ALMOX.load(rest).then(()=>{if(view==='almoxarifado')render();}).catch(()=>{if(view==='almoxarifado')render();});
+  }
+  html=window.SIG_ALMOX.view(canVisitMenu('almoxarifado'));break;case'importacoes':html=v5View();break;case'conciliacao':html=window.SIG_V6.view(canFinance());break;case'cotas':
   if(cloud()&&session&&canViewCota()&&window.SIG_COTAS&&!window.SIG_COTAS.isLoaded()){
     window.SIG_COTAS.load(rest).then(()=>{if(view==='cotas')render();}).catch(()=>{if(view==='cotas')render();});
   }
   html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
- if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}}
+ if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
@@ -1968,8 +1973,8 @@ async function signIn({email,password}){if(!cloud()||busy)return;
  }catch(e){showToast('Falha no acesso: '+errMsg(e))}
  finally{busy=false;if(button?.isConnected){button.disabled=false;button.innerHTML='Entrar <span class="sig-auth-arrow" aria-hidden="true">→</span>';}}
 }
-async function signOut(){window.SIG_COTAS?.resetCloud();previewRole=null;chat=[];v5Report=null;sharedProcessRows=[];sharedProcessHistory=[];sharedLoadError='';try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
-function saveSettings({url,key}){window.SIG_COTAS?.resetCloud();previewRole=null;url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(cloud()?config:{...config,mode:'demo'}));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
+async function signOut(){window.SIG_ALMOX?.reset();window.SIG_COTAS?.resetCloud();previewRole=null;chat=[];v5Report=null;sharedProcessRows=[];sharedProcessHistory=[];sharedLoadError='';try{if(session)await rest('/auth/v1/logout','POST',{},session.access_token)}catch{}session=null;sessionStorage.removeItem(KEYS.session);vaultClearOpenReports();db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''};closeModal();render()}
+function saveSettings({url,key}){window.SIG_ALMOX?.reset();window.SIG_COTAS?.resetCloud();previewRole=null;url=(url||'').trim().replace(/\/$/,'');key=(key||'').trim();if((url&&!key)||(!url&&key))return showToast('Informe URL e chave pública juntos.');if(url&&!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url))return showToast('Use uma URL de projeto HTTPS do Supabase (domínio *.supabase.co).');if(key&&/service_role|sb_secret_/i.test(key))return showToast('Nunca use chave secreta/service_role no navegador.');vaultClearOpenReports();config={url,key};localStorage.setItem(KEYS.settings,JSON.stringify(cloud()?config:{...config,mode:'demo'}));session=null;sessionStorage.removeItem(KEYS.session);closeModal();if(!cloud()){db=storage();profile={nome:'Demonstração',role:'admin',setor:'Todos',ativo:true}}else{db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:'Não autenticado',role:'leitura',setor:''}}render();showToast(cloud()?'Configuração salva. Faça login.':'Retorno ao modo demonstrativo.')}
 function assistantAnswer(question){const q=String(question||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
  const respostaV7=window.SIG_V7.answer(question,canFinance());if(respostaV7)return respostaV7;
  const respostaV6=window.SIG_V6.answer(question,canFinance());if(respostaV6)return respostaV6;
@@ -2000,11 +2005,20 @@ function exportData(){const payload={sistema:'SIG CSA-TIC',versao:2,exportado_em
 function importData(){if(cloud())return showToast('Importação JSON não está habilitada no banco compartilhado. Use importação validada.');const file=document.createElement('input');file.type='file';file.accept='.json,application/json';file.onchange=async()=>{try{const text=await file.files[0].text();if(text.length>3000000)throw Error('Arquivo excede 3 MB.');const parsed=JSON.parse(text);if(!TABLES.every(t=>Array.isArray(parsed.data?.[t])))throw Error('Estrutura de backup desconhecida.');if(parsed.tipo!=='DEMONSTRACAO_FICTICIA')throw Error('Somente backups demonstrativos são aceitos nesta versão.');if(!confirm('Substituir todos os dados demonstrativos deste navegador?'))return;db=parsed.data;saveLocal();render();showToast('Backup demonstrativo importado.')}catch(e){showToast('Importação recusada: '+errMsg(e))}};file.click()}
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
- if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','taskReadDetail','licDemoOpen','licDemoPreview','licDemoPrint','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter','sigFontePreview','sigFonteLoad','cotaToggleZeradas'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','profile','signOut','detail','sharedDetail','taskReadDetail','licDemoOpen','licDemoPreview','licDemoPrint','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter','sigFontePreview','sigFonteLoad','cotaToggleZeradas','almoxPick','almoxClear','almoxReload','almoxDetail','almoxZoomIn','almoxZoomOut','almoxZoomReset','almoxPrev','almoxNext'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
  switch(action){
+ case 'almoxPick':if(!canVisitMenu('almoxarifado'))return;window.SIG_ALMOX.pick(btn.dataset.rpm||'');break;
+ case 'almoxClear':if(!canVisitMenu('almoxarifado'))return;window.SIG_ALMOX.clear();break;
+ case 'almoxReload':if(!canVisitMenu('almoxarifado')||!cloud()||!session)return showToast('Consulta institucional necessária.');await window.SIG_ALMOX.load(rest,true);render();break;
+ case 'almoxDetail':if(!canVisitMenu('almoxarifado'))return;openModal('Detalhes da destinação RIPC','Consulta regional; não comprova entrega.',window.SIG_ALMOX.detail(decodeURIComponent(btn.dataset.record||'')),true);break;
+ case 'almoxZoomIn':window.SIG_ALMOX.zoom(1);break;
+ case 'almoxZoomOut':window.SIG_ALMOX.zoom(-1);break;
+ case 'almoxZoomReset':window.SIG_ALMOX.resetZoom();break;
+ case 'almoxPrev':window.SIG_ALMOX.paginate('prev');break;
+ case 'almoxNext':window.SIG_ALMOX.paginate('next');break;
  case 'sigFonteLoad':
   if(!canFinance()||!window.SIG_FONTE)return showToast('Consulta indisponível.');
   await window.SIG_FONTE.load(rest,true);render();break;
@@ -2076,6 +2090,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
 function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{
+  if(e.target.id==='almox-q'){if(canVisitMenu('almoxarifado'))window.SIG_ALMOX.input('almox-q',e.target.value);return;}
  if(e.target.id==='sig-fonte-busca'&&window.SIG_FONTE){
   window.SIG_FONTE.setQuery(e.target.value);
   const results=document.getElementById('sig-fonte-resultados');
@@ -2083,6 +2098,9 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
   return;
  }
  if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.id==='cota-audit-search'){window.SIG_COTAS_AUD.filter('search',e.target.value);return}if(e.target.id==='cota-accounting-input'){window.SIG_COTAS_AUD.compare(e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{
+   if(['almox-year','almox-status','almox-type','almox-destination','almox-subrpm','almox-sort'].includes(e.target.id)){
+     if(canVisitMenu('almoxarifado'))window.SIG_ALMOX.input(e.target.id,e.target.value);return;
+   }
   if(e.target.id==='lic-demo-count'){licDemoSyncCount(e.target.closest('form[data-form="licDemoSpecs"]'));return;}
   if(e.target.closest('form[data-form="aipc"]')){
    const form=e.target.closest('form[data-form="aipc"]');
