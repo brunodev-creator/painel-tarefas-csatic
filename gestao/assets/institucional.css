@@ -519,3 +519,27 @@ body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificac
  body.sig-lic-demo-printing .sig-lic-template-paper{width:100%!important;max-width:none!important;border:0!important;padding:0!important;margin:0!important;box-shadow:none!important;overflow:visible!important}
  body.sig-lic-demo-printing .sig-lic-template-cover{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+
+/* Fonte oficial Google Sheets — camada financeira de leitura sem mescla operacional */
+.sig-fonte-panel{margin-top:16px;margin-bottom:18px;display:flex;flex-direction:column;gap:12px}
+.sig-fonte-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sig-fonte-heading h2{font-size:17px;margin:0 0 5px}
+.sig-fonte-heading p{font-size:12px;margin:0}
+.sig-fonte-heading a{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.sig-fonte-pill{font-size:11px;font-weight:700;border-radius:99px;background:#eaf0eb;color:#3d6550;padding:7px 12px}
+.sig-fonte-panel>p{font-size:12px;color:#69757d;line-height:1.65;margin:0}
+.sig-fonte-overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.sig-fonte-overview>div{background:#f4f7f4;border:1px solid #e1eae0;border-radius:10px;padding:13px;display:flex;flex-direction:column;gap:6px}
+.sig-fonte-overview span{font-size:11px;color:#66776a}
+.sig-fonte-overview strong{font-size:17px;color:#315a41}
+.sig-fonte-panel .data-table td{font-size:11px;line-height:1.5}
+.sig-fonte-panel .data-table td:first-child{min-width:130px}
+.sig-fonte-preview{margin-top:10px;border-top:1px solid #e3e9e5;padding-top:14px}
+.sig-fonte-preview h3{font-size:14px;margin:0 0 12px}
+.sig-fonte-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sig-fonte-preview-bar input{flex:1;min-width:180px;border:1px solid #d5dfda;border-radius:9px;padding:10px;font-size:12px}
+.sig-fonte-preview-bar span,.sig-fonte-muted{font-size:11px;color:#718079}
+.sig-fonte-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.sig-fonte-toolbar label.btn{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+@media(max-width:650px){.sig-fonte-overview{grid-template-columns:1fr}.sig-fonte-toolbar .btn{width:100%}}
