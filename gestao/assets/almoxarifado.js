@@ -41,6 +41,7 @@ function normalize(row){
  const rpm=row.rpm===null||row.rpm===undefined?null:numRpm(Number(row.rpm));
  return {id:String(row.chave_origem||''),rpm,ano:Number(row.ano)||null,
   documento:String(row.documento_repasse||''),processo:String(row.processo_origem||''),
+  processoIdentificado:String(row.processo_identificado||''),
   descricao:String(row.material_descricao||'Não informado'),
   destino:String(row.unidade_destinataria||'Não informado'),
   valor:row.valor_ripc===null?null:Number(row.valor_ripc),tipo:category(row.material_descricao),
@@ -68,7 +69,7 @@ async function load(rest,force=false){
  state.phase='loading';state.error='';
  try{
   const [data]=await Promise.all([
-   rest('/rest/v1/sig_almox_destinacoes?select=chave_origem,chave_repasse,ano,documento_repasse,processo_origem,material_descricao,unidade_destinataria,rpm,valor_ripc,data_registro,situacao_processo,validacao_origem,quantidade,situacao_entrega,data_aquisicao&order=chave_origem.asc&limit=2000'),
+   rest('/rest/v1/sig_almox_destinacoes?select=chave_origem,chave_repasse,ano,documento_repasse,processo_origem,processo_identificado,material_descricao,unidade_destinataria,rpm,valor_ripc,data_registro,situacao_processo,validacao_origem,quantidade,situacao_entrega,data_aquisicao&order=chave_origem.asc&limit=2000'),
    loadMap()
   ]);
   if(!Array.isArray(data))throw Error('A consulta protegida de destinacões não retornou uma lista.');
@@ -92,11 +93,11 @@ function selectionRows(){return state.registros.filter(x=>belongs(x,state.select
 function filtered(){
  let a=selectionRows().filter(x=>
  (state.year==='TODOS'||String(x.ano)===state.year)&&
- (state.status==='TODOS'||(state.status==='NAO_INFORMADA'&&!x.entrega)||x.entrega===state.status)&&
+ (state.status==='TODOS'||(state.status==='NAO_INFORMADA'&&!x.statusProcesso)||x.statusProcesso===state.status)&&
  (state.type==='TODOS'||x.tipo===state.type)&&
  (state.destination==='TODOS'||x.destino===state.destination)&&
  (state.subrpm==='TODOS'||state.selected!=='RMBH'||String(x.rpm)===state.subrpm)&&
- (!state.q||textSearch([x.id,x.processo,x.descricao,x.destino,x.documento,x.tipo].join(' ')).includes(textSearch(state.q))));
+ (!state.q||textSearch([x.id,x.processo,x.processoIdentificado,x.descricao,x.destino,x.documento,x.tipo].join(' ')).includes(textSearch(state.q))));
  a.sort((a,b)=>{
  if(state.sort==='valor')return (b.valor??-Infinity)-(a.valor??-Infinity);
  if(state.sort==='material')return a.descricao.localeCompare(b.descricao,'pt-BR');
@@ -106,11 +107,15 @@ function filtered(){
 }
 const unique=a=>[...new Set(a)].sort((x,y)=>String(x).localeCompare(String(y),'pt-BR',{numeric:true}));
 function groupName(x){return x===null?'Todas as RPM':x==='RMBH'?'RMBH · 1ª, 2ª e 3ª RPM':x==='UNCLASSIFIED'?'Sem RPM identificada':REGIOES.find(r=>r.id===x)?.nome||'RPM';}
+function formatProcStatus(raw){
+ if(!raw)return 'Não informado';
+ return String(raw).replaceAll('_',' ').toLowerCase().replace(/^./,s=>s.toUpperCase());
+}
 function option(value,label,current){return '<option value="'+escape(value)+'"'+(value===current?' selected':'')+'>'+escape(label)+'</option>';}
 function options(values,current,labels={}){return values.map(v=>option(String(v),labels[v]||String(v),current)).join('');}
 function kpis(){
  const a=state.registros,classified=a.filter(x=>x.rpm!==null);
- const proc=new Set(classified.map(x=>x.processo).filter(Boolean));
+ const proc=new Set(classified.map(x=>x.processoIdentificado||x.processo).filter(Boolean));
  const entrega=classified.filter(x=>x.entrega==='Entregue').length,
        pend=classified.filter(x=>x.entrega==='Pendente').length,
        hasDelivery=classified.some(x=>!!x.entrega);
@@ -178,7 +183,8 @@ function mapHtml(){
 }
 function panelHtml(){
  const raw=selectionRows(),list=filtered(),years=unique(state.registros.map(x=>x.ano).filter(Boolean)).map(String),
- types=unique(raw.map(x=>x.tipo)),destinations=unique(raw.map(x=>x.destino));
+ types=unique(raw.map(x=>x.tipo)),destinations=unique(raw.map(x=>x.destino)),
+ statuses=unique(raw.map(x=>x.statusProcesso).filter(Boolean));
  const totalPages=Math.max(1,Math.ceil(list.length/state.pageSize));
  if(state.page>totalPages)state.page=totalPages;
  const page=list.slice((state.page-1)*state.pageSize,state.page*state.pageSize);
@@ -188,13 +194,13 @@ function panelHtml(){
  state.selected==='RMBH'?'Consolidação das 1ª, 2ª e 3ª RPM, individualizadas na fonte':REGIOES.find(x=>x.id===state.selected)?.sede||'')+
  '</p></div><span class="almox-count">'+raw.length+' registros</span></header>';
  const selects='<div class="almox-filters"><label>Ano<select id="almox-year">'+option('TODOS','Todos',state.year)+options(years,state.year)+'</select></label>'+
- '<label>Entrega<select id="almox-status">'+option('TODOS','Todas',state.status)+option('NAO_INFORMADA','Não informada',state.status)+'</select></label>'+
+ '<label>Situação da aquisição<select id="almox-status">'+option('TODOS','Todas',state.status)+options(statuses,state.status,Object.fromEntries(statuses.map(x=>[x,formatProcStatus(x)])))+option('NAO_INFORMADA','Não informada',state.status)+'</select></label>'+
  '<label>Tipo de material<select id="almox-type">'+option('TODOS','Todos',state.type)+options(types,state.type)+'</select></label>'+
  '<label>Unidade destinatária<select id="almox-destination">'+option('TODOS','Todas',state.destination)+options(destinations,state.destination)+'</select></label>'+
  (state.selected==='RMBH'?'<label>RPM da RMBH<select id="almox-subrpm">'+option('TODOS','1ª + 2ª + 3ª',state.subrpm)+option('1','1ª RPM',state.subrpm)+option('2','2ª RPM',state.subrpm)+option('3','3ª RPM',state.subrpm)+'</select></label>':'')+
  '<label class="almox-q">Pesquisar<input type="search" id="almox-q" placeholder="Material, processo, destino…" value="'+escape(state.q)+'"></label>'+
  '<label>Ordenação<select id="almox-sort">'+option('novo','Registro mais recente',state.sort)+option('valor','Maior valor RIPC',state.sort)+option('material','Material A–Z',state.sort)+'</select></label></div>';
- const line=x=>'<tr><td><strong>'+escape(x.processo?'Processo '+x.processo:'RIPC '+x.documento)+'</strong>'+
+ const line=x=>'<tr><td><strong>'+escape(x.processoIdentificado|| (x.processo?'Processo '+x.processo:'RIPC '+x.documento))+'</strong>'+
  '<small>Doc. de repasse '+escape(x.documento||'—')+'</small></td>'+
  '<td><b>'+escape(x.descricao)+'</b><small>'+escape(x.tipo)+'</small></td>'+
  '<td>'+escape(x.chaveRepasse.split('|').pop()?.split('.').slice(6,8).join('.')||'—')+'</td>'+
@@ -202,6 +208,7 @@ function panelHtml(){
  '<td class="almox-value">'+escape(brMoney(x.valor))+'</td>'+
  '<td>'+escape(x.destino)+'</td>'+
  '<td>'+escape(asDate(x.dataAquisicao))+'</td>'+
+ '<td><span class="almox-neutral-status">'+escape(formatProcStatus(x.statusProcesso))+'</span></td>'+
  '<td><span class="almox-neutral-status">'+escape(x.entrega||'Não informada')+'</span></td>'+
  '<td><button type="button" class="almox-view" data-action="almoxDetail" data-record="'+escape(encodeURIComponent(x.id))+'">Detalhes →</button></td></tr>';
  const missing=state.phase==='error'?'<div class="almox-state" role="alert">Falha ao consultar os registros: '+escape(state.error)+
@@ -210,7 +217,7 @@ function panelHtml(){
  !list.length?'<div class="almox-state">Nenhum registro corresponde à seleção. Não foram criados dados fictícios.</div>':'';
  const table='<div class="almox-table-scroll"><table class="almox-table"><thead><tr>'+
  '<th>Processo / Repasse</th><th>Material</th><th>Elemento-item</th><th>Qtd.</th><th>Valor RIPC</th>'+
- '<th>Unidade destinatária</th><th>Data aquisição</th><th>Entrega</th><th></th></tr></thead><tbody>'+
+ '<th>Unidade destinatária</th><th>Data aquisição</th><th>Situação aquisição</th><th>Entrega</th><th></th></tr></thead><tbody>'+
  page.map(line).join('')+'</tbody></table></div>';
  const pager='<footer class="almox-panel-footer"><span>'+list.length+' registro(s) filtrado(s) · página '+state.page+' de '+totalPages+'</span>'+
  '<div><button data-action="almoxPrev" type="button" '+(state.page===1?'disabled':'')+' aria-label="Página anterior">‹</button>'+
@@ -276,7 +283,7 @@ function detail(key){
  const r=state.registros.find(x=>x.id===key);
  if(!r)return '<p>Registro indisponível ou sem autorização.</p>';
  const fields=[
- ['Processo informado na origem',r.processo||'Não informado'],
+ ['Processo de compra',r.processoIdentificado||r.processo||'Não informado'],
  ['Documento de repasse',r.documento||'Não informado'],
  ['Objeto / material',r.descricao],['Tipo inferido da descrição',r.tipo],
  ['Destino textual',r.destino],['RPM',r.rpm?(r.rpm+'ª RPM'):'Não classificada'],
