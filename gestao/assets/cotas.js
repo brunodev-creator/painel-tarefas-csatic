@@ -95,7 +95,20 @@ function isDiaria(d){
  return p[6]==='3390'&&(item==='15XX'||/^15\d{2}$/.test(item));
 }
 function dailyRows(){return allRows().filter(isDiaria);}
-function rows(){return allRows().filter(d=>!isDiaria(d));}
+// Valores originais são mantidos integralmente na fonte e na V6.
+// Essas dotações apenas não integram o painel operacional BO/SIAD.
+const OUTROS_FORA_ESCOPO=Object.freeze({
+ '12510618113743650001339036006020':{
+   razao:'Serviços de pessoa física: não exibido no extrato contábil de 20/10/2026. Reservado para módulo futuro.'
+ },
+ '12510612270525000001339039131010':{
+   razao:'Água/esgoto: fora do total operacional por decisão do responsável. O extrato contábil de 20/10/2026 exibe R$ 870,00 nessa conta, que permanece como referência para auditoria.'
+ }
+});
+const normalizeDot=d=>String(d.dotacao||'').replace(/\D/g,'');
+function isOutro(d){return Object.prototype.hasOwnProperty.call(OUTROS_FORA_ESCOPO,normalizeDot(d));}
+function otherRows(){return allRows().filter(isOutro);}
+function rows(){return allRows().filter(d=>!isDiaria(d)&&!isOutro(d));}
 function dailyRef(d){
  const p=String(d.dotacao||'').split('.');
  if(p.length!==11)return null;
@@ -104,12 +117,14 @@ function dailyRef(d){
  return state.dailyRefs.find(x=>x.dotacao_normalizada===code)||null;
 }
 function overview(){
- const active=rows(),daily=dailyRows();
+ const active=rows(),daily=dailyRows(),others=otherRows();
  const mainBudget=active.reduce((t,d)=>t+d._budget,0);
  const mainSpent=active.reduce((t,d)=>t+d._spent,0);
  const known= daily.reduce((t,d)=>{const ref=dailyRef(d);return t+(ref?Number(ref.saldo_informado_centavos):0);},0);
  return {mainBudget,mainSpent,mainBalance:mainBudget-mainSpent,
    dayKnown:known,comparison:mainBudget-mainSpent+known,dailyCount:daily.length,
+   excludedOtherCount:others.length,excludedOtherBudget:others.reduce((n,d)=>n+d._budget,0),
+   excludedOtherBalance:others.reduce((n,d)=>n+d._balance,0),
    referenced:daily.filter(d=>!!dailyRef(d)).length};
 }
 function filtered(){
@@ -141,7 +156,7 @@ function refresh(){
  const toggle=document.getElementById('cotas-toggle-zeradas');
  if(toggle){toggle.textContent=state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas';toggle.setAttribute('aria-pressed',state.mostrarZeradas?'true':'false');}
  const note=document.getElementById('cotas-zero-note');
- if(note)note.textContent=state.mostrarZeradas?'Todas as dotações estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).';
+ if(note)note.textContent=state.mostrarZeradas?'Todas as dotações do escopo operacional estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).';
 }
 const date=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||'')?iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'não informada';
 function view(authorized,allowExport=false,allowImport=false){
@@ -172,14 +187,16 @@ function view(authorized,allowExport=false,allowImport=false){
  '<div class="budget-breadcrumb">Início <span>›</span> Cota orçamentária <span>›</span> <b>Saldos por dotação</b></div>'+
  warning+
  '<div class="budget-hero budget-hero-diarias">'+
- kpi('Cota BO · sem diárias',icon1,budget)+
- kpi('Abatimento V6 · sem diárias',icon2,spent)+
- kpi('Diferença V6 · sem diárias',icon3,balance)+
- kpi('Referência para conferência · inclui diárias informadas',icon3,overviewS.comparison)+
+ kpi('Cota BO/SIAD · escopo operacional',icon1,budget)+
+ kpi('Abatimento V6 · escopo operacional',icon2,spent)+
+ kpi('Diferença V6 · escopo operacional',icon3,balance)+
+ kpi('Conferência · operacional + diárias confirmadas',icon3,overviewS.comparison)+
  '</div>'+
- '<p class="budget-note budget-diarias-explanation">O valor de conferência soma apenas as referências de diárias documentadas. '+ 
- 'A posição V6 original é preservada: cota '+fmt(grossBudget)+'; abatimento '+fmt(grossSpent)+
- '; diferença '+fmt(grossBalance)+'. Não se trata de saldo oficial atualizado.</p>'+
+ '<p class="budget-note budget-diarias-explanation">A visão BO/SIAD operacional exclui todas as diárias 3390.15 e as dotações 4365 · 36XX e 2500 · 3913. '+
+ 'A conferência soma somente a referência de diária efetivamente confirmada no Portal Contábil. '+
+ 'A posição V6 original, sem exclusões, permanece preservada para auditoria: cota '+fmt(grossBudget)+
+ '; abatimento '+fmt(grossSpent)+'; diferença '+fmt(grossBalance)+
+ '. Esses saldos são gerenciais, não oficiais.</p>'+
  '<section class="card budget-panel"><div class="budget-panel-head"><div><h1>Saldos por dotação</h1><p>Visão consolidada por classificação orçamentária'+(report._dashboard?' · Fonte: DASHBOARD da PLANILHA ATUAL':' · Fonte: Conciliação V6 local')+'</p></div>'+
  (allowExport?'<button type="button" class="btn budget-export" data-action="cotaExport">↓ &nbsp; Exportar</button>':'')+'</div>'+
  '<div class="budget-toolbar">'+
@@ -189,11 +206,11 @@ function view(authorized,allowExport=false,allowImport=false){
  '<button type="button" class="btn budget-toggle-zeros" id="cotas-toggle-zeradas" data-action="cotaToggleZeradas" aria-pressed="'+(state.mostrarZeradas?'true':'false')+'">'+(state.mostrarZeradas?'Ocultar zeradas':'Mostrar todas')+'</button>'+
  '<button type="button" class="budget-clear" data-action="cotaClearFilters">Limpar filtros</button></div>'+
  '<p class="budget-note budget-description-note">Descrições indicativas pela classificação orçamentária. O objeto real deve ser conferido no empenho ou contrato.</p>'+
- '<p class="budget-note" id="cotas-zero-note">'+(state.mostrarZeradas?'Todas as dotações estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).')+'</p>'+
+ '<p class="budget-note" id="cotas-zero-note">'+(state.mostrarZeradas?'Todas as dotações do escopo operacional estão visíveis, inclusive as com diferença gerencial de R$ 0,00.':'Exibindo somente dotações com diferença gerencial diferente de R$ 0,00 (inclusive diferenças negativas).')+'</p>'+
  '<div class="table-scroll"><table class="data-table budget-table"><thead><tr><th>Dotação</th><th>Descrição da despesa</th><th>Tipo</th><th>Conta</th><th>Cota líquida BO</th><th>Abatimento V6</th><th>Diferença gerencial</th><th>Detalhes</th></tr></thead>'+
  '<tbody id="cotas-tbody">'+filtered().map(rowHtml).join('')+'</tbody></table></div>'+
  '<div class="budget-footer"><span>Exibindo <b id="cotas-count">'+filtered().length+' de '+rows().length+' dotações</b></span><span>Posição BO '+esc(window.SIG_COTAS_AUD?.getReport()?.position||date(s.referencia_cotas_data))+'</span></div>'+
- '</section>'+dailySection()+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
+ '</section>'+dailySection()+otherSection()+(report._dashboard?(window.SIG_COTAS_AUD?.view(allowExport)||''):'')+'</div>';
 }
 
 function dailySection(){
@@ -220,7 +237,7 @@ function dailySection(){
  }).join('');
  return '<section class="card budget-panel budget-diarias"><div class="budget-panel-head">'+
   '<div><h2>Diárias · conferência separada</h2>'+
-  '<p>Elemento 3390.15 · fora da lista de cotas gerenciais para compras e serviços</p></div></div>'+
+  '<p>Elemento 3390.15 · reservado para menu de diárias, fora do total operacional</p></div></div>'+
   '<p class="budget-note">'+esc(textNote)+'</p>'+
   '<div class="table-scroll"><table class="data-table budget-table"><thead><tr>'+
   '<th>Dotação</th><th>Descrição da despesa</th><th>Conta</th><th>Cota BO histórica</th><th>Diferença V6 bruta</th>'+
@@ -229,6 +246,30 @@ function dailySection(){
   '<p class="budget-note">Referência conhecida de diárias incluída SOMENTE no indicador “Referência para conferência”: '+
   '<strong>'+fmt(overview().dayKnown)+'</strong>. O abatimento das diárias segue pendente de metodologia e não foi lançado como empenho.</p>'+
   '</section>';
+}
+
+function otherSection(){
+ const others=otherRows();if(!others.length)return '';
+ const table=others.map(d=>{
+  const exception=OUTROS_FORA_ESCOPO[normalizeDot(d)];
+  return '<tr><td class="budget-dot">'+esc(d._code)+'</td>'+
+   '<td class="budget-description"><strong>'+esc(d._descTitle)+'</strong><small>'+esc(d._descArea)+'</small></td>'+
+   '<td class="budget-account">'+esc(d._account)+'</td>'+
+   '<td class="budget-value">'+fmt(d._budget)+'</td>'+
+   '<td class="budget-value">'+fmt(d._balance)+'</td>'+
+   '<td>'+esc(exception.razao)+'</td></tr>';
+ }).join('');
+ return '<section class="card budget-panel budget-diarias budget-other-exceptions">'+
+ '<div class="budget-panel-head"><div><h2>Outras dotações · fora do escopo operacional</h2>'+
+ '<p>Reservadas para um menu futuro, sem apagar o registro original BO/SIAD</p></div></div>'+
+ '<p class="budget-note">Não integram os indicadores, os filtros, a tabela principal nem o CSV de cotas operacionais. '+
+ 'A segregação não configura cancelamento, estorno ou abatimento de cota oficial.</p>'+
+ '<div class="table-scroll"><table class="data-table budget-table"><thead><tr>'+
+ '<th>Dotação</th><th>Descrição</th><th>Conta</th><th>Cota BO na origem</th><th>Diferença V6 bruta</th><th>Motivo da segregação</th>'+
+ '</tr></thead><tbody>'+table+'</tbody></table></div>'+
+ '<p class="budget-note">Cotas originais segregadas: <strong>'+fmt(others.reduce((n,d)=>n+d._budget,0))+
+ '</strong>; diferença V6 segregada: <strong>'+fmt(others.reduce((n,d)=>n+d._balance,0))+
+ '</strong>. Ambas permanecem consultáveis na V6 original.</p></section>';
 }
 function diariaDetail(key){
  const d=dailyRows().find(x=>String(x.dotacao||'')===String(key||''));
@@ -280,9 +321,9 @@ function exportCSV(){
  const body='\uFEFF'+[columns.map(quote).join(';'),...lines].join('\r\n');
  const blob=new Blob([body],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download='SIG_CSA_TIC_Cotas_Orcamentarias.csv';
+ const a=document.createElement('a');a.href=url;a.download='SIG_CSA_TIC_Cotas_Operacionais_Sem_Excecoes.csv';
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
  return true;
 }
-window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,diariaDetail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length,getOverview:overview,getDescription:key=>{const d=allRows().find(x=>x.dotacao===key||x._code===key);return d?{titulo:d._descTitle,area:d._descArea}:null;}});
+window.SIG_COTAS=Object.freeze({view,filter,clear,resetFilters,toggleZeradas,detail,diariaDetail,exportCSV,load,resetCloud,isLoaded,getCount:()=>rows().length,getOverview:overview,getExcluded:()=>otherRows().map(d=>({codigo:d._code,cota:d._budget,diferenca:d._balance})),getDescription:key=>{const d=allRows().find(x=>x.dotacao===key||x._code===key);return d?{titulo:d._descTitle,area:d._descArea}:null;}});
 })();
