@@ -913,3 +913,50 @@ svg.has-selection .almox-rpm-label:not(.selected) .almox-lbl{opacity:.55}
 .btn.is-busy::before{content:"";width:12px;height:12px;margin-right:7px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;vertical-align:-2px;animation:sig-spin .7s linear infinite}
 @keyframes sig-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.toast,.btn.is-busy::before{animation:none}}
+
+/* ===== Sistema visual SIG: tokens e componentes base =====
+   Novas telas devem usar estes tokens em vez de cores e medidas soltas. */
+:root{
+ --sig-primary:#796a46;--sig-primary-strong:#5f5236;--sig-primary-soft:#f3efe4;
+ --sig-text:#202329;--sig-text-muted:#5e6268;--sig-text-subtle:#6b6f75;
+ --sig-surface:#fff;--sig-bg:#f4f2ef;--sig-border:#e3dfd6;
+ --sig-danger:#9e3f3c;--sig-danger-soft:#fbeceb;
+ --sig-warning:#875f1c;--sig-warning-soft:#f8efdc;
+ --sig-success:#3c6b55;--sig-success-soft:#e9f1ec;
+ --sig-info:#4e5a6b;--sig-info-soft:#eef0f3;
+ --sig-space-1:4px;--sig-space-2:8px;--sig-space-3:12px;--sig-space-4:16px;--sig-space-5:24px;--sig-space-6:32px;
+ --sig-radius-sm:8px;--sig-radius:12px;
+ --sig-text-xs:12px;--sig-text-sm:13px;--sig-text-base:14px;--sig-text-lg:16px;--sig-text-xl:20px;
+ --sig-focus:0 0 0 3px rgba(121,106,70,.38);
+ --sig-touch:44px;
+}
+/* Foco visível e consistente em todos os controles (antes faltava em textarea e no menu). */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--sig-primary);outline-offset:2px}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--sig-primary);box-shadow:var(--sig-focus)}
+/* Botões: altura mínima e alinhamento uniformes. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;line-height:1.25}
+.btn.small{min-height:32px;font-size:12px}
+.btn.danger{border-color:#e7c2bf;color:var(--sig-danger)}
+/* Textos de apoio com contraste AA (antes ~2,6–3,3:1). */
+.sub,.cell-sub,.item-meta,.tiny,.helper,.kpi-foot,.kpi-label,.empty,.table-empty,.filter-summary{color:var(--sig-text-muted)}
+.cell-sub,.item-meta,.tiny,.helper,.kpi-foot{font-size:var(--sig-text-xs)}
+.data-table th{color:var(--sig-text-muted);font-size:11px}
+.data-table td{font-size:var(--sig-text-sm)}
+.cell-main{font-size:var(--sig-text-sm)}
+/* Selos de situação na paleta institucional. */
+.flag{font-size:11px}
+.flag.red{background:var(--sig-danger-soft);color:var(--sig-danger)}
+.flag.amber{background:var(--sig-warning-soft);color:var(--sig-warning)}
+.flag.teal{background:var(--sig-success-soft);color:var(--sig-success)}
+.flag.gray{background:var(--sig-info-soft);color:var(--sig-info)}
+.kpi.red .kpi-icon{background:var(--sig-danger-soft);color:var(--sig-danger)}
+.kpi.alert .kpi-icon{background:var(--sig-warning-soft);color:var(--sig-warning)}
+.kpi.blue .kpi-icon{background:var(--sig-primary-soft);color:var(--sig-primary-strong)}
+.info-note{background:var(--sig-info-soft);color:#3f4854;border:1px solid #e1e4e9}
+.info-note.warning-note{background:var(--sig-warning-soft);color:#5f4a1f;border-color:#eddcb7}
+/* Alvos de toque de 44px em telas sensíveis ao toque e no celular. */
+@media (pointer:coarse),(max-width:760px){
+ .btn,.btn.small,.navitem,.icon-button,.link-button,.form-row input,.form-row select,.searchbox input,.toolbar select{min-height:var(--sig-touch)}
+ .btn.small{padding:8px 12px}
+}
+.is-late{color:var(--sig-danger)!important;font-weight:700}

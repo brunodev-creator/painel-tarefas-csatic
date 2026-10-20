@@ -1488,7 +1488,7 @@ function tasksView(){
    '<td>'+(link?'<button class="link-button" data-action="sharedDetail" data-id="'+esc(link.id)+'">'+esc(link.numero)+'</button>':
     t.processo_id?'<span class="cell-sub">Sincronizando…</span>':'—')+'</td>'+
    '<td>'+esc(t.setor)+'</td><td>'+esc(t.responsavel||'Fila da seção')+'</td>'+
-   '<td>'+fmtDate(t.prazo)+(isOverdue(t)?'<div class="cell-sub" style="color:#b85243">Atrasada</div>':'')+'</td>'+
+   '<td>'+fmtDate(t.prazo)+(isOverdue(t)?'<div class="cell-sub is-late">Atrasada</div>':'')+'</td>'+
    '<td>'+iconBadge(past?'Encaminhada':t.status)+(past?'<div class="cell-sub">Etapa anterior</div>':'')+
    '</td><td><div class="sig-task-actions">'+
     '<button class="btn small" data-action="taskReadDetail" data-id="'+esc(t.id)+'">Ver tarefa</button>'+
