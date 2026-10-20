@@ -900,3 +900,16 @@ svg.has-selection .almox-rpm-label:not(.selected) .almox-lbl{opacity:.55}
  .almox-page *,.almox-page *::before{transition:none!important;animation:none!important}
  #almox-map-transform.is-animating{transition:none}
 }
+
+/* ===== Feedback de ações: mensagens e envio em andamento ===== */
+.toast{display:flex;align-items:flex-start;gap:10px;max-width:min(420px,calc(100vw - 32px));padding:13px 16px;border-radius:10px;background:#2b2d31;color:#fff;font-size:13px;line-height:1.45;cursor:pointer;animation:sig-toast-in .18s ease-out}
+.toast-icon{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.18);font-weight:800;font-size:12px}
+.toast-success{background:#2f5a46}
+.toast-error{background:#8a3532}
+.toast-error .toast-icon{background:#fff;color:#8a3532}
+@keyframes sig-toast-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media(max-width:640px){.toast{left:16px;right:16px;bottom:16px;max-width:none}}
+.btn.is-busy{cursor:progress;opacity:.75}
+.btn.is-busy::before{content:"";width:12px;height:12px;margin-right:7px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;vertical-align:-2px;animation:sig-spin .7s linear infinite}
+@keyframes sig-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.toast,.btn.is-busy::before{animation:none}}

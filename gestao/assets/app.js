@@ -181,7 +181,20 @@ function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:
 function assignedToMe(t){if(previewRole){const sector=({'compras':'Compras','licitacao':'Licitação','sofi':'SOFI',...SIG_CHIEF_SECTIONS})[previewRole];return !!sector&&t.setor===sector;}return !!(t.responsavel_auth_id&&t.responsavel_auth_id===currentAuthId())||(!t.responsavel_auth_id&&String(t.responsavel).toLowerCase()===String(profile.nome).toLowerCase())}
 function userCandidates(setor){return (db.usuarios||[]).filter(u=>u.ativo&&u.auth_id&&u.setor===setor&&['admin','chefia',{'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[setor],...Object.entries(SIG_CHIEF_SECTIONS).filter(([,v])=>v===setor).map(([k])=>k)].includes(u.role))}
 function iconBadge(status){const s=String(status||'');const cls=/Bloqueado|Vencido|Atrasad|Cancelad/.test(s)?'red':/Aguardando|Pendente|Baixa cobertura|Próximo vencimento/.test(s)?'amber':/Conclu|Vigente|Ativo/.test(s)?'teal':/andamento|prepara/i.test(s)?'blue':'gray';return `<span class="flag ${cls}">${esc(s)}</span>`}
-function showToast(msg){const root=document.getElementById('toast-root');root.innerHTML=`<div class="toast">${esc(msg)}</div>`;setTimeout(()=>root.querySelector('.toast')?.remove(),3500)}
+// Tipo inferido do texto para não alterar as dezenas de chamadas existentes.
+const TOAST_ERROR=/^(falha|erro|não foi possível|não é possível|não pode|sem permissão|sem autorização|acesso|somente|apenas|selecione|informe|descreva|escolha|vincule|cadastre|valor|você não|arquivo|importação recusada|prévia|tarefa (indisponível|já)|a tarefa|encaminhamento (não|bloqueado)|aipc pendente|antes de|já existe|existem|número e objeto|processo (indisponível|não)|perfil|usuário não|sessão expirada|contrato não|competência|use uma url|nunca use|fim da vigência|execução não|valores devem|frase-senha|as frases|relatório|json|este módulo|consulta|geração|gere|conclua|o perfil|tarefa concluída|para alterar|para concluir|a chefia|militar só|o processo relacionado|essa competência|é necessário)/i;
+const TOAST_SUCCESS=/(com sucesso|salv[oa]s?\b|salvo neste|registrad[oa]|encaminhad[oa]|concluída e|assumida|iniciada|restaurad[oa]|exportado|redistribuída|gerado\.|atualizad[oa]s?\.|finalizada|marcadas como lidas|sessão iniciada|bem-vindo|apagada)/i;
+let toastTimer=null;
+function showToast(msg,kind){
+ const text=String(msg??'');
+ kind=kind||(TOAST_ERROR.test(text)?'error':TOAST_SUCCESS.test(text)?'success':'info');
+ const root=document.getElementById('toast-root');
+ const icon=kind==='error'?'!':kind==='success'?'✓':'i';
+ root.innerHTML='<div class="toast toast-'+kind+'"'+(kind==='error'?' role="alert"':'')+'><span class="toast-icon" aria-hidden="true">'+icon+'</span><span>'+esc(text)+'</span></div>';
+ root.onclick=()=>{root.innerHTML='';};
+ clearTimeout(toastTimer);
+ toastTimer=setTimeout(()=>root.querySelector('.toast')?.remove(),kind==='error'?7000:4000);
+}
 function errMsg(err){return err?.message||'Ocorreu um erro inesperado.'}
 function findProcess(id){return db.processos.find(p=>p.id===id)}
 function optionsWithAll(items,label='Todos'){return `<option value="Todos">${esc(label)}</option>`+items.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('')}
@@ -2088,8 +2101,18 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'chiefSector': navigate('processos');filters.setor=btn.dataset.sector||'Todos';render();break;
  case'menu':document.getElementById('sidebar').classList.toggle('open');document.getElementById('shade').classList.toggle('visible');break;
  case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
+// Retorno imediato no botão de envio: evita duplo clique e mostra que o SIG está trabalhando.
+function submitFeedback(e){
+ const form=e.target;
+ const btn=form?.matches?.('form')&&(e.submitter||form.querySelector('button[type="submit"]'));
+ if(!btn||btn.disabled||previewRole)return()=>{};
+ const label=btn.innerHTML;
+ btn.disabled=true;btn.setAttribute('aria-busy','true');btn.classList.add('is-busy');
+ if(form.dataset.form!=='chat')btn.textContent=form.dataset.form==='login'?'Autenticando…':'Salvando…';
+ return()=>{if(btn.isConnected){btn.disabled=false;btn.removeAttribute('aria-busy');btn.classList.remove('is-busy');btn.innerHTML=label;}};
+}
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
-function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x)))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{handleSubmit(e).catch(x=>showToast(errMsg(x)))});document.addEventListener('input',e=>{
+function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x),'error'))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{const done=submitFeedback(e);handleSubmit(e).catch(x=>showToast(errMsg(x),'error')).finally(done)});document.addEventListener('input',e=>{
   if(e.target.id==='almox-q'){if(canVisitMenu('almoxarifado'))window.SIG_ALMOX.input('almox-q',e.target.value);return;}
  if(e.target.id==='sig-fonte-busca'&&window.SIG_FONTE){
   window.SIG_FONTE.setQuery(e.target.value);
