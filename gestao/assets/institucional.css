@@ -1020,3 +1020,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sig-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:rgba(0,0,0,.08);font-size:11px;font-weight:800}
 .btn.primary .sig-count{background:rgba(255,255,255,.25)}
 .table-empty .btn{margin-left:8px}
+
+/* ===== Detalhe do processo: próximo passo em destaque ===== */
+.sig-next-step{display:flex;align-items:center;justify-content:space-between;gap:var(--sig-space-4);margin:var(--sig-space-3) 0;padding:var(--sig-space-3) var(--sig-space-4);border:1px solid #e6dcc4;border-left:4px solid var(--sig-primary);border-radius:var(--sig-radius);background:var(--sig-primary-soft)}
+.sig-next-step small{display:block;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--sig-primary-strong)}
+.sig-next-step strong{display:block;font-size:var(--sig-text-lg);margin:2px 0}
+.sig-next-step span{display:block;font-size:var(--sig-text-xs);color:var(--sig-text-muted)}
+.sig-next-step .btn{flex:none}
+@media(max-width:640px){.sig-next-step{flex-direction:column;align-items:stretch}}
