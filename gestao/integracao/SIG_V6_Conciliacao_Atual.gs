@@ -11,10 +11,10 @@ function sigV6VerificarOrigemAtual_(){
  return ss;
 }
 const SIGV6 = Object.freeze({
- version:'6.0.0', maxRows:30000,maxAlerts:450,
+ version:'6.1.0', maxRows:30000,maxAlerts:450,
  names:{
   cotas:'IMPORT_SALDOS_BO',ripc:'DESTINACAO_REPASSES',itens:'ITENS_AQUISICAO',
-  empenhos:'INDICE_EMPENHOS',continuos:'CONTROLE_SERVICOS_CONTINUOS',
+  empenhos:'INDICE_EMPENHOS',movimentos:'IMPORT_EXECUCAO_DESPESA_BO',continuos:'CONTROLE_SERVICOS_CONTINUOS',
   processos:'CONTROLE_PROCESSOS_COMPRA',correcoes:'SIG_V6_CORRECOES_APROVADAS',alocacoes:'SIG_V6_ALOCACOES_APROVADAS'},
  outputs:{resumo:'SIG_V6_RESUMO',repasses:'SIG_V6_REPASSES',dotacoes:'SIG_V6_DOTACOES',
  empenhos:'SIG_V6_EMPENHOS',continuos:'SIG_V6_CONTINUOS',alertas:'SIG_V6_ALERTAS',
@@ -277,6 +277,9 @@ function sigV6ConciliarAbatimentos_(repasses, empenhos, alert, alocacoesAprovada
   else if(viaGlobal){status='ABATIDO_GLOBAL';target=global;descricao='Somente a dotação global do mesmo elemento e demais campos existe.';}
   else {status='SEM_COTA';descricao='Nenhuma dotação específica ou global correspondente.';}
   if(target)totals[target]=(totals[target]||0)+value;
+   if(e.ajuste_estado!=='SEM_AJUSTE')descricao+=(descricao?' ':'')+
+     'Ajuste financeiro orçamentário: '+e.ajuste_estado+
+     ', impacto '+e.ajuste_aplicado_centavos+' centavos; índice original '+e.liquido_indice_centavos+' centavos.';
   if(status==='AMBIGUA_SEM_ABATE')alert('ATENCAO','ABATE_AMBIGUO',SIGV6.names.empenhos,0,
     'Empenho '+e.chave_empenho+': existem cotas específica e global; sem abatimento automático.');
   if(status==='SEM_COTA'||status==='CODIGO_INCOMPLETO'||status==='VALOR_NEGATIVO_CONFERIR')
@@ -290,7 +293,8 @@ function sigV6ConciliarAbatimentos_(repasses, empenhos, alert, alocacoesAprovada
    unidade_contabil_executora:e.unidade_contabil_executora,
    dotacao_texto_fonte:e.dotacao_texto_fonte,
    normalizacao_dotacao:e.normalizacao_dotacao,detalhe_normalizacao:e.detalhe_normalizacao,
-   referencia:'Posição dos dados importados; não individualiza documento de repasse.'});
+   liquido_indice_centavos:e.liquido_indice_centavos,ajuste_aplicado_centavos:e.ajuste_aplicado_centavos,ajuste_estado:e.ajuste_estado,
+    referencia:'Posição dos dados importados; não individualiza documento de repasse.'});
  }
  return {registros:out,abatidoPorDot:totals};
 }
@@ -320,6 +324,43 @@ function sigV6Sha_(v){
  const bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(v),Utilities.Charset.UTF_8);
  return bytes.map(b=>('0'+(b<0?b+256:b).toString(16)).slice(-2)).join('');
 }
+
+/** Retifica líquido de empenho somente pelo ajuste financeiro ORÇAMENTÁRIO assinado.
+ * Não utiliza Total_Ajustes como desconto: essa coluna é magnitude de conferência.
+ */
+function sigV6AplicarAjustesAssinados_(r,valor,lista,alert){
+ const key=r.get('Chave_Empenho'),m=lista[key];
+ const declarado=sigV6Reais_(r.get('Total_Ajustes'));
+ if(!m){
+  if(declarado!==null&&declarado!==0)alert('BLOQUEIO','AJUSTE_SEM_MOVIMENTO',SIGV6.names.movimentos,r.linha,'Índice com ajuste sem movimento orçamentário: '+key);
+  return {liquido:valor,orig:valor,delta:0,estado:'SEM_AJUSTE'};
+ }
+ const inicial=sigV6Reais_(r.get('Total_Empenho_Inicial')),
+  reforco=sigV6Reais_(r.get('Total_Reforco')),anul=sigV6Reais_(r.get('Total_Anulacao_Empenho'));
+ if([declarado,inicial,reforco,anul].some(v=>v===null)||declarado!==m.absoluto){
+  alert('BLOQUEIO','AJUSTE_DIVERGENTE',SIGV6.names.empenhos,r.linha,'Ajuste não validado com índice do empenho '+key);
+  return {liquido:valor,orig:valor,delta:0,estado:'PENDENTE'};
+ }
+ const base=inicial+reforco-anul;
+ if(valor===base)return {liquido:valor+m.assinado,orig:valor,delta:m.assinado,estado:'AJUSTE_APLICADO'};
+ if(valor===base+m.assinado)return {liquido:valor,orig:valor,delta:0,estado:'JA_CONTABILIZADO'};
+ alert('BLOQUEIO','AJUSTE_AMBIGUO',SIGV6.names.empenhos,r.linha,'Valor líquido não confere com/sem ajuste: '+key);
+ return {liquido:valor,orig:valor,delta:0,estado:'PENDENTE'};
+}
+function sigV6MapaAjustesOrcamentarios_(linhas,alert){
+ const m=Object.create(null);
+ for(const r of linhas){
+  if(sigV6NormalHeader_(r.get('Tipo da especificação'))!=='ajustefinanceiroorcamentario')continue;
+  const ano=sigV6Year_(r.get('Ano Empenho')),ue=sigV6Doc_(r.get('Código Unidade Compra')),
+   numero=sigV6Doc_(r.get('Número do Empenho')),cent=sigV6Reais_(r.get('Valor Despesa Empenhada'));
+  if(!ano||!ue||!numero||cent===null){
+   alert('BLOQUEIO','AJUSTE_INVALIDO',SIGV6.names.movimentos,r.linha,'Ajuste sem chave ou valor assinado');continue;
+  }
+  const id=ano+'|'+ue+'|'+numero,acc=m[id]||(m[id]={assinado:0,absoluto:0,linhas:[]});
+  acc.assinado+=cent;acc.absoluto+=Math.abs(cent);acc.linhas.push(r.linha);
+ }
+ return m;
+}
 function sigV6Construir_(){
  sigV6VerificarOrigemAtual_();
  const now=new Date().toISOString(),notices=[],max=SIGV6.maxAlerts;
@@ -330,6 +371,9 @@ function sigV6Construir_(){
  const dests=sigV6Ler_(SIGV6.names.ripc,['ID_RIPC','Ano','Doc_Repasse','Dotacao','Valor_RIPC'],alert);
  const itens=sigV6Ler_(SIGV6.names.itens,['ID_Item_RIPC','ID_RIPC','Valor_Total'],alert);
  const emps=sigV6Ler_(SIGV6.names.empenhos,['Chave_Empenho','Dotacao','Total_Empenhado_Liquido','Saldo_Atual_Empenho'],alert);
+ const movimentos=sigV6Ler_(SIGV6.names.movimentos,
+  ['Tipo da especificação','Ano Empenho','Código Unidade Compra','Número do Empenho','Valor Despesa Empenhada'],alert);
+ const mapaAjustes=sigV6MapaAjustesOrcamentarios_(movimentos,alert);
  const continuos=sigV6Ler_(SIGV6.names.continuos,['Chave_Empenho','Saldo_Atual_Empenho'],alert);
  const processos=sigV6Ler_(SIGV6.names.processos,['ID_Processo','Processo_Compra','Status_Processo'],alert);
  // Aba privada opcional: nenhuma correção é inferida nem publicada no código público.
@@ -433,13 +477,15 @@ function sigV6Construir_(){
   if(!id||dot.length<10){alert('BLOQUEIO','EMPENHO_IDENTIFICACAO',SIGV6.names.empenhos,r.linha,'Chave ou dotação inválida');continue;}
   if(empSeen[id]){alert('BLOQUEIO','EMPENHO_DUPLICADO',SIGV6.names.empenhos,r.linha,'Chave repetida: '+id);continue;}
   empSeen[id]=true;
-  const liquid=sigV6Reais_(r.get('Total_Empenhado_Liquido')),saldo=sigV6Reais_(r.get('Saldo_Atual_Empenho'));
-  if(liquid===null||saldo===null){alert('BLOQUEIO','EMPENHO_VALORES',SIGV6.names.empenhos,r.linha,'Montante empenhado ou saldo inválido');continue;}
+  const liquidOriginal=sigV6Reais_(r.get('Total_Empenhado_Liquido')),saldo=sigV6Reais_(r.get('Saldo_Atual_Empenho'));
+  if(liquidOriginal===null||saldo===null){alert('BLOQUEIO','EMPENHO_VALORES',SIGV6.names.empenhos,r.linha,'Montante empenhado ou saldo inválido');continue;}
+  const ajuste=sigV6AplicarAjustesAssinados_(r,liquidOriginal,mapaAjustes,alert);
+  const liquid=ajuste.liquido;
   const e={chave_empenho:id,processo:r.get('Processo_Compra'),dotacao:dot,dotacao_orig:dotOrigem,
     dotacao_texto_fonte:r.get('Dotacao'),normalizacao_dotacao:correcao.normalizacao,
     detalhe_normalizacao:correcao.detalhe,
     unidade_contabil_executora:unidade,eh_tdco:ehTdco,fora_unidade_cotas:foraUE,
-    empenhado_liquido_centavos:liquid,saldo_informado_centavos:saldo,
+    empenhado_liquido_centavos:liquid,liquido_indice_centavos:liquidOriginal,ajuste_aplicado_centavos:ajuste.delta,ajuste_estado:ajuste.estado,saldo_informado_centavos:saldo,
     classificacao:tipoExecucao,historico:r.get('Data_Atualizacao')||''};
   empenhos.push(e);byEmp[id]=e;
   // TDCO/OU outra unidade não entra em agregações nem abatimentos das contas da UE 1250070.
@@ -502,7 +548,10 @@ function sigV6Construir_(){
    empenhos_outra_ue_listados:abatimentos.filter(x=>x.status==='OUTRA_UNIDADE_FORA_ESCOPO').length,
    valor_tdco_sem_abate_centavos:abatimentos.filter(x=>x.status==='TDCO_FORA_ESCOPO').reduce((a,x)=>a+x.valor_empenhado_liquido_centavos,0),
    empenhos_dota_corrigidos:abatimentos.filter(x=>x.normalizacao_dotacao==='FUNCIONAL_0000_PARA_0001_APROVADA').length,
-   valor_abatido_gerencial_centavos:abatimentos.filter(x=>x.dotacao_de_abate)
+   ajustes_orcamentarios_identificados:Object.keys(mapaAjustes).length,
+    ajustes_orcamentarios_aplicados:empenhos.filter(x=>x.ajuste_aplicado_centavos!==0).length,
+    efeito_financeiro_ajustes_centavos:empenhos.reduce((a,x)=>a+x.ajuste_aplicado_centavos,0),
+    valor_abatido_gerencial_centavos:abatimentos.filter(x=>x.dotacao_de_abate)
        .reduce((sum,x)=>sum+x.valor_empenhado_liquido_centavos,0),
    dotacoes_globais:dotacoes.filter(x=>x.tipo_dotacao==='GLOBAL'&&x.documentos>0).length,
    cota_global_centavos:dotacoes.filter(x=>x.tipo_dotacao==='GLOBAL').reduce((a,b)=>a+b.cotas_centavos,0),
@@ -515,7 +564,7 @@ function sigV6Construir_(){
    diferenca_global_informativa_centavos:rawCotas.reduce((n,x)=>n+x.credito_liquido_centavos,0)-
      Object.values(byRipc).reduce((n,x)=>n+x.valor_ripc_centavos,0),
    empenho_liquido_total_centavos:empenhos.reduce((n,x)=>n+x.empenhado_liquido_centavos,0)};
- const report={sig_version:'6.0.0',tipo:'CONCILIACAO_LOCAL',origem:'Planilha: '+SpreadsheetApp.getActiveSpreadsheet().getName(),
+ const report={sig_version:'6.1.0',tipo:'CONCILIACAO_LOCAL',origem:'Planilha: '+SpreadsheetApp.getActiveSpreadsheet().getName(),
   gerado_em:now,referencia_arquivo:'Posição das abas conforme última importação; não significa dados de hoje.',
   resumo:summary,repasses,dotacoes,abatimentos,ripcs:Object.values(byRipc),empenhos,continuos:continuosOut,
   processos:processosOut,alertas:notices,
@@ -528,14 +577,15 @@ function sigV6Construir_(){
    'Elemento sem item: código BO 00EE é interpretado como EE00 na chave numérica e EEXX na exibição, conforme orientação CSA-TIC. Original preservado.',
    'Recursos globais (conta 998020301) e específicos (conta 998020302) não são conciliados automaticamente entre si ou com um documento de repasse.',
    'Regra mestre: abate valor líquido positivo de cada empenho UMA vez na dotação presente nas cotas. Se coexistirem dotação específica e global: alerta, sem escolha nem abatimento automático.',
-   'O valor da cota não precisa coincidir com o empenho; não se reutiliza o valor do RIPC como novo gasto.',
+   'Ajuste financeiro orçamentário usa valor assinado da IMPORT_EXECUCAO_DESPESA_BO e evita desconto duplo; divergências bloqueiam a publicação.',
+    'O valor da cota não precisa coincidir com o empenho; não se reutiliza o valor do RIPC como novo gasto.',
    'TDCO ou empenho de unidade contábil diferente da 1250070: apenas listado, jamais abatido das contas 998020301 e 998020302.',
    'Correção histórica de 0000 para 0001 exige aprovação registrada por chave de empenho na SIG_V6_CORRECOES_APROVADAS, correspondência exata e cota existente. Códigos originais preservados.',
    'Diferença gerencial (cotas menos abatimentos) pode ser negativa e não é saldo oficial nem prova de insuficiência do SIAFI. Somente a data de posição das cotas, e não a geração do relatório, indica até quando é possível inferir presença de dotação.',
    'Disponibilidade para empenhar, reforço de contrato e classificação de serviço contínuo exigem conferência oficial.'
   ]};
- report.assinatura_geral=sigV6Sha_(JSON.stringify({regra_dotacao_global_v2:true,regra_mestre_abate_v1:true,regra_exclusao_tdco_v1:true,regra_normalizacao_historica_v1:true,referencia_cotas:dataCotas,abatimentos:abatimentos.map(x=>[x.chave_empenho,x.status,x.dotacao_de_abate]),repasses:repasses.map(x=>[x.chave,x.credito_liquido_centavos,x.valor_ripc_centavos]),
-   empenhos:empenhos.map(x=>[x.chave_empenho,x.empenhado_liquido_centavos,x.saldo_informado_centavos]),
+ report.assinatura_geral=sigV6Sha_(JSON.stringify({regra_ajustes_financeiros_assinados_v1:true,regra_dotacao_global_v2:true,regra_mestre_abate_v1:true,regra_exclusao_tdco_v1:true,regra_normalizacao_historica_v1:true,referencia_cotas:dataCotas,abatimentos:abatimentos.map(x=>[x.chave_empenho,x.status,x.dotacao_de_abate]),repasses:repasses.map(x=>[x.chave,x.credito_liquido_centavos,x.valor_ripc_centavos]),
+   empenhos:empenhos.map(x=>[x.chave_empenho,x.empenhado_liquido_centavos,x.saldo_informado_centavos,x.ajuste_aplicado_centavos]),
    continuos:continuosOut.map(x=>[x.chave_empenho,x.reforco_sugerido_centavos])}));
  return report;
 }
@@ -565,6 +615,9 @@ function sigV6Escrever_(r){
   ['Abatimento gerencial (R$)',fmt(r.resumo.valor_abatido_gerencial_centavos)],
   ['Diferença gerencial NÃO OFICIAL (R$)',fmt(r.resumo.cota_liquida_centavos-r.resumo.valor_abatido_gerencial_centavos)],
   ['Empenhado total no índice (R$)',fmt(r.resumo.empenho_liquido_total_centavos)],
+  ['Ajustes financeiros orçamentários localizados',r.resumo.ajustes_orcamentarios_identificados],
+  ['Ajustes aplicados sem duplicidade',r.resumo.ajustes_orcamentarios_aplicados],
+  ['Efeito assinado dos ajustes (R$)',fmt(r.resumo.efeito_financeiro_ajustes_centavos)],
   ['TDCO fora do abatimento (R$)',fmt(r.resumo.valor_tdco_sem_abate_centavos)],
   ['RIPC relacionados',r.resumo.ripcs],
   ['Documentos de repasse',r.resumo.repasses],
@@ -592,21 +645,21 @@ function sigV6Escrever_(r){
   fmt(x.abatido_sig_centavos),fmt(x.diferenca_gerencial_centavos)]));
  sigV6CriarAba_(ss,n.empenhos,['Chave Empenho','Processo','Dotação consolidada','Dotação original','Empenhado líquido (R$)',
   'Saldo de empenho (R$)','Tipo de execução','Leitura EEXX','Tipo','Conta','Eh TDCO?','UE contábil',
-  'Dotação texto de origem','Correção histórica','Justificativa'],r.empenhos.map(x=>[
+  'Dotação texto de origem','Correção histórica','Justificativa','Valor líquido original índice (R$)','Ajuste aplicado (R$)','Situação ajuste'],r.empenhos.map(x=>[
   x.chave_empenho,x.processo,x.dotacao,x.dotacao_orig,fmt(x.empenhado_liquido_centavos),
   fmt(x.saldo_informado_centavos),x.classificacao,sigV6DotInfo_(x.dotacao).exibicao,sigV6DotInfo_(x.dotacao).tipo,sigV6DotInfo_(x.dotacao).conta,
   x.eh_tdco?'SIM':'NÃO',x.unidade_contabil_executora,x.dotacao_texto_fonte,
-  x.normalizacao_dotacao,x.detalhe_normalizacao]));
+  x.normalizacao_dotacao,x.detalhe_normalizacao,fmt(x.liquido_indice_centavos),fmt(x.ajuste_aplicado_centavos),x.ajuste_estado]));
  sigV6CriarAba_(ss,n.abatimentos,['Chave empenho','Processo','Dotação do empenho (normalizada)',
   'Dotação original','Dotação global candidata','Dotação utilizada para abate',
   'Valor líquido empenhado (R$)','Resultado','Há cota específica?','Há cota global?','Observação',
-  'Tipo execução','Eh TDCO?','UE contábil','Dotação fonte texto','Normalização histórica','Justificativa normalização'],r.abatimentos.map(x=>[
+  'Tipo execução','Eh TDCO?','UE contábil','Dotação fonte texto','Normalização histórica','Justificativa normalização','Valor líquido original índice (R$)','Ajuste aplicado (R$)','Situação ajuste'],r.abatimentos.map(x=>[
   x.chave_empenho,x.processo,x.dotacao_empenho,x.dotacao_empenho_original,
   x.dotacao_global_candidata,x.dotacao_de_abate,
   fmt(x.valor_empenhado_liquido_centavos),x.status,x.cota_especifica_existe?'SIM':'NÃO',
   x.cota_global_existe?'SIM':'NÃO',x.descricao,
   x.tipo_execucao_contabil,x.eh_tdco?'SIM':'NÃO',x.unidade_contabil_executora,x.dotacao_texto_fonte,
-  x.normalizacao_dotacao,x.detalhe_normalizacao]));
+  x.normalizacao_dotacao,x.detalhe_normalizacao,fmt(x.liquido_indice_centavos),fmt(x.ajuste_aplicado_centavos),x.ajuste_estado]));
  sigV6CriarAba_(ss,n.continuos,['Chave empenho','Processo','Dotação','Status',
   'Saldo informado (R$)','Reforço sugerido (R$)','Tipo execução','Observação'],r.continuos.map(x=>[
   x.chave_empenho,x.processo,x.dotacao,x.status,fmt(x.saldo_informado_centavos),
