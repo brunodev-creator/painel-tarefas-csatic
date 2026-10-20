@@ -1468,17 +1468,19 @@ async function claimQueueTask(id){
 }
 function tasksView(){
  const setor=setorUsuario();
- const list=db.tarefas.filter(t=>
-  taskScope==='mine'?assignedToMe(t):
-  taskScope==='queue'?t.setor===setor&&queueClaimable(t):
-  taskScope==='sector'?t.setor===setor:true);
+ const inScope=scope=>db.tarefas.filter(t=>
+  scope==='mine'?assignedToMe(t):
+  scope==='queue'?t.setor===setor&&queueClaimable(t):
+  scope==='sector'?t.setor===setor:true);
+ const list=inScope(taskScope);
+ const scopeCount={mine:inScope('mine').filter(t=>isOpenTask(t)&&!taskIsPriorStage(t)).length,queue:inScope('queue').length,sector:inScope('sector').filter(t=>isOpenTask(t)&&!taskIsPriorStage(t)).length};
  const arr=list.filter(t=>filters.setor==='Todos'||t.setor===filters.setor)
   .filter(t=>filters.status==='Todos'||(taskIsPriorStage(t)?'Encaminhada':t.status)===filters.status)
   .filter(t=>searchText(t.titulo,t.responsavel,t.descricao,taskProcessSummary(t)?.numero).includes(filters.q.toLocaleLowerCase('pt-BR')))
   .sort((a,b)=>(!isOpenTask(a)||taskIsPriorStage(a))-(!isOpenTask(b)||taskIsPriorStage(b))||daysLeft(a.prazo)-daysLeft(b.prazo));
  const actions='<div class="sig-task-tabs">'+[
   ['mine','Minhas tarefas'],['queue','Fila disponível'],['sector','Toda a seção']
- ].map(([key,label])=>'<button type="button" class="btn small'+(taskScope===key?' primary':'')+'" data-action="taskScope" data-scope="'+key+'">'+label+'</button>').join('')+
+ ].map(([key,label])=>'<button type="button" class="btn small'+(taskScope===key?' primary':'')+'" data-action="taskScope" data-scope="'+key+'" aria-pressed="'+(taskScope===key)+'">'+label+(scopeCount[key]?' <span class="sig-count">'+scopeCount[key]+'</span>':'')+'</button>').join('')+
   (!previewRole&&canWrite(setor)?'<button type="button" class="btn primary" data-action="newTask" data-sector="'+esc(setor)+'">+ Criar tarefa</button>':'')+'</div>';
  const rows=arr.map(t=>{
   const available=t.setor===setor&&queueClaimable(t)&&!previewRole;
@@ -1508,7 +1510,7 @@ function tasksView(){
   '<div class="toolbar"><label class="searchbox">⌕ <input id="filter-q" data-filter="q" placeholder="Buscar tarefa..." value="'+esc(filters.q)+'"></label>'+
   '<select data-filter="status" class="field-select">'+optionsWithAll(TASK_STATUSES,'Todas as situações')+'</select></div>'+
   '<div class="card table-card"><div class="table-scroll"><table class="data-table"><thead><tr><th>Tarefa</th><th>Processo</th><th>Seção</th><th>Responsável</th><th>Prazo</th><th>Situação</th><th>Ações</th></tr></thead><tbody>'+
-  (rows||'<tr><td colspan="7" class="table-empty">Nenhuma tarefa nesta fila.</td></tr>')+
+  (rows||'<tr><td colspan="7" class="table-empty">'+(taskScope==='mine'&&!list.length&&scopeCount.queue?'Nenhuma tarefa atribuída a você. <button type="button" class="btn small primary" data-action="taskScope" data-scope="queue">Ver '+scopeCount.queue+' tarefa(s) na fila da seção</button>':'Nenhuma tarefa nesta fila.')+'</td></tr>')+
   '</tbody></table></div></div>';
 }
 function contractsView(){

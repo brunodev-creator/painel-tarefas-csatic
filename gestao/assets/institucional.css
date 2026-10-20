@@ -1017,3 +1017,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .sig-now-actions .btn{flex:1}
  .sig-now-chip{min-height:var(--sig-touch)}
 }
+.sig-count{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:rgba(0,0,0,.08);font-size:11px;font-weight:800}
+.btn.primary .sig-count{background:rgba(255,255,255,.25)}
+.table-empty .btn{margin-left:8px}
