@@ -783,6 +783,43 @@ function purchaseNextButton(p){
  const n=processNextStep(p);
  return n?'<button type="button" class="btn primary" data-action="'+n.action+'" data-id="'+esc(p.id)+'" title="'+esc(n.why)+'">'+esc(n.label)+' →</button>':'';
 }
+// Andamento rápido: só o que muda no dia a dia; o cadastro completo continua em Detalhes → Editar.
+function progressForm(id){
+ const p=findProcess(id);
+ if(!p||previewRole||!canWrite(p.setor)||!activeProcess(p))return showToast('Sem permissão para registrar andamento neste processo.');
+ const html='<form data-form="andamento" data-id="'+esc(id)+'"><div class="form-grid">'+
+  textareaField('proxima_acao','Próxima providência',p.proxima_acao||'')+
+  inputField('prazo','Prazo da próxima providência',String(p.prazo||'').slice(0,10),'date')+
+  selectField('status','Situação',STATUSES.filter(x=>x!=='Cancelado'),p.status)+
+  inputField('etapa','Etapa atual',p.etapa||'','text','required maxlength="160"')+
+  textareaField('observacao','O que foi feito (vai para o histórico)','')+
+  '</div><p class="helper">Altere só o que mudou. Para mudar valores, SEI ou modalidade, use Detalhes → Editar.</p>'+
+  '<div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Registrar andamento</button></div></form>';
+ openModal('Registrar andamento',p.numero+' · '+(p.objeto||''),html,true);
+ document.querySelector('#modal-root [name="observacao"]')?.focus();
+}
+async function submitProgress(form){
+ const p=findProcess(form.dataset.id);
+ if(!p||previewRole||!canWrite(p.setor)||!activeProcess(p))throw Error('Processo indisponível para registrar andamento.');
+ const d=gather(form),obs=String(d.observacao||'').trim(),next=String(d.proxima_acao||'').trim(),etapa=String(d.etapa||'').trim();
+ if(next.length<5)return showToast('Informe a próxima providência (mínimo 5 caracteres).');
+ if(!etapa)return showToast('Informe a etapa atual.');
+ if(!STATUSES.includes(d.status)||d.status==='Cancelado')return showToast('Selecione uma situação válida.');
+ const record=normalizeProcess({...p,etapa,status:d.status,prazo:d.prazo||null,proxima_acao:next,
+  bloqueio_motivo:d.status==='Bloqueado'&&obs?obs:p.bloqueio_motivo,updated_at:nowIso()});
+ const summary=obs||('Andamento atualizado. Etapa: '+etapa+'; próxima providência: '+next+(d.prazo?'; prazo '+fmtDate(d.prazo):'')+'.');
+ busy=true;
+ try{
+  await persist('processos',record,true);
+  // Tipo já usado em Registrar movimentação, aceito pela RPC registrar_ocorrencia.
+  let logged=true;
+  try{await addEvent(p.id,'Observação','Andamento — '+summary,profile.nome);}catch(e){logged=false;}
+  if(cloud())await fetchCloud();
+  closeModal();render();
+  showToast(logged?'Andamento registrado no histórico do processo.':'Andamento salvo, mas o registro no histórico falhou. Use Detalhes → + Movimentação.',logged?'success':'error');
+ }catch(e){showToast('Não foi possível registrar o andamento: '+errMsg(e))}
+ finally{busy=false}
+}
 function purchaseView(){
  const all=db.processos.filter(p=>p.setor==='Compras');
  const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,done:all.filter(p=>p.status==='Concluído').length};
@@ -810,7 +847,7 @@ function purchaseView(){
    '<div class="sig-buy-item-head"><div class="sig-buy-item-heading"><button type="button" class="sig-buy-process-link" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><h3>'+esc(p.objeto||'Objeto não informado')+'</h3></div><div class="sig-buy-tags">'+iconBadge(p.status)+purchaseAipcTag(p)+(p.prioridade==='Alta'?'<span class="sig-buy-high">Alta prioridade</span>':'')+'</div></div>'+
    '<div class="sig-buy-next"><span>Próxima providência</span><strong>'+esc(p.proxima_acao||'Definir a próxima providência')+'</strong></div>'+
    '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Responsável: <b>'+esc(p.responsavel||'Não definido')+'</b></span><span class="'+(issue?'sig-buy-deadline-urgent':'')+'">'+esc(deadline)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span></div>'+
-   '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+purchaseNextButton(p)+'</div></div></article>';
+   '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit&&activeProcess(p)?'<button type="button" class="btn" data-action="progressForm" data-id="'+esc(p.id)+'">Registrar andamento</button>':'')+purchaseNextButton(p)+'</div></div></article>';
  };
  const list=visible.length?visible.slice(0,purchaseLimit).map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
  const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&isOpenTask(t)&&assignedToMe(t)).length;
@@ -2078,7 +2115,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='andamento')return submitProgress(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -2192,6 +2229,7 @@ async function handleClick(e){if(!e.target.closest?.('#sig-global-search'))close
   if(!canFinance()||!window.SIG_FONTE)return showToast('Consulta indisponível.');
   try{await window.SIG_FONTE.open(id,rest);render();}
   catch(error){showToast('Não foi possível consultar: '+errMsg(error))}break;
+ case 'progressForm':progressForm(id);break;
  case 'globalOpen':closeGlobalSearch(true);if(findProcess(id))detail(id);else sharedProcessDetail(id);break;
  case 'licDemoOpen':licDemoOpen(id);break;
  case 'licDemoGenerate':await licDemoGenerate(id);break;
