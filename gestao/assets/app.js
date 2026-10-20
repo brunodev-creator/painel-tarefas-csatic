@@ -785,11 +785,10 @@ function purchaseView(){
   {id:'done',label:'Concluídos',help:'Histórico finalizado',value:counts.done,icon:'✓'}
  ];
  const canEdit=!previewRole&&canWrite('Compras');
- const categoryCards='<div class="sig-buy-services">'+PURCHASE_SERVICES.map(x=>{
-  const total=all.filter(p=>categoryFromProcess(p)===x.id).length;
-  return '<button class="sig-buy-service'+(serviceFilter===x.id?' selected':'')+'" type="button" data-action="buyService" data-service="'+esc(x.id)+'"><span class="sig-buy-service-icon">'+x.icon+'</span>'+
-   '<strong>'+esc(x.short)+'</strong><small>'+esc(x.desc)+'</small><span class="sig-buy-service-count">'+total+' demanda(s)</span></button>';
- }).join('')+'</div>';
+ // Modalidade como linha de etiquetas: um toque filtra, outro toque em "Todas" limpa.
+ const chip=(id,label,total,title)=>'<button type="button" class="sig-buy-chip'+(serviceFilter===id?' selected':'')+'" data-action="buyService" data-service="'+esc(id)+'" aria-pressed="'+String(serviceFilter===id)+'"'+(title?' title="'+esc(title)+'"':'')+'>'+esc(label)+' <span>'+total+'</span></button>';
+ const categoryCards='<div class="sig-buy-chips" role="group" aria-label="Filtrar por modalidade"><span class="sig-buy-chips-label">Modalidade</span>'+
+  chip('Todos','Todas',all.length)+PURCHASE_SERVICES.map(x=>chip(x.id,x.short,all.filter(p=>categoryFromProcess(p)===x.id).length,x.desc)).join('')+'</div>';
  const metrics='<div class="sig-buy-metrics" aria-label="Filtrar processos de compras">'+tabs.map(t=>
   '<button type="button" class="sig-buy-metric'+(purchaseFilter===t.id?' active':'')+'" data-action="buyFilter" data-filter="'+t.id+'" aria-pressed="'+String(purchaseFilter===t.id)+'"><span class="sig-buy-metric-top"><span>'+esc(t.label)+'</span><span class="sig-buy-metric-icon" aria-hidden="true">'+t.icon+'</span></span><strong>'+t.value+'</strong><small>'+esc(t.help)+'</small></button>'
  ).join('')+'</div>';
@@ -811,7 +810,7 @@ function purchaseView(){
   '</div></div>';
  const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+all.length+' processo(s)</span></div>';
  const more=visible.length>purchaseLimit?'<div class="sig-buy-more"><span>Exibindo '+Math.min(visible.length,purchaseLimit)+' de '+visible.length+' processos filtrados</span><button type="button" class="btn" data-action="buyMore">Ver mais processos ↓</button></div>':'';
- return '<section class="sig-buy-page">'+headingHtml+categoryCards+'<div class="sig-buy-service-toggle"><button class="btn small" data-action="buyService" data-service="Todos">'+(serviceFilter==='Todos'?'Todas as modalidades ✓':'Exibir todas as modalidades')+'</button></div>'+metrics+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
+ return '<section class="sig-buy-page">'+headingHtml+metrics+categoryCards+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
 }
 async function loadSharedProcesses(){
  if(!cloud()||!session?.user?.id)return;

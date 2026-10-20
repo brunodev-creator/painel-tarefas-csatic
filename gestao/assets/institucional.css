@@ -1068,3 +1068,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sig-buy-empty strong{font-size:var(--sig-text-base);color:var(--sig-text)}
 .sig-buy-empty span{font-size:var(--sig-text-sm);color:var(--sig-text-muted)}
 .table-empty{color:var(--sig-text-muted);font-size:var(--sig-text-sm)}
+
+/* ===== Compras: modalidades como etiquetas compactas ===== */
+.sig-buy-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sig-space-2);margin:0 0 var(--sig-space-3)}
+.sig-buy-chips-label{font-size:var(--sig-text-xs);font-weight:800;color:var(--sig-text-muted);margin-right:2px}
+.sig-buy-chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:5px 12px;border:1px solid var(--sig-border);border-radius:999px;background:var(--sig-surface);color:var(--sig-text);font-size:var(--sig-text-sm);font-weight:700}
+.sig-buy-chip span{font-size:11px;font-weight:800;color:var(--sig-text-muted)}
+.sig-buy-chip:hover{border-color:var(--sig-primary)}
+.sig-buy-chip.selected{background:var(--sig-primary);border-color:var(--sig-primary);color:#fff}
+.sig-buy-chip.selected span{color:#f3efe4}
+@media(max-width:640px){.sig-buy-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}.sig-buy-chip{flex:none;min-height:var(--sig-touch)}}
