@@ -115,3 +115,35 @@ saldo oficial. As descrições são auxiliares e não alteram nenhuma regra
 de abatimento da V6, o snapshot, ou a apresentação separada das diárias.
 O catálogo de leitura pode ser atualizado em
 [`cotas-descricoes.js`](./assets/cotas-descricoes.js).
+
+
+## Exceções do painel BO/SIAD operacional — atualização 20/10/2026
+
+A partir desta revisão, **o painel de cotas operacionais** (não a fonte financeira nem a V6) exclui do somatório de **cota BO/SIAD**, abatimentos e diferença gerencial:
+
+- **Todas as diárias militares** (elemento 3390.15, inclusive `2500 · 15XX`, `2061 · 15XX`, `4365 · 15XX` e `4365 · 1501`).
+- **`1251.06.181.137.4365.0001.3390.36XX.60.2.0`** — serviços de pessoa física: cota fonte R$ 600,00, sem saldo exibido no relatório de 20/10; reservada para tratamento futuro em seção própria.
+- **`1251.06.122.705.2500.0001.3390.3913.10.1.0`** — água/esgoto: cota fonte R$ 10.833,00, excluída do total operacional por solicitação. **Atenção: no print do Portal Contábil de 20/10 ela aparece com R$ 870,00**, portanto a exclusão não significa ausência comprovada ou saldo zero. A referência fica documentada para auditoria.
+
+Essas duas últimas dotações aparecem em uma **tabela de exceções fora do escopo operacional**; as diárias ficam em tabela separada para um menu futuro. Em ambos os casos **não** integram tabela operacional, filtros, CSV ou KPIs.
+
+**Diária confirmada:** `4365 · 3390.15XX · 60.2.0`, referência no Portal Contábil de 20/10/2026 às 08h00min24s: **R$ 1.188,00** (antes R$ 2.085,00, consulta de 19/10). Sua referência manual protegida foi atualizada em `sig_cotas_diarias_referencia`. Sem lançamento de abatimento nem alteração da posição BO original. Outras diárias sem saldo contábil confirmado **não são computadas** na conferência.
+
+### Totais da posição V6 de 20/10/2026
+
+| Indicador | Valor |
+| --- | ---: |
+| Cota BO original (V6 auditável, todas as dotações) | R$ 89.206.351,21 |
+| Abatimento V6 original | R$ 85.819.873,38 |
+| Diferença V6 original | R$ 3.386.477,83 |
+| Cotas de diárias segregadas | R$ 257.622,80 |
+| Cotas das outras duas exceções segregadas | R$ 11.433,00 |
+| **Cota BO/SIAD do escopo operacional** | **R$ 88.937.295,41** |
+| **Abatimento V6 do escopo operacional** | **R$ 85.819.873,38** |
+| **Diferença V6 do escopo operacional** | **R$ 3.117.422,03** |
+| Referência contábil de diária confirmada | R$ 1.188,00 |
+| **Conferência gerencial operacional + diária confirmada** | **R$ 3.118.610,03** |
+
+A tabela principal fica com **37 dotações**. O filtro padrão mostra **23 com diferença distinta de zero**, e a opção “Mostrar todas” mostra 37. Quatro dotações de diárias e duas de outras exceções permanecem em tabelas de conferência segregadas.
+
+**Escopo e auditoria:** estas exclusões são **regras da visualização operacional**, não cancelamentos ou correções da conta oficial. A importação original (DASHBOARD e 12 snapshots Supabase), a conciliação V6, as correções aprovadas, os documentos e os empenhos **não foram alterados**. O relatório de auditoria mantém o total bruto e pode ser comparado com os filtros operacionais. Não afirmar que o valor operacional é saldo oficial atualizado do SIAFI-MG.
