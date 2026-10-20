@@ -755,10 +755,14 @@ function purchaseDays(prazo){
  const current=new Date();current.setHours(12,0,0,0);
  return Math.round((target.getTime()-current.getTime())/86400000);
 }
-function purchaseIssue(p){
- const due=purchaseDays(p.prazo);
- return activeProcess(p)&&(p.status==='Bloqueado'||p.status==='Aguardando providência'||due<0);
+// Regra única de "exige atenção", usada na Compras e no painel inicial.
+function attentionReasons(p){
+ if(!activeProcess(p))return [];
+ const out=v3Reasons(p).filter(r=>r!=='Sem responsável individual');
+ if(p.status==='Aguardando providência')out.unshift('Recebido, aguardando providência');
+ return out;
 }
+function purchaseIssue(p){return attentionReasons(p).length>0;}
 function purchaseDueSoon(p){
  const due=purchaseDays(p.prazo);
  return activeProcess(p)&&Number.isFinite(due)&&due>=0&&due<=7;
@@ -776,7 +780,7 @@ function purchaseView(){
   .filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.proxima_acao,p.referencia_sei,p.dotacao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort(purchaseSort);
  const tabs=[
   {id:'all',label:'Todos os processos',help:'Registro completo',value:counts.all,icon:'▤'},
-  {id:'attention',label:'Exigem atenção',help:'Atrasados, bloqueados ou aguardando ação',value:counts.attention,icon:'!'},
+  {id:'attention',label:'Exigem atenção',help:'Recebidos, atrasados, bloqueados ou parados',value:counts.attention,icon:'!'},
   {id:'week',label:'Próximos 7 dias',help:'Prazos que estão chegando',value:counts.week,icon:'◷'},
   {id:'done',label:'Concluídos',help:'Histórico finalizado',value:counts.done,icon:'✓'}
  ];
@@ -1660,7 +1664,7 @@ function actionNowPanel(){
  const late=mine.filter(isOverdue).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
  const soon=mine.filter(t=>!isOverdue(t)&&daysLeft(t.prazo)<=3).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
  const queue=db.tarefas.filter(t=>(!sector||t.setor===sector)&&queueClaimable(t)).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
- const stalled=db.processos.map(p=>({p,why:v3Reasons(p).filter(r=>r!=='Sem responsável individual')}))
+ const stalled=db.processos.map(p=>({p,why:attentionReasons(p)}))
   .filter(x=>x.why.length&&(!sector||x.p.setor===sector)).sort((a,b)=>daysLeft(a.p.prazo)-daysLeft(b.p.prazo));
  const unread=v3Unread();
  const due=t=>{const d=daysLeft(t.prazo);return !t.prazo?'Sem prazo':d<0?'Atrasada há '+Math.abs(d)+' dia(s)':d===0?'Vence hoje':'Vence em '+d+' dia(s)';};
@@ -1684,7 +1688,7 @@ function actionNowPanel(){
  const chips=chip(late.length,late.length===1?'atrasada':'atrasadas','danger','data-action="taskScope" data-scope="mine"')+
   chip(soon.length,'vencem em até 3 dias','warning','data-action="taskScope" data-scope="mine"')+
   chip(queue.length,'na fila para assumir','info','data-action="taskScope" data-scope="queue"')+
-  chip(stalled.length,stalled.length===1?'processo parado ou vencido':'processos parados ou vencidos','warning',role==='admin'?'data-view="alertas"':'data-view="processos"')+
+  chip(stalled.length,stalled.length===1?'processo exige atenção':'processos exigem atenção','warning',canVisitMenu('compras')&&sector==='Compras'?'data-action="buyFilter" data-filter="attention"':role==='admin'?'data-view="alertas"':'data-view="processos"')+
   chip(unread,unread===1?'aviso não lido':'avisos não lidos','info','data-view="notificacoes"');
  const hour=new Date().getHours(),greet=hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';
  const name=String(profile.nome||'').split(' ')[0];
@@ -2195,7 +2199,7 @@ async function handleClick(e){if(!e.target.closest?.('#sig-global-search'))close
  case 'refreshShared':await loadSharedProcesses();break;
  case 'claimTask':await claimQueueTask(id);break;
  case 'buyService':if(btn.dataset.service!=='Todos'&&!PURCHASE_SERVICES.some(x=>x.id===btn.dataset.service))break;serviceFilter=btn.dataset.service;purchaseLimit=12;render();break;
- case 'buyFilter':if(!['all','attention','week','done'].includes(btn.dataset.filter))break;purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
+ case 'buyFilter':if(!['all','attention','week','done','sent'].includes(btn.dataset.filter))break;if(view!=='compras'&&canVisitMenu('compras'))navigate('compras');purchaseFilter=btn.dataset.filter;purchaseLimit=12;render();break;
  case 'buyMore':purchaseLimit+=12;render();break;
  case 'chiefMember':chiefMemberFilter=chiefMemberFilter===btn.dataset.member?'Todos':btn.dataset.member;render();break;
  case 'chiefNewTask':{
