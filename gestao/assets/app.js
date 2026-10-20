@@ -773,6 +773,16 @@ function purchaseSort(a,b){
  const da=purchaseDays(a.prazo),dbb=purchaseDays(b.prazo);
  return da-dbb||String(a.numero).localeCompare(String(b.numero),'pt-BR',{numeric:true});
 }
+// Situação da AIPC visível na lista: é a principal condição para encaminhar à Licitação.
+function purchaseAipcTag(p){
+ if(!requiresAipc(p)||!activeProcess(p))return '';
+ const doc=getAipc(p.id);
+ return isAipcReady(p.id)?'<span class="flag teal">AIPC pronta</span>':doc?'<span class="flag amber">AIPC em rascunho</span>':'<span class="flag red">AIPC pendente</span>';
+}
+function purchaseNextButton(p){
+ const n=processNextStep(p);
+ return n?'<button type="button" class="btn primary" data-action="'+n.action+'" data-id="'+esc(p.id)+'" title="'+esc(n.why)+'">'+esc(n.label)+' →</button>':'';
+}
 function purchaseView(){
  const all=db.processos.filter(p=>p.setor==='Compras');
  const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,done:all.filter(p=>p.status==='Concluído').length};
@@ -797,10 +807,10 @@ function purchaseView(){
   const deadline=!p.prazo?'Prazo não definido':due<0?'Atrasado há '+Math.abs(due)+' dia(s)':due===0?'Vence hoje':due<=7?'Vence em '+due+' dia(s)':'Prazo '+fmtDate(p.prazo);
   const urgency=issue?' urgent':purchaseDueSoon(p)?' near':'';
   return '<article class="sig-buy-item'+urgency+'">'+
-   '<div class="sig-buy-item-head"><div class="sig-buy-item-heading"><button type="button" class="sig-buy-process-link" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><h3>'+esc(p.objeto||'Objeto não informado')+'</h3></div><div class="sig-buy-tags">'+iconBadge(p.status)+(p.prioridade==='Alta'?'<span class="sig-buy-high">Alta prioridade</span>':'')+'</div></div>'+
+   '<div class="sig-buy-item-head"><div class="sig-buy-item-heading"><button type="button" class="sig-buy-process-link" data-action="detail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><h3>'+esc(p.objeto||'Objeto não informado')+'</h3></div><div class="sig-buy-tags">'+iconBadge(p.status)+purchaseAipcTag(p)+(p.prioridade==='Alta'?'<span class="sig-buy-high">Alta prioridade</span>':'')+'</div></div>'+
    '<div class="sig-buy-next"><span>Próxima providência</span><strong>'+esc(p.proxima_acao||'Definir a próxima providência')+'</strong></div>'+
    '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Responsável: <b>'+esc(p.responsavel||'Não definido')+'</b></span><span class="'+(issue?'sig-buy-deadline-urgent':'')+'">'+esc(deadline)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span></div>'+
-   '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn primary" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+'</div></div></article>';
+   '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit?'<button type="button" class="btn" data-action="editProcess" data-id="'+esc(p.id)+'">Atualizar</button>':'')+purchaseNextButton(p)+'</div></div></article>';
  };
  const list=visible.length?visible.slice(0,purchaseLimit).map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
  const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&isOpenTask(t)&&assignedToMe(t)).length;
