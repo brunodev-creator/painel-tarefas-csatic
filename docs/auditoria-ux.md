@@ -120,6 +120,7 @@ Contagem a partir da tela inicial do perfil, em cliques (C) e campos digitados/e
 | 1 | 1–8 + correções (avatar abria convite, assistente ignorava perguntas, erro ao trocar destino) | Concluído — branch `feat/ux-revisao` |
 | 2 | 11 (próximo passo + "Concluir e encaminhar") e 12 (busca global) | Concluído — branch `feat/ux-revisao-lote2` |
 | 3 | 9, 10, 13, 14 (componentes unificados, código morto, carregamento de fontes, testes de fumaça) | Concluído — branch `feat/ux-revisao-lote3` |
+| 4 | Módulo Compras: AIPC e próximo passo no cartão, "Registrar andamento", aba "Enviados", etiquetas de modalidade, regra única de atenção, menu "Acompanhar seções" | Concluído — branch `feat/ux-revisao-lote4`. Proposta pendente: identificador do processo gerado automaticamente (exige sequência no banco) |
 
 ### Fora do escopo (dependem de autorização ou integração)
 
