@@ -535,20 +535,37 @@ function v4CompetenceForm(id,contractId){
  '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar competência</button></div></form>';
  openModal(id?'Editar competência':'Nova competência',c.numero+' · Registros informados manualmente',html,true);
 }
+// Seção que recebe o processo quando a tarefa encerra a etapa atual (mesma sugestão do formulário de encaminhamento).
+function taskForwardTarget(t){
+ const p=t?.processo_id?findProcess(t.processo_id):null;
+ if(!p||previewRole||p.setor!==t.setor||!activeProcess(p)||!canWrite(p.setor))return null;
+ return ({Compras:'Licitação','Licitação':'SOFI','SOFI':'Compras'})[p.setor]||null;
+}
 function v4FinishTaskModal(id){
  const t=db.tarefas.find(x=>x.id===id);
  if(!t||!canManageTask(t))return showToast('Sem permissão para concluir esta tarefa.');
  if(t.status==='Concluída')return showToast('Tarefa já concluída.');
+ const next=taskForwardTarget(t);
  const html='<div class="info-note"><strong>'+esc(t.titulo)+'</strong><p>Responsável: '+esc(t.responsavel)+' · Setor: '+esc(t.setor)+'</p></div>'+
  '<form data-form="v4FinishTask" data-id="'+esc(id)+'"><div class="form-grid">'+textareaField('conclusao_observacao','Providência executada e resultado','')+
- '</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Concluir tarefa</button></div></form>';
+ (next?'<p class="helper">Se a próxima etapa é de outra seção, use <strong>Concluir e encaminhar</strong>: o texto acima vira o motivo do encaminhamento e a tarefa fica registrada como Encaminhada.</p>':'')+
+ '</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button>'+
+ (next?'<button class="btn" type="submit" name="acao" value="encaminhar">Concluir e encaminhar à '+esc(next)+' →</button>':'')+
+ '<button class="btn primary" type="submit" name="acao" value="concluir">Concluir tarefa</button></div></form>';
  openModal('Concluir tarefa','A conclusão ficará registrada com data, autor e justificativa.',html,true);
 }
-async function v4HandleFinishTask(form){
+async function v4HandleFinishTask(form,acao){
  const t=db.tarefas.find(x=>x.id===form.dataset.id);
  if(!t||!canManageTask(t))throw Error('Somente o responsável pode concluir uma tarefa ativa.');
  const obs=String(gather(form).conclusao_observacao||'').trim();
  if(obs.length<8)return showToast('Descreva a providência executada (mínimo 8 caracteres).');
+ if(acao==='encaminhar'&&taskForwardTarget(t)){
+  // Não grava nada aqui: abre o encaminhamento já com a tarefa e o motivo; a RPC registra tudo ao confirmar.
+  closeModal();transferForm(t.processo_id,t.id);
+  const tf=document.querySelector('#modal-root form[data-form="transfer"]');
+  if(tf){tf.elements.motivo.value=obs;tf.elements.proxima_acao.focus();}
+  return;
+ }
  if(t.status==='Concluída')return showToast('Tarefa já concluída.');
  busy=true;
  try{
@@ -2023,7 +2040,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
