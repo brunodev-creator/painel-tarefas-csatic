@@ -820,16 +820,33 @@ async function submitProgress(form){
  }catch(e){showToast('Não foi possível registrar o andamento: '+errMsg(e))}
  finally{busy=false}
 }
+// Processos que a Compras já encaminhou e hoje estão em outra seção (acompanhamento, sem edição).
+function purchaseSentList(){
+ const history=cloud()?sharedProcessHistory:db.tramites;
+ const lastSent=new Map();
+ for(const h of history||[]){
+  if(h.origem!=='Compras')continue;
+  const t=new Date(h.criado_em).getTime();
+  if(!lastSent.has(h.processo_id)||lastSent.get(h.processo_id).t<t)lastSent.set(h.processo_id,{t,h});
+ }
+ const rows=cloud()?sharedProcessRows:db.processos;
+ return rows.filter(p=>p.setor!=='Compras'&&lastSent.has(p.id)).map(p=>({...p,_sent:lastSent.get(p.id)})).sort((a,b)=>b._sent.t-a._sent.t);
+}
 function purchaseView(){
  const all=db.processos.filter(p=>p.setor==='Compras');
- const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,done:all.filter(p=>p.status==='Concluído').length};
- const visible=all.filter(p=>serviceFilter==='Todos'||categoryFromProcess(p)===serviceFilter).filter(p=>purchaseFilter==='attention'?purchaseIssue(p):purchaseFilter==='week'?purchaseDueSoon(p):purchaseFilter==='done'?p.status==='Concluído':true)
-  .filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.proxima_acao,p.referencia_sei,p.dotacao).includes(filters.q.toLocaleLowerCase('pt-BR'))).sort(purchaseSort);
+ const sent=purchaseSentList();
+ const counts={all:all.length,attention:all.filter(purchaseIssue).length,week:all.filter(purchaseDueSoon).length,sent:sent.length};
+ if(purchaseFilter==='done')purchaseFilter='all';
+ const q=filters.q.toLocaleLowerCase('pt-BR');
+ const source=purchaseFilter==='sent'?sent:all;
+ const visible=source.filter(p=>serviceFilter==='Todos'||categoryFromProcess(p)===serviceFilter).filter(p=>purchaseFilter==='attention'?purchaseIssue(p):purchaseFilter==='week'?purchaseDueSoon(p):true)
+  .filter(p=>searchText(p.numero,p.objeto,p.responsavel,p.etapa,p.proxima_acao,p.referencia_sei,p.dotacao,p.setor).includes(q));
+ if(purchaseFilter!=='sent')visible.sort(purchaseSort);
  const tabs=[
   {id:'all',label:'Todos os processos',help:'Registro completo',value:counts.all,icon:'▤'},
   {id:'attention',label:'Exigem atenção',help:'Recebidos, atrasados, bloqueados ou parados',value:counts.attention,icon:'!'},
   {id:'week',label:'Próximos 7 dias',help:'Prazos que estão chegando',value:counts.week,icon:'◷'},
-  {id:'done',label:'Concluídos',help:'Histórico finalizado',value:counts.done,icon:'✓'}
+  {id:'sent',label:'Enviados',help:'Já encaminhados: onde estão agora',value:counts.sent,icon:'→'}
  ];
  const canEdit=!previewRole&&canWrite('Compras');
  // Modalidade como linha de etiquetas: um toque filtra, outro toque em "Todas" limpa.
@@ -849,13 +866,18 @@ function purchaseView(){
    '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Responsável: <b>'+esc(p.responsavel||'Não definido')+'</b></span><span class="'+(issue?'sig-buy-deadline-urgent':'')+'">'+esc(deadline)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span></div>'+
    '<div class="sig-buy-actions"><button type="button" class="btn" data-action="detail" data-id="'+esc(p.id)+'">Ver detalhes</button>'+(canEdit&&activeProcess(p)?'<button type="button" class="btn" data-action="progressForm" data-id="'+esc(p.id)+'">Registrar andamento</button>':'')+purchaseNextButton(p)+'</div></div></article>';
  };
- const list=visible.length?visible.slice(0,purchaseLimit).map(card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
+ const sentCard=p=>'<article class="sig-buy-item sig-buy-sent">'+
+  '<div class="sig-buy-item-head"><div class="sig-buy-item-heading"><button type="button" class="sig-buy-process-link" data-action="sharedDetail" data-id="'+esc(p.id)+'">'+esc(p.numero)+'</button><h3>'+esc(p.objeto||'Objeto não informado')+'</h3></div><div class="sig-buy-tags"><span class="flag gray">Agora na '+esc(p.setor)+'</span>'+iconBadge(p.status)+'</div></div>'+
+  '<div class="sig-buy-next"><span>Próxima providência na '+esc(p.setor)+'</span><strong>'+esc(p.proxima_acao||'A definir pela seção')+'</strong></div>'+
+  '<div class="sig-buy-item-bottom"><div class="sig-buy-meta"><span>Enviado em <b>'+new Date(p._sent.t).toLocaleDateString('pt-BR')+'</b> · '+esc(p._sent.h.tipo||'Encaminhamento')+' → '+esc(p._sent.h.destino)+'</span><span>Etapa: '+esc(p.etapa||'Não definida')+'</span>'+(p.prazo?'<span>Prazo: '+fmtDate(p.prazo)+'</span>':'')+'</div>'+
+  '<div class="sig-buy-actions"><button type="button" class="btn" data-action="sharedDetail" data-id="'+esc(p.id)+'">Acompanhar</button></div></div></article>';
+ const list=visible.length?visible.slice(0,purchaseLimit).map(purchaseFilter==='sent'?sentCard:card).join(''):'<div class="sig-buy-empty"><strong>Nenhum processo encontrado neste filtro.</strong><span>Altere o filtro ou a pesquisa para consultar outras demandas.</span></div>';
  const taskCount=db.tarefas.filter(t=>t.setor==='Compras'&&isOpenTask(t)&&assignedToMe(t)).length;
  const headingHtml='<div class="sig-buy-head"><div><div class="eyebrow">Fluxo de aquisições</div><h1>Central de Compras</h1><p>Encontre rapidamente as demandas que precisam de providência.</p></div><div class="sig-buy-head-actions">'+
   '<button type="button" class="btn" data-view="tarefas">Minhas tarefas'+(taskCount?' · '+taskCount+' no setor':'')+'</button>'+
   (canEdit?'<button type="button" class="btn primary" data-action="newProcess" data-sector="Compras">+ Nova demanda</button>':'')+
   '</div></div>';
- const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+all.length+' processo(s)</span></div>';
+ const top='<div class="sig-buy-workbar"><label class="sig-buy-search"><span aria-hidden="true">⌕</span><input id="filter-q" data-filter="q" type="search" autocomplete="off" placeholder="Buscar número, objeto, responsável ou SEI" aria-label="Buscar processos de compras" value="'+esc(filters.q)+'"></label><span class="sig-buy-count" role="status">'+visible.length+' de '+source.length+' processo(s)'+(purchaseFilter==='sent'?' enviados':'')+'</span></div>';
  const more=visible.length>purchaseLimit?'<div class="sig-buy-more"><span>Exibindo '+Math.min(visible.length,purchaseLimit)+' de '+visible.length+' processos filtrados</span><button type="button" class="btn" data-action="buyMore">Ver mais processos ↓</button></div>':'';
  return '<section class="sig-buy-page">'+headingHtml+metrics+categoryCards+top+'<div class="sig-buy-list">'+list+'</div>'+more+'<p class="sig-buy-hint">Processos ordenados por urgência e prazo. Registros de compras são mantidos no mesmo banco e histórico do SIG.</p></section>';
 }
@@ -870,7 +892,7 @@ async function loadSharedProcesses(){
   if(session?.user?.id!==uid)return;
   sharedProcessRows=Array.isArray(rows)?rows:[];
   sharedProcessHistory=Array.isArray(history)?history:[];
-  sharedLoadError='';if(view==='processos'||(view==='tarefas'&&!document.querySelector('#modal-root form')))render();
+  sharedLoadError='';if(view==='processos'||((view==='tarefas'||view==='compras')&&!document.querySelector('#modal-root form')))render();
  }catch(e){
   sharedLoadError=errMsg(e);
   if(view==='processos'){render();showToast('Acompanhamento compartilhado indisponível: '+sharedLoadError);}

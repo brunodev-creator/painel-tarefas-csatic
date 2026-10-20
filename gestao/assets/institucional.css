@@ -1078,3 +1078,4 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sig-buy-chip.selected{background:var(--sig-primary);border-color:var(--sig-primary);color:#fff}
 .sig-buy-chip.selected span{color:#f3efe4}
 @media(max-width:640px){.sig-buy-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}.sig-buy-chip{flex:none;min-height:var(--sig-touch)}}
+.sig-buy-sent{border-left:3px solid var(--sig-info)}
