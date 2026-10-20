@@ -1051,3 +1051,20 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .sig-global-search input::placeholder{color:var(--sig-text-subtle)}
  .sig-global-search kbd{display:none}
 }
+
+/* ===== Componentes unificados: cartões de indicador e estados vazios =====
+   Os módulos usam classes próprias (kpi, v3-tile, v4-kpi, v5-metric, sig-chief-stat,
+   sig-buy-metric, budget-card); aqui todos passam a seguir o mesmo padrão visual. */
+.kpi,.v3-tile,.v4-kpi,.v5-metric,.sig-chief-stat,.sig-buy-metric,.budget-card{border:1px solid var(--sig-border);border-radius:var(--sig-radius);background:var(--sig-surface);box-shadow:var(--shadow)}
+.kpi-label,.v3-tile small,.v4-kpi small,.v5-metric small,.sig-chief-stat>span,.sig-buy-metric-top,.budget-label{font-size:var(--sig-text-xs);font-weight:700;letter-spacing:0;color:var(--sig-text-muted)}
+.kpi-value,.v3-tile strong,.v4-kpi strong,.v5-metric strong,.sig-chief-stat>strong,.sig-buy-metric strong,.budget-card strong{font-family:Manrope,Arial,sans-serif;font-weight:800;letter-spacing:-.03em;color:var(--sig-text)}
+.kpi-foot,.v3-tile span,.v4-kpi span,.v5-metric span,.sig-chief-stat>small,.sig-buy-metric small{font-size:var(--sig-text-xs);line-height:1.45;color:var(--sig-text-muted)}
+.sig-chief-stat.warning>strong{color:var(--sig-danger)}
+.sig-buy-metric.active{border-color:var(--sig-primary);background:#fcfaf5}
+.sig-buy-metric:hover{border-color:var(--sig-primary)}
+.sig-buy-metric-icon,.kpi-icon{color:var(--sig-primary-strong)}
+.empty,.sig-buy-empty,.sig-chief-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:var(--sig-space-5) var(--sig-space-4);border:1px dashed var(--sig-border);border-radius:var(--sig-radius);background:#fcfbf9;color:var(--sig-text-muted);font-size:var(--sig-text-sm);line-height:1.5;text-align:center}
+.empty-icon{font-size:24px;margin:0;color:var(--sig-primary);opacity:.7}
+.sig-buy-empty strong{font-size:var(--sig-text-base);color:var(--sig-text)}
+.sig-buy-empty span{font-size:var(--sig-text-sm);color:var(--sig-text-muted)}
+.table-empty{color:var(--sig-text-muted);font-size:var(--sig-text-sm)}
