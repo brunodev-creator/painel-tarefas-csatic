@@ -1028,3 +1028,26 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sig-next-step span{display:block;font-size:var(--sig-text-xs);color:var(--sig-text-muted)}
 .sig-next-step .btn{flex:none}
 @media(max-width:640px){.sig-next-step{flex-direction:column;align-items:stretch}}
+
+/* ===== Busca global no topo ===== */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.sig-global-search{position:relative;display:flex;align-items:center;gap:8px;flex:0 1 440px;margin:0 var(--sig-space-4);padding:0 10px;height:40px;border:1px solid #4b4a47;border-radius:10px;background:#323234;color:#cfc9bc}
+.sig-global-search[hidden]{display:none}
+.sig-global-search:focus-within{border-color:#c4ae7a;box-shadow:0 0 0 3px rgba(196,174,122,.25)}
+.sig-global-search input{flex:1;min-width:0;height:100%;border:0;outline:0;background:transparent;color:#f6f3ed;font-size:var(--sig-text-sm)}
+.sig-global-search input::placeholder{color:#b7b1a5}
+.sig-global-search kbd{font:700 11px/1 inherit;padding:3px 6px;border:1px solid #5a5853;border-radius:5px;color:#b7b1a5}
+.sig-global-results{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:40;max-height:min(70vh,460px);overflow:auto;padding:6px;border:1px solid var(--sig-border);border-radius:var(--sig-radius);background:var(--sig-surface);box-shadow:0 18px 40px rgba(0,0,0,.18);color:var(--sig-text)}
+.sig-global-item{display:block;width:100%;text-align:left;padding:9px 11px;border:0;border-radius:var(--sig-radius-sm);background:transparent;color:inherit}
+.sig-global-item:hover,.sig-global-item:focus-visible{background:var(--sig-primary-soft);outline-offset:-2px}
+.sig-global-item strong{display:block;font-size:var(--sig-text-sm)}
+.sig-global-item span{display:block;font-size:var(--sig-text-sm);overflow-wrap:anywhere}
+.sig-global-item small{display:block;font-size:var(--sig-text-xs);color:var(--sig-text-muted);margin-top:2px}
+.sig-global-empty{margin:0;padding:12px;font-size:var(--sig-text-sm);color:var(--sig-text-muted)}
+@media(max-width:780px){
+ .topbar{flex-wrap:wrap;height:auto!important;min-height:62px;padding-top:8px!important;padding-bottom:8px!important;row-gap:8px}
+ .sig-global-search{order:3;flex:1 1 100%;margin:0;height:var(--sig-touch);background:#f6f4ef;border-color:var(--sig-border);color:var(--sig-text-muted)}
+ .sig-global-search input{color:var(--sig-text)}
+ .sig-global-search input::placeholder{color:var(--sig-text-subtle)}
+ .sig-global-search kbd{display:none}
+}
