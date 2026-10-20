@@ -1079,3 +1079,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .sig-buy-chip.selected span{color:#f3efe4}
 @media(max-width:640px){.sig-buy-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}.sig-buy-chip{flex:none;min-height:var(--sig-touch)}}
 .sig-buy-sent{border-left:3px solid var(--sig-info)}
+@media(max-width:640px){
+ .sig-buy-metrics{gap:8px}
+ .sig-buy-metric,.sig-buy-metric.active{min-height:0;padding:10px 12px}
+ .sig-buy-metric small{display:none}
+ .sig-buy-metric strong{font-size:22px}
+}
