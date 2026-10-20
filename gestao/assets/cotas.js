@@ -103,6 +103,9 @@ const OUTROS_FORA_ESCOPO=Object.freeze({
  },
  '12510612270525000001339039131010':{
    razao:'Água/esgoto: fora do total operacional por decisão do responsável. O extrato contábil de 20/10/2026 exibe R$ 870,00 nessa conta, que permanece como referência para auditoria.'
+ },
+ '12510618113743650001339039136020':{
+   razao:'Água/esgoto: fora do escopo de aquisições por decisão do responsável. Saldo gerencial bruto R$ 1.505,00, não exibido no extrato contábil de 20/10/2026; reservado para tratamento futuro.'
  }
 });
 const normalizeDot=d=>{
@@ -196,7 +199,7 @@ function view(authorized,allowExport=false,allowImport=false){
  kpi('Diferença V6 · escopo operacional',icon3,balance)+
  kpi('Conferência · operacional + diárias confirmadas',icon3,overviewS.comparison)+
  '</div>'+
- '<p class="budget-note budget-diarias-explanation">A visão BO/SIAD operacional exclui todas as diárias 3390.15 e as dotações 4365 · 36XX e 2500 · 3913. '+
+ '<p class="budget-note budget-diarias-explanation">A visão BO/SIAD operacional exclui todas as diárias 3390.15, a dotação 4365 · 36XX e as duas dotações de água/esgoto (2500 e 4365 · 3913). '+
  'A conferência soma somente a referência de diária efetivamente confirmada no Portal Contábil. '+
  'A posição V6 original, sem exclusões, permanece preservada para auditoria: cota '+fmt(grossBudget)+
  '; abatimento '+fmt(grossSpent)+'; diferença '+fmt(grossBalance)+
