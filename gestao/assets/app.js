@@ -1639,6 +1639,13 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
+// No celular as tabelas viram cartões; cada célula recebe o rótulo da sua coluna.
+function labelTables(root){
+ root?.querySelectorAll('table.data-table:not(.budget-table)').forEach(table=>{
+  const heads=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+  table.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(heads[i]&&!td.hasAttribute('colspan'))td.dataset.label=heads[i];}));
+ });
+}
 function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canVisitMenu(view))view=firstRoleView();updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
  if(cloud()&&session&&(!cloudDataReady||(cloudExtraState!=='ready'&&!SIG_FAST_VIEWS.includes(view)))){
   // Durante o primeiro login, preserve a paisagem e o formulário já visível
@@ -1661,11 +1668,11 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   }
   html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
- if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
+ if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;labelTables(content);if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
-function openModal(title,sub,content,large=false){document.getElementById('modal-root').innerHTML=`<div class="modal-backdrop"><div class="modal ${large?'large':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-header"><div><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p></div><button class="close-x" data-action="closeModal" aria-label="Fechar">×</button></div>${content}</div></div>`;const first=document.querySelector('#modal-root input:not([type="hidden"]),#modal-root button');first?.focus()}
+function openModal(title,sub,content,large=false){document.getElementById('modal-root').innerHTML=`<div class="modal-backdrop"><div class="modal ${large?'large':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-header"><div><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p></div><button class="close-x" data-action="closeModal" aria-label="Fechar">×</button></div>${content}</div></div>`;labelTables(document.getElementById('modal-root'));const first=document.querySelector('#modal-root input:not([type="hidden"]),#modal-root button');first?.focus()}
 function closeModal(){
  const form=document.querySelector('#modal-root form[data-form="aipc"]');
  if(form&&form.dataset.dirty==='1'){
@@ -2117,7 +2124,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
  if(e.target.id==='sig-fonte-busca'&&window.SIG_FONTE){
   window.SIG_FONTE.setQuery(e.target.value);
   const results=document.getElementById('sig-fonte-resultados');
-  if(results)results.innerHTML=window.SIG_FONTE.rowsHtml();
+  if(results){results.innerHTML=window.SIG_FONTE.rowsHtml();labelTables(document.getElementById('content'));}
   return;
  }
  if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.id==='cota-audit-search'){window.SIG_COTAS_AUD.filter('search',e.target.value);return}if(e.target.id==='cota-accounting-input'){window.SIG_COTAS_AUD.compare(e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{

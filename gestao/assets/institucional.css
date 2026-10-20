@@ -960,3 +960,31 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .btn.small{padding:8px 12px}
 }
 .is-late{color:var(--sig-danger)!important;font-weight:700}
+
+/* ===== Tabelas em cartões no celular (sem rolagem horizontal) ===== */
+@media(max-width:640px){
+ .data-table:not(.budget-table){min-width:0!important;display:block}
+ .data-table:not(.budget-table) thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+ .data-table:not(.budget-table) tbody{display:grid;gap:var(--sig-space-3);padding:var(--sig-space-3)}
+ .data-table:not(.budget-table) tr{display:block;border:1px solid var(--sig-border);border-radius:var(--sig-radius);background:var(--sig-surface);padding:var(--sig-space-3) var(--sig-space-4)}
+ .data-table:not(.budget-table) tbody tr:hover{background:var(--sig-surface)}
+ .data-table:not(.budget-table) td{display:block;position:relative;padding:7px 0 7px 36%!important;border-bottom:1px solid #f0ede7!important;font-size:var(--sig-text-sm);text-align:left!important;white-space:normal!important;min-width:0!important}
+ .data-table:not(.budget-table) td:last-child{border-bottom:0!important}
+ .data-table:not(.budget-table) td::before{content:attr(data-label);position:absolute;left:0;top:9px;width:33%;font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--sig-text-muted)}
+ .data-table:not(.budget-table) td:not([data-label]){padding-left:0!important}
+ .data-table:not(.budget-table) td:not([data-label])::before{content:none}
+ /* Primeira coluna (identificação) como título do cartão. */
+ .data-table:not(.budget-table) td:first-child{padding:0 0 8px!important;font-size:var(--sig-text-base)}
+ .data-table:not(.budget-table) td:first-child::before{position:static;display:block;width:auto;margin-bottom:2px}
+ .data-table:not(.budget-table) td .btn{white-space:normal}
+ .data-table:not(.budget-table) td:has(.btn){padding-left:0!important}
+ .data-table:not(.budget-table) td:has(.btn)::before{display:none}
+ .data-table:not(.budget-table) .sig-task-actions,.data-table:not(.budget-table) td:has(>.btn){display:flex;flex-wrap:wrap;gap:var(--sig-space-2)}
+ .data-table:not(.budget-table) td:has(>.btn)>.btn,.data-table:not(.budget-table) .sig-task-actions .btn{flex:1 1 140px}
+ .table-card .table-scroll,.sig-chief-panel .table-scroll{overflow:visible}
+ .table-card{background:transparent;border:0;box-shadow:none}
+ .table-card .data-table:not(.budget-table) tbody{padding:0}
+ .toolbar select{flex:1 1 100%;min-width:0}
+ .data-table:not(.budget-table) .table-empty{padding:var(--sig-space-5) var(--sig-space-3)}
+}
+.toolbar select{height:42px;border:1px solid var(--sig-border);border-radius:10px;padding:0 12px;background:var(--sig-surface);color:var(--sig-text);font-size:var(--sig-text-sm)}
