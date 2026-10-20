@@ -48,6 +48,14 @@ Perfis são guardados no banco e verificados por RLS e funções protegidas. O s
 - `index.html` / `assets/app.js` / `assets/styles.css`: site estático.
 - `functions/gerenciar-usuarios/index.ts`: função Supabase Deno, publicada no ambiente de teste.
 - `database/schema.sql`: esquema inicial; migrações v2 foram aplicadas diretamente ao banco de testes.
-- `tests/test_ui.py`, `tests/test_v2.py`, `tests/test_cloud_v2.py`: testes de interface (incluindo conexão simulada).
+- `tests/smoke.html` + `tests/smoke.js`: testes de fumaça no navegador, sem dependências, sobre o modo demonstração (18 verificações: menus de 6 perfis, celular 375px, painel inicial, tarefas, autopreenchimento, busca global, assistente e correções do lote de UX).
 
 Não é necessário instalar dependências de frontend. Para testes locais, execute `python3 -m http.server 8080` na pasta raiz.
+
+### Testes
+
+1. Na raiz do repositório: `python3 -m http.server 8080` (no Windows: `py -m http.server 8080`).
+2. Abra `http://localhost:8080/gestao/tests/smoke.html` e clique em **Executar testes** (ou use `?auto` na URL).
+3. O título da aba mostra `PASS n/n` ou `FAIL`; o detalhe fica em `window.SMOKE_RESULT`.
+
+Os testes usam somente dados fictícios do modo demonstração e restauram o `localStorage` ao final. Não cobrem o login real nem o banco Supabase: valide esses fluxos manualmente no ambiente piloto.

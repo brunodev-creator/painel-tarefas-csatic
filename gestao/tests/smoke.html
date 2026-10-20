@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>SIG · testes de fumaça</title>
+<style>
+ body{margin:0;font:14px/1.5 system-ui,Arial,sans-serif;color:#202329;background:#f4f2ef}
+ header{padding:16px 20px;background:#272729;color:#f6f3ed}
+ header h1{margin:0;font-size:18px}
+ header p{margin:4px 0 0;font-size:13px;color:#cfc9bc}
+ main{display:grid;grid-template-columns:minmax(320px,1fr) auto;gap:16px;padding:16px 20px}
+ button{font:inherit;font-weight:700;padding:9px 16px;border-radius:8px;border:1px solid #796a46;background:#796a46;color:#fff;cursor:pointer}
+ button:disabled{opacity:.6;cursor:progress}
+ #summary{margin:12px 0;font-weight:800}
+ #summary.pass{color:#3c6b55}#summary.fail{color:#9e3f3c}
+ ol{margin:0;padding-left:22px}
+ li{margin:4px 0}
+ li.pass::marker{content:"✓  ";color:#3c6b55}
+ li.fail{color:#9e3f3c}li.fail::marker{content:"✗  "}
+ li small{display:block;color:#5e6268}
+ iframe{width:1440px;height:820px;border:1px solid #d9d4c8;background:#fff;transform-origin:0 0}
+ #frame-wrap{overflow:auto;max-width:60vw;max-height:80vh}
+ @media(max-width:900px){main{grid-template-columns:1fr}#frame-wrap{max-width:100%}}
+</style>
+</head>
+<body>
+<header>
+ <h1>SIG CSA-TIC · testes de fumaça</h1>
+ <p>Roda o SIG em <strong>modo demonstração</strong> (dados fictícios) dentro desta página. As preferências do navegador são restauradas ao final. Não usa o banco institucional.</p>
+</header>
+<main>
+ <section>
+  <button id="run" type="button">Executar testes</button>
+  <div id="summary" role="status" aria-live="polite">Clique em "Executar testes".</div>
+  <ol id="results"></ol>
+ </section>
+ <div id="frame-wrap"><iframe id="app" title="SIG em teste"></iframe></div>
+</main>
+<script src="./smoke.js"></script>
+</body>
+</html>
