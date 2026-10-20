@@ -212,7 +212,7 @@ function updateChrome(){
  document.body.classList.toggle('sig-role-preview',!!previewRole);
  const personalTaskCount=db.tarefas.filter(t=>isOpenTask(t)&&assignedToMe(t)).length;
  const unread=v3Unread();
- document.getElementById('nav').innerHTML=currentMenus().map(id=>NAV.find(([key])=>key===id)).filter(Boolean).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
+ document.getElementById('nav').innerHTML=currentMenus().map(id=>NAV.find(([key])=>key===id)).filter(Boolean).map(([v,ico,label])=>'<button class="navitem '+(view===v?'active':'')+'" data-view="'+v+'"'+(view===v?' aria-current="page"':'')+'><span class="nav-ico">'+ico+'</span><span>'+label+'</span>'+(v==='notificacoes'&&unread?'<span class="bubble">'+unread+'</span>':v==='tarefas'&&personalTaskCount?'<span class="bubble">'+personalTaskCount+'</span>':'')+'</button>').join('');
  document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';
  const indicator=document.getElementById('sync-indicator');
  indicator.classList.toggle('online',cloud()&&!!session);
@@ -1744,7 +1744,8 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
-function openModal(title,sub,content,large=false){document.getElementById('modal-root').innerHTML=`<div class="modal-backdrop"><div class="modal ${large?'large':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-header"><div><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p></div><button class="close-x" data-action="closeModal" aria-label="Fechar">×</button></div>${content}</div></div>`;labelTables(document.getElementById('modal-root'));const first=document.querySelector('#modal-root input:not([type="hidden"]),#modal-root button');first?.focus()}
+let modalOrigin=null;
+function openModal(title,sub,content,large=false){const root=document.getElementById('modal-root');if(!root.firstElementChild)modalOrigin=document.activeElement;root.innerHTML=`<div class="modal-backdrop"><div class="modal ${large?'large':''}" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="modal-header"><div><h2>${esc(title)}</h2><p class="sub">${esc(sub)}</p></div><button class="close-x" data-action="closeModal" aria-label="Fechar">×</button></div>${content}</div></div>`;labelTables(document.getElementById('modal-root'));const first=document.querySelector('#modal-root input:not([type="hidden"]),#modal-root button');first?.focus()}
 function closeModal(){
  const form=document.querySelector('#modal-root form[data-form="aipc"]');
  if(form&&form.dataset.dirty==='1'){
@@ -1755,7 +1756,11 @@ function closeModal(){
   return;
  }
  clearTimeout(aipcAutoTimer);aipcAutoTimer=null;
+ const hadModal=!!document.getElementById('modal-root').firstElementChild;
  document.getElementById('modal-root').innerHTML='';
+ // Devolve o foco ao botão que abriu a janela (teclado e leitor de tela).
+ if(hadModal&&modalOrigin?.isConnected)modalOrigin.focus();
+ modalOrigin=null;
 }
 function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero:'',objeto:'',modalidade:'COTEP',setor:sector||'Compras',etapa:'Triagem da demanda',status:'Em andamento',responsavel:'',prioridade:'Média',data_entrada:today(),prazo:dayOffset(7),valor_estimado:0,valor_homologado:0,dotacao:'',proxima_acao:'',bloqueio_motivo:'',referencia_sei:''};
  if(!canWrite(p.setor))return showToast('Sem permissão de edição neste setor.');
