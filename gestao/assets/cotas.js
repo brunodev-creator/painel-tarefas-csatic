@@ -105,7 +105,11 @@ const OUTROS_FORA_ESCOPO=Object.freeze({
    razao:'Água/esgoto: fora do total operacional por decisão do responsável. O extrato contábil de 20/10/2026 exibe R$ 870,00 nessa conta, que permanece como referência para auditoria.'
  }
 });
-const normalizeDot=d=>String(d.dotacao||'').replace(/\D/g,'');
+const normalizeDot=d=>{
+ const p=String(d.dotacao||'').split('.');
+ if(p.length===11&&/^00\d{2}$/.test(p[7]))p[7]=p[7].slice(2)+'00';
+ return p.join('').replace(/\D/g,'');
+};
 function isOutro(d){return Object.prototype.hasOwnProperty.call(OUTROS_FORA_ESCOPO,normalizeDot(d));}
 function otherRows(){return allRows().filter(isOutro);}
 function rows(){return allRows().filter(d=>!isDiaria(d)&&!isOutro(d));}
