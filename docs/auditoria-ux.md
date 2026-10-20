@@ -113,6 +113,14 @@ Contagem a partir da tela inicial do perfil, em cliques (C) e campos digitados/e
 | 15 | Sugestão de motivo/próxima ação no encaminhamento a partir do fluxo padrão de cada seção | Médio | **Regra de negócio** → proposta | — |
 | 16 | Importar itens/números de especificação do SIAD/Portal de Compras | Muito alto | **Integração** → proposta | — |
 
+### Andamento
+
+| Lote | Itens | Situação |
+|---|---|---|
+| 1 | 1–8 + correções (avatar abria convite, assistente ignorava perguntas, erro ao trocar destino) | Concluído — branch `feat/ux-revisao` |
+| 2 | 11 (próximo passo + "Concluir e encaminhar") e 12 (busca global) | Concluído — branch `feat/ux-revisao-lote2` |
+| 3 | 9, 10, 13, 14 (componentes unificados, código morto, fontes locais, testes) | Próximo |
+
 ### Fora do escopo (dependem de autorização ou integração)
 
 - **SIAD / SEI:** número do processo SEI, link e documentos (hoje digitados), códigos SIAD dos itens da AIPC, números das especificações de empenho e dos empenhos — importar eliminaria a digitação nas etapas 7 e 8.
