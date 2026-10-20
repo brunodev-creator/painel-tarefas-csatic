@@ -147,3 +147,13 @@ Essas duas últimas dotações aparecem em uma **tabela de exceções fora do es
 A tabela principal fica com **37 dotações**. O filtro padrão mostra **23 com diferença distinta de zero**, e a opção “Mostrar todas” mostra 37. Quatro dotações de diárias e duas de outras exceções permanecem em tabelas de conferência segregadas.
 
 **Escopo e auditoria:** estas exclusões são **regras da visualização operacional**, não cancelamentos ou correções da conta oficial. A importação original (DASHBOARD e 12 snapshots Supabase), a conciliação V6, as correções aprovadas, os documentos e os empenhos **não foram alterados**. O relatório de auditoria mantém o total bruto e pode ser comparado com os filtros operacionais. Não afirmar que o valor operacional é saldo oficial atualizado do SIAFI-MG.
+
+## Atualização complementar — água/esgoto 4365/3913 (20/10/2026)
+
+Conforme solicitação, a dotação `1251.06.181.137.4365.0001.3390.3913.60.2.0` (água/esgoto, cota bruta BO de **R$ 1.505,00**, diferença V6 bruta de **R$ 1.505,00**, nenhum abatimento V6) foi acrescida às exceções da **visualização operacional**. No extrato contábil do Portal recebido de 20/10/2026 com saldos zerados ocultos, essa dotação não é exibida; não se presume saldo oficial zero sem extrato individual.
+
+Ela agora fica na tabela **Outras dotações — fora do escopo operacional**, junto com `2500/3390.3913` e `4365/3390.36XX`, sem entrar na tabela operacional, no CSV, nos indicadores ou nos filtros do quadro principal. A diária `4365/3390.15XX` continua na seção própria, usando somente **R$ 1.188,00** como referência contábil manual.
+
+**Totais do snapshot financeiro de 20/10/2026:** 43 dotações na origem; 4 diárias, 3 outras excluídas, **36** operacionais (22 com diferença não zerada). Cota BO/SIAD gerencial operacional **R$ 88.935.790,41**; abatimento V6 operacional **R$ 85.819.873,38**; diferença gerencial operacional **R$ 3.115.917,03**; conferência operacional + diária informada **R$ 3.117.105,03**. A diferença remanescente perante as contas contábeis, após igualar o escopo definido pelo usuário, é **R$ 383.185,83**, sujeita à confirmação dos saldos não exibidos.
+
+**Integridade:** nenhum registro da planilha, abatimento real, empenho, correção aprovada ou snapshot da V6 foi modificado. Total bruto V6 mantido em **R$ 3.386.477,83**.
