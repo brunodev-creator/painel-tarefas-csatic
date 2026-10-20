@@ -157,3 +157,32 @@ Ela agora fica na tabela **Outras dotações — fora do escopo operacional**, j
 **Totais do snapshot financeiro de 20/10/2026:** 43 dotações na origem; 4 diárias, 3 outras excluídas, **36** operacionais (22 com diferença não zerada). Cota BO/SIAD gerencial operacional **R$ 88.935.790,41**; abatimento V6 operacional **R$ 85.819.873,38**; diferença gerencial operacional **R$ 3.115.917,03**; conferência operacional + diária informada **R$ 3.117.105,03**. A diferença remanescente perante as contas contábeis, após igualar o escopo definido pelo usuário, é **R$ 383.185,83**, sujeita à confirmação dos saldos não exibidos.
 
 **Integridade:** nenhum registro da planilha, abatimento real, empenho, correção aprovada ou snapshot da V6 foi modificado. Total bruto V6 mantido em **R$ 3.386.477,83**.
+
+
+## V6.1 — ajuste financeiro orçamentário assinado (20/10/2026)
+
+**Causa contábil confirmada pelo responsável:** um lançamento do tipo `Ajuste financeiro orçamentário` reduziu o comprometimento do empenho 132/2026. A V6 antiga considerava apenas o total inicial + reforços − anulações, ignorando o efeito de **−R$ 668,36**, embora o índice registrasse a existência de ajuste em `Total_Ajustes`.
+
+**Nova regra de abatimento** (`gestao/integracao/SIG_V6_Conciliacao_Atual.gs`, versão 6.1.0):
+1. Ler os lançamentos `Ajuste financeiro orçamentário` de `IMPORT_EXECUCAO_DESPESA_BO`, vinculando ano + unidade compradora + número do empenho.
+2. Usar o valor **assinado** da coluna `Valor Despesa Empenhada` (pode reduzir ou aumentar); não tratar `Total_Ajustes` como sinal do ajuste, somente como conferência de magnitude.
+3. Conferir `Total_Empenho_Inicial + Total_Reforco − Total_Anulacao_Empenho` com `Total_Empenhado_Liquido` do índice.
+4. Se o índice ainda não incorporou os ajustes, aplicar uma única vez o efeito assinado. Se já incorporou, **não aplicar novamente**.
+5. Se houver ausência de movimento, divergência de magnitude ou incompatibilidade contábil, emitir **BLOQUEIO**, sem subtrair valores arbitrariamente.
+6. Não misturar `Ajuste financeiro RP`, conformidades, RIPC ou saldos de empenho com o movimento financeiro orçamentário.
+
+**Exemplo conferido:** empenho 132/2026, processo 1250071 000020/2026 (nobreaks). Valor original R$ 568.063,06; ajuste financeiro orçamentário −R$ 668,36; **abatimento R$ 567.394,70**. Na dotação global `1251.06.181.137.4365.0001.4490.0052.48.0.0`, a cota permanece R$ 55.791.195,11, o abatimento passa a R$ 55.766.195,11 e a diferença gerencial passa a **R$ 25.000,00**.
+
+**Posição gerencial consolidada (mesmas cotas importadas em 20/10):**
+- Cota V6 original preservada: **R$ 89.206.351,21**.
+- Abatimento V6.1 corrigido: **R$ 85.819.205,02** (redução de R$ 668,36).
+- Diferença gerencial bruta: **R$ 3.387.146,19**.
+- Quadro BO/SIAD operacional (segregações de diárias, serviços PF e água/esgoto já aprovadas): **R$ 3.116.585,39** de diferença gerencial.
+- Conferência gerencial operacional + diária informada R$ 1.188,00: **R$ 3.117.773,39**.
+- A diferença frente ao Portal Contábil do mesmo escopo fica em **R$ 383.854,19**, condicionada à confirmação de saldos das dotações não exibidas no extrato. A divergência de R$ 668,36 foi resolvida isoladamente; remanescem quatro dotações para investigar.
+
+**Rastreabilidade:** novas colunas em `SIG_V6_EMPENHOS` e `SIG_V6_ABATIMENTOS` registram o líquido anterior, o ajuste aplicado e o estado da conciliação. Foi criada a cópia `DASHBOARD_BACKUP_20261020_AJUSTE_V61`. As seis abas de conciliação e o Dashboard foram recalculados na planilha, e o SIG recebeu os 12 snapshots atualizados no Supabase. A fonte bruta importada, os reforços, as anulações, o processo e os documentos BO/SIAD **não foram alterados**.
+
+**Atenção à recorrência:** o arquivo `.gs` do repositório já contém a correção, mas atualizar o repositório **não instala automaticamente** essa versão no projeto do Google Apps Script associado à planilha. Para garantir que uma próxima execução automática da V6 não volte ao cálculo antigo, o responsável pelo Apps Script deve atualizar o código instalado com a versão 6.1.0 e validar o acionador. A importação das fontes de 08h pode continuar normalmente; o ponto de atenção é a rotina que recalcula a V6 e sobrescreve o Dashboard. 
+
+**Teste reproduzível:** `node gestao/tests/teste_v61_ajuste_financeiro.cjs`, com casos de ajuste negativo, positivo, já incorporado, inconsistente e exclusão de `Ajuste financeiro RP`.
