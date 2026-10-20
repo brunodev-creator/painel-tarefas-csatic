@@ -65,14 +65,17 @@ test('Celular (375px): nenhum menu com rolagem horizontal',async()=>{
  assert(!bad.length,'Rolagem horizontal em: '+bad.join(', '));
  noErrors();
 });
-test('Tela inicial mostra "O que exige sua ação agora"',async()=>{
+test('Minhas tarefas mostra "O que exige sua ação agora" (e as outras telas não)',async()=>{
  await loadApp({role:'compras'});
+ assert(!$('.sig-now'),'Painel aparece fora de Minhas tarefas');
+ click('#nav [data-view=tarefas]');await wait(40);
  const panel=await until(()=>$('.sig-now'),'painel não apareceu');
  assert(/ação agora|Tudo em dia/.test(panel.textContent),'Título do painel inesperado');
  noErrors();
 });
-test('Assumir pela tela inicial e validar conclusão (mensagem de erro)',async()=>{
+test('Assumir pelo painel e validar conclusão (mensagem de erro)',async()=>{
  await loadApp({role:'compras'});
+ click('#nav [data-view=tarefas]');await wait(40);
  const claim=await until(()=>$('.sig-now [data-action=claimTask]'),'nenhuma tarefa na fila');
  const id=claim.dataset.id;claim.click();await wait(80);
  assert($('.toast-success'),'Sem mensagem de sucesso ao assumir');
