@@ -481,12 +481,12 @@ function v4SofiView(){
 }
 function v4RequestForm(id,selectedProcess){
  if(!canFinance())return showToast('Somente SOFI ou chefia podem alterar demandas de empenho.');
- const r=v4Solicitacoes().find(x=>x.id===id)||{processo_id:selectedProcess||'',dotacao:findProcess(selectedProcess)?.dotacao||'',valor_solicitado:0,status:'Em análise',descricao:'',pendencia:'',prazo:dayOffset(5),empenho_id:null};
+ const r=v4Solicitacoes().find(x=>x.id===id)||{processo_id:selectedProcess||'',dotacao:findProcess(selectedProcess)?.dotacao||'',valor_solicitado:findProcess(selectedProcess)?Number(moneyToCommit(findProcess(selectedProcess)).toFixed(2)):0,status:'Em análise',descricao:'',pendencia:'',prazo:dayOffset(5),empenho_id:null};
  const procs=db.processos.filter(x=>activeProcess(x)||x.id===r.processo_id);
  const options='<option value="" '+(!r.processo_id?'selected':'')+'>Selecione um processo</option>'+procs.map(p=>'<option value="'+esc(p.id)+'" '+(p.id===r.processo_id?'selected':'')+'>'+esc(p.numero)+' · '+esc(p.setor)+' · '+esc(p.objeto.slice(0,50))+'</option>').join('');
  const empenhos='<option value="">Nenhum empenho vinculado</option>'+db.empenhos.filter(e=>e.status!=='Anulado').map(e=>'<option value="'+esc(e.id)+'" '+(e.id===r.empenho_id?'selected':'')+'>'+esc(e.numero)+'/'+esc(e.ano)+' · '+esc(v4ProcessLabel(e.processo_id))+'</option>').join('');
- const html='<form data-form="v4Request" data-id="'+esc(id||'')+'"><div class="form-grid"><div class="form-row full"><label>Processo relacionado</label><select name="processo_id" required '+(id?'disabled':'')+'>'+options+'</select></div>'+
- inputField('dotacao','Dotação para conferência',r.dotacao,'text','required maxlength="100"')+inputField('valor_solicitado','Valor solicitado (R$)',r.valor_solicitado,'number','required min="0.01" step="0.01"')+
+ const html='<form data-form="v4Request" data-id="'+esc(id||'')+'"><div class="form-grid"><div class="form-row full"><label for="f-v4-processo">Processo relacionado</label><select id="f-v4-processo" data-fill-from-process="dotacao,valor_solicitado" name="processo_id" required '+(id?'disabled':'')+'>'+options+'</select></div>'+
+ inputField('dotacao','Dotação para conferência',r.dotacao,'text','required maxlength="100"')+inputField('valor_solicitado','Valor solicitado (R$)',r.valor_solicitado,'number','required min="0.01" step="0.01" aria-describedby="f-valor-hint"')+(id?'':'<small class="helper form-row full" id="f-valor-hint">Sugestão: valor homologado menos empenhos já registrados no processo. Confira antes de salvar.</small>')+
  selectField('status','Situação',['Em análise','Aguardando documentação','Pronto para empenhar','Empenhado','Devolvido','Cancelado'],r.status)+inputField('prazo','Prazo de análise',r.prazo,'date')+
  textareaField('descricao','Descrição e justificativa',r.descricao)+textareaField('pendencia','Pendência ou motivo de devolução',r.pendencia||'')+
  '<div class="form-row full"><label>Empenho relacionado (obrigatório para marcar "Empenhado")</label><select name="empenho_id">'+empenhos+'</select></div></div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar solicitação</button></div></form>';
@@ -1373,6 +1373,13 @@ function aipcImprimir(){
  window.print();
 }
 
+const AIPC_REUSE_FIELDS=['unidade_executora','chefe_compras','ordenador_despesa','ordenador_substituto'];
+function aipcResponsaveisAnteriores(exceptId){
+ const last=(db.aipc||[]).filter(a=>a.processo_id!==exceptId&&a.dados&&typeof a.dados==='object')
+  .sort((a,b)=>new Date(b.atualizado_em||0)-new Date(a.atualizado_em||0))[0];
+ if(!last)return {};
+ return Object.fromEntries(AIPC_REUSE_FIELDS.filter(k=>String(last.dados[k]||'').trim()).map(k=>[k,String(last.dados[k]).trim()]));
+}
 function aipcForm(id){
  const p=aipcProcess(id);
  if(!p||!canEditAipc())return showToast('Somente a Seção de Compras pode editar a AIPC.');
@@ -1383,7 +1390,9 @@ function aipcForm(id){
   modalidade:p.tipo_servico||p.modalidade||'',sei:p.referencia_sei||''
  };
  // Migrar visualmente o campo antigo "Localidade" para "RPM" sem perder seu valor.
- const data={...defaults,...old,rpm:old.rpm??old.localidade??''};
+ // AIPC nova: responsáveis da unidade raramente mudam; reaproveita a última AIPC registrada.
+ const reused=item?{}:aipcResponsaveisAnteriores(id);
+ const data={...defaults,...reused,...old,rpm:old.rpm??old.localidade??''};
  const legacyCount=Array.from({length:30},(_,idx)=>idx+1)
   .filter(n=>['lote','quantidade','siad','descricao','unitario','total']
    .some(field=>String(old['item_'+n+'_'+field]??'').trim()!==''))
@@ -1414,7 +1423,8 @@ function aipcForm(id){
   selector+'<div class="sig-aipc-items">'+itemFields+'</div></details>';
 
  const html='<form data-form="aipc" data-id="'+esc(id)+'" data-initial-item-count="'+initialCount+'" class="sig-aipc-form">'+
-  '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Salve o rascunho mesmo sem número e continue o preenchimento depois.</div>'+
+  '<div class="info-note">AIPC — Autorização de Instauração de Processo de Compras. Salve o rascunho mesmo sem número e continue o preenchimento depois.'+
+   (Object.keys(reused).length?' <strong>Objeto, valor, dotação, modalidade e SEI vieram do processo; unidade executora, chefe da Compras e ordenadores vieram da última AIPC. Confira antes de finalizar.</strong>':'')+'</div>'+
   '<div class="sig-aipc-statebar"><span data-aipc-document-status>'+esc(item?.status==='pronta'?'Pronta':item?'Rascunho':'Não iniciada')+'</span>'+
    '<span data-aipc-save-status aria-live="polite">'+(item?.atualizado_em?'Salvo às '+new Date(item.atualizado_em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'Ainda não salvo')+'</span></div>'+
   sections+items+
@@ -1689,6 +1699,19 @@ function actionNowPanel(){
  return '<section class="sig-now" aria-label="Pendências que exigem ação">'+head+list+rest+'</section>';
 }
 // No celular as tabelas viram cartões; cada célula recebe o rótulo da sua coluna.
+function fillFromProcess(select){
+ const p=findProcess(select.value),form=select.form;
+ if(!p||!form)return;
+ const values={dotacao:p.dotacao||'',valor_solicitado:Number(moneyToCommit(p).toFixed(2))||'',...taskDefaultsFromProcess(p)};
+ let filled=0;
+ for(const key of String(select.dataset.fillFromProcess||'').split(',')){
+  const field=form.elements.namedItem(key);
+  if(!field||values[key]===undefined||values[key]==='')continue;
+  const blank=!String(field.value).trim()||(field.type==='number'&&!Number(field.value));
+  if(blank||field.dataset.autofilled==='1'){field.value=values[key];field.dataset.autofilled='1';filled++;}
+ }
+ if(filled)showToast('Campos preenchidos com os dados do processo '+p.numero+'. Confira antes de salvar.','info');
+}
 function labelTables(root){
  root?.querySelectorAll('table.data-table:not(.budget-table)').forEach(table=>{
   const heads=[...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
@@ -1784,6 +1807,15 @@ function processForm(id,sector){const p=db.processos.find(x=>x.id===id)||{numero
  const html=`<form data-form="process" data-id="${esc(id||'')}"><div class="form-grid">${inputField('numero','Número do processo',p.numero,'text','required maxlength="80"')}${id&&cloud()?`<div class="form-row"><label>Setor responsável</label><div class="info-note">${esc(p.setor)} · use Encaminhar para transferir</div></div>`:selectField('setor','Setor responsável',SECTORS,p.setor)}${textareaField('objeto','Objeto da aquisição',p.objeto)}${selectField('modalidade','Modalidade',['COTEP','Pregão','Dispensa','Inexigibilidade','Adesão ARP','Outro'],p.modalidade)}${inputField('etapa','Etapa atual',p.etapa,'text','required')}${selectField('status','Situação',STATUSES,p.status)}${id&&cloud()?`<div class="form-row"><label>Responsável</label><div class="info-note">${esc(p.responsavel)} · use Encaminhar para redistribuir</div></div>`:inputField('responsavel','Responsável / equipe',p.responsavel,'text','required')}${selectField('prioridade','Prioridade',PRIORITIES,p.prioridade)}${inputField('data_entrada','Data de entrada',p.data_entrada,'date')}${inputField('prazo','Prazo da etapa',p.prazo,'date')}${inputField('valor_estimado','Valor estimado (R$)',p.valor_estimado,'number','step="0.01" min="0"')}${inputField('valor_homologado','Valor homologado (R$)',p.valor_homologado,'number','step="0.01" min="0"')}${inputField('dotacao','Dotação',p.dotacao)}${inputField('referencia_sei','Referência / link SEI',p.referencia_sei)}${textareaField('proxima_acao','Próxima providência',p.proxima_acao)}${textareaField('bloqueio_motivo','Motivo do impedimento (se houver)',p.bloqueio_motivo)}</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">${id?'Salvar alterações':'Cadastrar processo'}</button></div></form>`;
  openModal(id?'Editar processo':'Cadastrar novo processo','Cada processo tem um responsável, situação e próxima providência.',html,true);
 }
+// Reaproveita o que o processo já informa; o militar só confirma ou ajusta.
+function taskDefaultsFromProcess(p){
+ if(!p)return {};
+ const out={};
+ if(String(p.proxima_acao||'').trim())out.titulo=String(p.proxima_acao).trim().slice(0,180);
+ if(PRIORITIES.includes(p.prioridade))out.prioridade=p.prioridade;
+ if(p.prazo&&daysLeft(p.prazo)>=0)out.prazo=String(p.prazo).slice(0,10);
+ return out;
+}
 function taskForm(id,proc,requestedSection,requestedMember){
  const existing=db.tarefas.find(x=>x.id===id)||null;
  if(existing&&!canManageTask(existing))return showToast('Somente o responsável ou a chefia pode editar uma tarefa ativa.');
@@ -1791,9 +1823,9 @@ function taskForm(id,proc,requestedSection,requestedMember){
  const fixed=!chief||isSectionChiefRole(profile.role)?setorUsuario():null;
  const setor=existing?.setor||fixed||((requestedSection&&SECTORS.includes(requestedSection))?requestedSection:findProcess(proc)?.setor||'Compras');
  if(!canWrite(setor))return showToast('Sem permissão para criar tarefas neste setor.');
- const t=existing||{processo_id:proc||'',titulo:'',descricao:'',setor,responsavel:'',responsavel_auth_id:requestedMember||(!chief&&cloud()?currentAuthId():''),prioridade:'Média',status:'Pendente',prazo:dayOffset(3)};
+ const t=existing||{processo_id:proc||'',titulo:'',descricao:'',setor,responsavel:'',responsavel_auth_id:requestedMember||(!chief&&cloud()?currentAuthId():''),prioridade:'Média',status:'Pendente',prazo:dayOffset(3),...taskDefaultsFromProcess(findProcess(proc))};
  const choices=(db.processos||[]).filter(p=>p.setor===setor).map(p=>({label:p.numero+' — '+p.objeto.slice(0,55),value:p.id}));
- const procSelect='<div class="form-row full"><label for="f-processo_id">Processo relacionado (opcional)</label><select id="f-processo_id" name="processo_id"><option value="">Tarefa independente</option>'+
+ const procSelect='<div class="form-row full"><label for="f-processo_id">Processo relacionado (opcional)</label><select id="f-processo_id" name="processo_id"'+(existing?'':' data-fill-from-process="titulo,prioridade,prazo"')+'><option value="">Tarefa independente</option>'+
   choices.map(p=>'<option value="'+esc(p.value)+'"'+(p.value===t.processo_id?' selected':'')+'>'+esc(p.label)+'</option>').join('')+'</select></div>';
  const setorField=(fixed||existing&&cloud())?'<div class="form-row"><label>Seção</label><div class="sig-buy-readonly">'+esc(setor)+'</div><input name="setor" type="hidden" value="'+esc(setor)+'"></div>':
   '<div class="form-row"><label for="f-task-sector">Seção</label><select id="f-task-sector" name="setor">'+optionList(SECTORS,setor)+'</select></div>';
@@ -1813,6 +1845,11 @@ function taskForm(id,proc,requestedSection,requestedMember){
   (id?textareaField('conclusao_observacao','Ao concluir: providência realizada (mín. 8 caracteres)',t.conclusao_observacao||''):'')+
   '</div><div class="modal-footer"><button type="button" class="btn" data-action="closeModal">Cancelar</button><button type="submit" class="btn primary">Salvar tarefa</button></div></form>';
  openModal(id?'Editar tarefa':'Criar tarefa',id?'Atualize sua providência.':'Registre sua tarefa ou distribua para a fila da seção.',html,true);
+ if(!existing){
+  // Valores sugeridos podem ser trocados ao escolher outro processo, até o militar editá-los.
+  const form=document.querySelector('#modal-root form[data-form="task"]');
+  for(const name of ['prazo','prioridade',...(t.titulo?['titulo']:[])]){const el=form?.elements.namedItem(name);if(el)el.dataset.autofilled='1';}
+ }
 }
 
 function contractForm(id){if(!canFinance())return showToast('A edição financeira está restrita à SOFI e chefia.');
@@ -1828,7 +1865,7 @@ function repasseForm(id){if(!canFinance())return showToast('A edição financeir
 function empenhoForm(id){if(!canFinance())return showToast('A edição financeira está restrita à SOFI e chefia.');
  const e=db.empenhos.find(x=>x.id===id)||{numero:'',ano:new Date().getFullYear(),processo_id:'',contrato_id:'',dotacao:'',valor_empenhado:0,valor_consumido:0,status:'Em preparação'};
  const choices=(items,key)=>`<option value="">Não vincular</option>`+items.map(x=>`<option value="${esc(x.id)}" ${x.id===e[key]?'selected':''}>${esc(x.numero)}</option>`).join('');
- const html=`<form data-form="empenho" data-id="${esc(id||'')}"><div class="form-grid">${inputField('numero','Nº do empenho',e.numero,'text','required')}${inputField('ano','Ano',e.ano,'number','min="2020" max="2100"')}${inputField('dotacao','Dotação',e.dotacao,'text','required')}<div class="form-row"><label>Processo</label><select name="processo_id">${choices(db.processos,'processo_id')}</select></div><div class="form-row"><label>Contrato</label><select name="contrato_id">${choices(db.contratos,'contrato_id')}</select></div>${inputField('valor_empenhado','Valor empenhado (R$)',e.valor_empenhado,'number','step="0.01" min="0"')}${inputField('valor_consumido','Execução informada (R$)',e.valor_consumido,'number','step="0.01" min="0"')}${selectField('status','Status',['Em preparação','Ativo','Anulado','Encerrado'],e.status)}</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar empenho</button></div></form>`;
+ const html=`<form data-form="empenho" data-id="${esc(id||'')}"><div class="form-grid">${inputField('numero','Nº do empenho',e.numero,'text','required')}${inputField('ano','Ano',e.ano,'number','min="2020" max="2100"')}${inputField('dotacao','Dotação',e.dotacao,'text','required')}<div class="form-row"><label for="f-emp-processo">Processo</label><select id="f-emp-processo" data-fill-from-process="dotacao" name="processo_id">${choices(db.processos,'processo_id')}</select></div><div class="form-row"><label>Contrato</label><select name="contrato_id">${choices(db.contratos,'contrato_id')}</select></div>${inputField('valor_empenhado','Valor empenhado (R$)',e.valor_empenhado,'number','step="0.01" min="0"')}${inputField('valor_consumido','Execução informada (R$)',e.valor_consumido,'number','step="0.01" min="0"')}${selectField('status','Status',['Em preparação','Ativo','Anulado','Encerrado'],e.status)}</div><div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">Salvar empenho</button></div></form>`;
  openModal(id?'Editar empenho':'Novo empenho','O registro manual não substitui a importação dos movimentos oficiais.',html);
 }
 function detail(id){const p=findProcess(id);if(!p)return showToast('Processo não encontrado.');
@@ -2176,6 +2213,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
   if(results){results.innerHTML=window.SIG_FONTE.rowsHtml();labelTables(document.getElementById('content'));}
   return;
  }
+ if(e.target.dataset?.autofilled)delete e.target.dataset.autofilled;
  if(e.target.closest('form[data-form="aipc"]')){aipcScheduleAutosave(e.target.closest('form[data-form="aipc"]'));return;}if(e.target.id==='cotas-busca'){window.SIG_COTAS.filter('q',e.target.value);return}if(e.target.id==='cota-audit-search'){window.SIG_COTAS_AUD.filter('search',e.target.value);return}if(e.target.id==='cota-accounting-input'){window.SIG_COTAS_AUD.compare(e.target.value);return}if(e.target.dataset?.filter==='q')handleFilter(e)});document.addEventListener('change',e=>{
    if(['almox-year','almox-status','almox-type','almox-destination','almox-subrpm','almox-sort'].includes(e.target.id)){
      if(canVisitMenu('almoxarifado'))window.SIG_ALMOX.input(e.target.id,e.target.value);return;
@@ -2209,6 +2247,7 @@ function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>sh
    if(modality)modality.value=({ 'Registro de Preço':'Registro de Preço','COTEP':'COTEP','Pregão':'Pregão','Elaboração de ARP':'Elaboração de ARP'})[e.target.value]||'Outro';
    return;
   }
+  if(e.target.dataset?.fillFromProcess){fillFromProcess(e.target);return;}
   if(e.target.id==='f-task-sector'&&e.target.closest('form[data-form="task"]')){
    const newSector=e.target.value;
    const uSelect=document.getElementById('f-responsavel_auth_id');
