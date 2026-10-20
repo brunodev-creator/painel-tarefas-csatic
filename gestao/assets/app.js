@@ -1639,6 +1639,53 @@ async function submitUser(form){const d=gather(form),existing=form.dataset.form=
  const payload={nome:d.nome,role:d.role,setor:d.setor,...(existing?{auth_id:form.dataset.id,ativo:d.ativo==='true'}:{email:d.email})};
  busy=true;try{const r=await adminApi(existing?'atualizar':'convidar',payload);busy=false;closeModal();await loadAdminUsers();showToast(r.mensagem||'Usuário atualizado.');if(cloud())await fetchCloud()}catch(e){busy=false;showToast('Não foi possível concluir: '+errMsg(e))}
 }
+// Tela inicial: o que exige ação do militar agora, com o próximo passo a um clique.
+// Somente leitura de dados já carregados; as ações reutilizam os fluxos existentes.
+function actionNowPanel(){
+ const role=effectiveRole();
+ if(role==='leitura'||(cloud()&&!session))return '';
+ const sector=role==='admin'?null:setorUsuario();
+ const mine=db.tarefas.filter(t=>isOpenTask(t)&&assignedToMe(t)&&taskIsCurrentStage(t));
+ const late=mine.filter(isOverdue).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
+ const soon=mine.filter(t=>!isOverdue(t)&&daysLeft(t.prazo)<=3).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
+ const queue=db.tarefas.filter(t=>(!sector||t.setor===sector)&&queueClaimable(t)).sort((a,b)=>daysLeft(a.prazo)-daysLeft(b.prazo));
+ const stalled=db.processos.map(p=>({p,why:v3Reasons(p).filter(r=>r!=='Sem responsável individual')}))
+  .filter(x=>x.why.length&&(!sector||x.p.setor===sector)).sort((a,b)=>daysLeft(a.p.prazo)-daysLeft(b.p.prazo));
+ const unread=v3Unread();
+ const due=t=>{const d=daysLeft(t.prazo);return !t.prazo?'Sem prazo':d<0?'Atrasada há '+Math.abs(d)+' dia(s)':d===0?'Vence hoje':'Vence em '+d+' dia(s)';};
+ const procLabel=t=>{const p=taskProcessSummary(t);return p?p.numero+' · ':'';};
+ const taskItem=(t,sev)=>{
+  const finish=canManageTask(t);
+  return {sev,title:t.titulo,meta:procLabel(t)+due(t),
+   act:finish?'<button type="button" class="btn small primary" data-action="v4FinishTask" data-id="'+esc(t.id)+'">Concluir</button>':'',
+   more:'<button type="button" class="btn small" data-action="taskReadDetail" data-id="'+esc(t.id)+'">Ver</button>'};
+ };
+ const items=[
+  ...late.map(t=>taskItem(t,'danger')),
+  ...soon.map(t=>taskItem(t,'warning')),
+  ...queue.map(t=>({sev:'info',title:t.titulo,meta:'Fila da '+t.setor+' · '+procLabel(t)+due(t),
+   act:!previewRole&&canWrite(t.setor)?'<button type="button" class="btn small primary" data-action="claimTask" data-id="'+esc(t.id)+'">Assumir</button>':'',
+   more:'<button type="button" class="btn small" data-action="taskReadDetail" data-id="'+esc(t.id)+'">Ver</button>'})),
+  ...stalled.map(x=>({sev:'warning',title:x.p.numero+' · '+(x.p.objeto||''),meta:x.p.setor+' · '+x.why.join(' · '),act:'',
+   more:'<button type="button" class="btn small" data-action="'+(findProcess(x.p.id)?'detail':'sharedDetail')+'" data-id="'+esc(x.p.id)+'">Abrir processo</button>'}))
+ ];
+ const chip=(n,label,cls,attrs)=>n?'<button type="button" class="sig-now-chip '+cls+'" '+attrs+'><strong>'+n+'</strong> '+label+'</button>':'';
+ const chips=chip(late.length,late.length===1?'atrasada':'atrasadas','danger','data-action="taskScope" data-scope="mine"')+
+  chip(soon.length,'vencem em até 3 dias','warning','data-action="taskScope" data-scope="mine"')+
+  chip(queue.length,'na fila para assumir','info','data-action="taskScope" data-scope="queue"')+
+  chip(stalled.length,stalled.length===1?'processo parado ou vencido':'processos parados ou vencidos','warning',role==='admin'?'data-view="alertas"':'data-view="processos"')+
+  chip(unread,unread===1?'aviso não lido':'avisos não lidos','info','data-view="notificacoes"');
+ const hour=new Date().getHours(),greet=hour<12?'Bom dia':hour<18?'Boa tarde':'Boa noite';
+ const name=String(profile.nome||'').split(' ')[0];
+ const date=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+ const head='<div class="sig-now-head"><div><span class="sig-now-greet">'+esc(greet+(name&&cloud()?', '+name:''))+' · '+esc(date)+'</span>'+
+  '<h2>'+(items.length?'O que exige sua ação agora':'Tudo em dia')+'</h2></div>'+(chips?'<div class="sig-now-chips">'+chips+'</div>':'')+'</div>';
+ if(!items.length)return '<section class="sig-now sig-now-clear" aria-label="Pendências">'+head+'<p class="sig-now-empty">Nenhuma tarefa atrasada, vencendo ou aguardando na fila da sua seção.</p></section>';
+ const shown=items.slice(0,5);
+ const list='<ul class="sig-now-list">'+shown.map(x=>'<li class="sig-now-item" data-sev="'+x.sev+'"><div class="sig-now-main"><strong>'+esc(x.title)+'</strong><span>'+esc(x.meta)+'</span></div><div class="sig-now-actions">'+x.act+x.more+'</div></li>').join('')+'</ul>';
+ const rest=items.length>shown.length?'<p class="sig-now-more">Mais '+(items.length-shown.length)+' item(ns) nas listas acima.</p>':'';
+ return '<section class="sig-now" aria-label="Pendências que exigem ação">'+head+list+rest+'</section>';
+}
 // No celular as tabelas viram cartões; cada célula recebe o rótulo da sua coluna.
 function labelTables(root){
  root?.querySelectorAll('table.data-table:not(.budget-table)').forEach(table=>{
@@ -1666,7 +1713,7 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   if(cloud()&&session&&canViewCota()&&window.SIG_COTAS&&!window.SIG_COTAS.isLoaded()){
     window.SIG_COTAS.load(rest).then(()=>{if(view==='cotas')render();}).catch(()=>{if(view==='cotas')render();});
   }
-  html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
+  html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(view===firstRoleView()||view==='dashboard')html=actionNowPanel()+html;if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
  if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;labelTables(content);if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
@@ -2107,7 +2154,7 @@ async function handleClick(e){const btn=e.target.closest('[data-action],[data-vi
  case 'startReceipt': await v3StartReceipt(id);break;
  case 'chiefSector': navigate('processos');filters.setor=btn.dataset.sector||'Todos';render();break;
  case'menu':document.getElementById('sidebar').classList.toggle('open');document.getElementById('shade').classList.toggle('visible');break;
- case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();break;case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':taskScope=btn.dataset.scope;render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
+ case'retryCloudLoad':await fetchCloud();break;case'closeModal':closeModal();break;case'detail':detail(id);break;case'newProcess':processForm(null,btn.dataset.sector);break;case'editProcess':processForm(id);break;case'transfer':transferForm(id,btn.dataset.task);break;case'newTask':taskForm(null,btn.dataset.process,btn.dataset.sector);break;case'editTask':taskForm(id);break;case'newContract':contractForm(null);break;case'editContract':contractForm(id);break;case'newRepasse':repasseForm(null);break;case'editRepasse':repasseForm(id);break;case'newEmpenho':empenhoForm(null);break;case'editEmpenho':empenhoForm(id);break;case'logEvent':logForm(id);break;case'settings':settingsModal();break;case'profile':profileModal();break;case'inviteUser':userForm(null);break;case'editUser':userForm(id);break;case'reloadUsers':await loadAdminUsers();break;case'taskScope':if(!['mine','queue','sector'].includes(btn.dataset.scope))break;taskScope=btn.dataset.scope;if(view!=='tarefas'&&canVisitMenu('tarefas'))navigate('tarefas');else render();break;case'receiptScope':receiptScope=btn.dataset.scope;render();break;break;case'signOut':await signOut();break;case'ask':ask(btn.dataset.text);break;case'clearChat':chat=[];render();break;case'refresh':if(cloud())await fetchCloud();else{db=storage();render();showToast('Dados locais atualizados.')};break;case'export':exportData();break;case'import':importData();break;case'resetDemo':resetDemo();break;case'reconnectInstitutional':reconnectInstitutional();break;case'disconnect':saveSettings({url:'',key:''});break;case'demoRole':if(!cloud()){profile.role=btn.dataset.role;localStorage.setItem(KEYS.profile,profile.role);closeModal();render()}break;default:break;}}
 // Retorno imediato no botão de envio: evita duplo clique e mostra que o SIG está trabalhando.
 function submitFeedback(e){
  const form=e.target;
