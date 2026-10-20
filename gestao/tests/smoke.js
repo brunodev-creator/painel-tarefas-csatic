@@ -19,9 +19,9 @@ async function until(fn,msg,timeout=4000){
  throw Error('Tempo esgotado: '+msg);
 }
 // Carrega o app em modo demonstração, com dados fictícios novos e o perfil pedido.
-async function loadApp({role='admin',width=1440,height=820}={}){
+async function loadApp({role='admin',width=1440,height=820,keepData=false}={}){
  localStorage.setItem('sig-csatic-connect-v1',JSON.stringify({mode:'demo'}));
- localStorage.removeItem('sig-csatic-demo-v1');
+ if(!keepData)localStorage.removeItem('sig-csatic-demo-v1');
  localStorage.setItem('sig-csatic-role-v1',role);
  frame.style.width=width+'px';frame.style.height=height+'px';
  const loaded=new Promise(r=>frame.addEventListener('load',r,{once:true}));
@@ -156,6 +156,57 @@ test('Tabelas viram cartões com rótulos no celular',async()=>{
  const td=$('.data-table tbody td[data-label]');
  assert(td,'Células sem data-label');
  assert(win.getComputedStyle($('.data-table tbody tr')).display==='block','Linha não virou cartão');
+ noErrors();
+});
+
+test('Compras: cartão mostra AIPC e próximo passo',async()=>{
+ await loadApp({role:'compras'});
+ click('#nav [data-view=compras]');await wait(40);
+ const item=[...$$('.sig-buy-item')].find(x=>x.textContent.includes('DEMO-004/2026'));
+ assert(item,'Cartão DEMO-004/2026 ausente');
+ assert(/AIPC pendente/.test(item.textContent),'Situação da AIPC ausente no cartão');
+ assert([...item.querySelectorAll('.btn.primary')].some(b=>/AIPC|Encaminhar/.test(b.textContent)),'Botão de próximo passo ausente');
+ noErrors();
+});
+test('Compras: modalidade filtra pela etiqueta',async()=>{
+ await loadApp({role:'compras'});
+ click('#nav [data-view=compras]');await wait(40);
+ click('.sig-buy-chip[data-service="COTEP"]');await wait(40);
+ assert($('.sig-buy-chip[data-service="COTEP"]').getAttribute('aria-pressed')==='true','Etiqueta não ficou selecionada');
+ assert(!$('.sig-buy-service-toggle'),'Botão antigo de modalidades ainda presente');
+ noErrors();
+});
+test('Compras: "Registrar andamento" grava processo e histórico',async()=>{
+ await loadApp({role:'compras'});
+ click('#nav [data-view=compras]');await wait(40);
+ click('[data-action=progressForm][data-id="d-p1"]');
+ const form=await until(()=>$('form[data-form=andamento]'),'formulário de andamento não abriu');
+ assert(form.elements.proxima_acao.value==='Concluir revisão do TR','Próxima providência não veio preenchida');
+ form.elements.proxima_acao.value='Enviar TR revisado para a chefia';
+ form.elements.observacao.value='Revisão do TR concluída com o requisitante.';
+ form.querySelector('button[type=submit]').click();
+ await until(()=>$('.toast-success'),'sem mensagem de sucesso');
+ const data=JSON.parse(localStorage.getItem('sig-csatic-demo-v1'));
+ assert(data.processos.find(p=>p.id==='d-p1').proxima_acao==='Enviar TR revisado para a chefia','Processo não atualizado');
+ assert(data.eventos.some(e=>e.processo_id==='d-p1'&&/^Andamento — Revisão do TR concluída/.test(e.descricao)),'Histórico não registrado');
+ noErrors();
+});
+test('Compras: aba "Enviados" mostra processos que saíram da Compras',async()=>{
+ await loadApp({role:'compras'});
+ const data=JSON.parse(localStorage.getItem('sig-csatic-demo-v1'));
+ data.tramites.unshift({id:'smoke-tr',processo_id:'d-p2',origem:'Compras',destino:'Licitação',tipo:'Encaminhamento',motivo:'Teste',proxima_acao:'Analisar propostas',responsavel_destino:'Fila da Licitação',criado_em:new Date().toISOString()});
+ localStorage.setItem('sig-csatic-demo-v1',JSON.stringify(data));
+ await loadApp({role:'compras',keepData:true});
+ click('#nav [data-view=compras]');await wait(40);
+ click('.sig-buy-metric[data-filter="sent"]');await wait(40);
+ const item=[...$$('.sig-buy-sent')].find(x=>x.textContent.includes('DEMO-002/2026'));
+ assert(item,'Processo enviado não aparece');
+ assert(/Agora na Licitação/.test(item.textContent),'Seção atual ausente');
+ noErrors();
+});
+test('Menu intersetorial se chama "Acompanhar seções"',async()=>{
+ await loadApp({role:'compras'});
+ assert(/Acompanhar seções/.test($('#nav [data-view=processos]')?.textContent||''),'Rótulo antigo no menu');
  noErrors();
 });
 
