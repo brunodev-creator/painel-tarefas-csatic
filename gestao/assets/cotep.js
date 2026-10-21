@@ -61,6 +61,7 @@ function intentionForm(){
 function procedureForm(existing){
  const f=fields();const x=existing||{};const year=new Date().getFullYear();
  return contentForm('cotepProcedimento',
+  f.i('id','Registro',x.id||'','hidden')+
   f.i('ano','Exercício',x.ano||year,'number','min="2020" max="2100" required')+
   f.i('unidade_gestora','Unidade gestora',x.unidade_gestora||'1250071','text','required pattern="[0-9]{5,9}"')+
   f.i('numero','COTEP nº',x.numero||'','text','required placeholder="Ex.: 126/2026"')+
