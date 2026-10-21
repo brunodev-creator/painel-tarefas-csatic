@@ -1,72 +1,56 @@
-# SIG — Intenções e reservas de COTEP (21/10/2026)
+# SIG — Intenções de COTEP (v2, 21/10/2026)
 
-## Acesso e operação
-O menu **Intenções COTEP** foi integrado a todas as contas ativas do SIG. Qualquer usuário autenticado pode consultar e registrar intenção do centro, com exercício, UG, centro, elemento-item, objeto, valor estimado, data da necessidade e justificativa.
+Ferramenta central da DTS-1 para controlar o **limite anual de COTEP por elemento-item**, organizar as intenções dos centros e impedir que novas intenções ou COTEPs comprometam valores já consumidos ou reservados.
 
-A intenção começa Pendente, sem bloquear saldo. A DTS-1, mediante gestores habilitados pelo administrador em **Gestores DTS-1**, decide se devolve, rejeita, cancela, reserva ou finaliza. Os gestores também cadastram COTEPs por elemento-item, com estimativas e resultados finais.
+## Critério de controle (operacional PMMG)
+- Unidade de controle: **elemento-item** (ex.: 3016, 5207).
+- Limite parametrizado por **exercício e unidade gestora** em `sig_cotep_limites` (2026 / UG 1250071: **R$ 65.492,11** por elemento-item).
+- A base normativa fica registrada no parâmetro e marcada como **«Pendente» de validação jurídica institucional**. Somente o administrador registra a validação, com documento (parecer/nota técnica).
 
-Todos os usuários ativos podem visualizar as intenções de outros centros. O módulo não libera reservas automaticamente ao vencer a validade; a DTS-1 deve conferir e atualizar cada caso. Existe exportação CSV de intenções.
+| Grandeza | Regra |
+|---|---|
+| Consumido | COTEPs realizadas: `Finalizada` pelo valor homologado/negociado; `Realizada (a conferir)` pelo valor informado até a DTS-1 confirmar o homologado |
+| Comprometido | COTEPs `Em andamento` (estimado do item) + intenções com reserva aprovada |
+| Saldo | limite − consumido − comprometido |
+| Intenções pendentes | exibidas à parte; **não abatem** o saldo |
+| Fracassada / Deserta / Cancelada | não ocupam limite; intenções vinculadas voltam à fila como pendentes |
 
-## Critério de reserva e legalidade
-Elemento-item é um indicador gerencial, NÃO é uma unidade autônoma de limite legal de dispensa. Ao aprovar, o gestor deve definir o **ramo de atividade**, categoria (geral/engenharia), valor e validade da reserva, vinculados à UG e ao exercício.
+Sem dupla contagem: ao gerar a COTEP, a reserva da intenção é **transferida** para o item da COTEP (a intenção fica `Em COTEP`, com reserva zero). Ao finalizar, o homologado substitui o estimado e a diferença é liberada automaticamente (o evento informa o valor liberado).
 
-A aprovação confronta: (a) procedimentos finalizados, pelo valor homologado/negociado; (b) procedimentos em andamento, pela estimativa; (c) intenções já reservadas, pelo valor reservado. Fracassados e cancelados não ocupam reserva gerencial. A validação só abrange dados efetivamente cadastrados na base. O sistema não presume valores jurídicos oficiais.
+## Validação com os dados de 2026
+| Elemento-item | COTEPs | Consumido + comprometido | Saldo |
+|---|---|---|---|
+| 3016 | 43, 48, 64, 126 (R$ 2.896,00 homologado) + 130 em andamento (R$ 674,95) | R$ 59.617,57 | **R$ 5.874,54** |
+| 5207 | 95 + 130 em andamento (R$ 23.599,00) | R$ 64.299,00 | **R$ 1.193,11** |
 
-É obrigatório cadastrar uma BASE CONFERIDA da UG, exercício e categoria, incluindo referência documental da conferência no Portal de Compras e demais fontes relevantes. O algoritmo bloqueia a reserva se encontrar QUALQUER procedimento da mesma UG e exercício em andamento ou finalizado sem ramo/categoria, ou histórico «Realizada (a conferir)» com resultado desconhecido. Assim, a simples classificação contábil diferente não libera saldo de ramo possivelmente comum. O gestor não deve confirmar a base sem conferência integral e documental.
+A COTEP 130/2026 é **um** procedimento (`sig_cotep_coteps`) com **dois** lançamentos (3016 e 5207), cada um controlado no seu código. Os demais registros (3024, 5203, 3964, 3921 e 122/2026 fracassada) foram preservados.
 
-A reserva é transacional, com bloqueio de concorrência por exercício, UG, categoria e ramo. O sistema ainda não integra o Portal de Compras e não atesta a disponibilidade legal ou orçamentária oficial.
+## Uso
+**Centros (qualquer conta ativa do SIG):** abrir *Intenções COTEP*, clicar no cartão do elemento-item e preencher centro, objeto, valor, prioridade e justificativa. O formulário mostra o saldo atual e o saldo se a intenção for aprovada. Para um código que não aparece, use *Outro elemento-item* (o catálogo é aberto). Intenções pendentes ou devolvidas podem ser editadas/canceladas pelo autor.
 
-## COTEP 126/2026 — correção confirmada pelo responsável
-- Elemento-item: **3016**.
-- Situação: **Finalizada**.
-- Valor homologado e negociado: **R$ 2.896,00**.
-- Estimativa publicada no aviso: R$ 2.896,14 (conferir fonte oficial).
-- Ao cadastrar o histórico, usar **R$ 2.896,00** no campo *Valor final homologado*, não no campo de estimativa.
-- UG, ramo e categoria exigem confirmação própria.
+**DTS-1 (gestores habilitados pelo administrador em *Parâmetros → Gestores DTS-1*):**
+- *Fila de intenções*: reservar com um clique (o banco recusa se faltar saldo), analisar (ajustar reserva, liberar, devolver, rejeitar, priorizar, agrupar).
+- Selecionar várias intenções → **Gerar COTEP** (aceita vários elementos-itens; informe o número de uma COTEP em andamento para acrescentar intenções a ela).
+- *COTEPs*: registrar/editar procedimento com um ou mais elementos-itens, situação e valores; vincular a processo de compra do SIG (modalidade COTEP).
+- *Parâmetros*: limite do exercício/UG, catálogo de elementos-itens, centros e gestores.
 
-A COTEP 130/2026 possui lançamentos em 3016 e 5207 no mesmo procedimento. Não duplicar o total. A COTEP 122/2026 foi registrada no levantamento como fracassada. Ferramentas elétricas segue como intenção sem número/valor/código confirmados.
+Alertas no cartão: **utilização elevada** (≥ 80%), **saldo insuficiente** (pendentes > saldo), **limite atingido** e **limite excedido**.
 
-**Histórico transferido em 21/10/2026 por autorização expressa do usuário:** 12 lançamentos, 11 COTEPs distintas, 12 eventos de auditoria. Importação em operação única, apenas no banco do piloto; o repositório público contém somente estrutura e orientações, não a lista real. Fonte: planilha [Controle Gerencial de COTEPs 2026](https://docs.google.com/spreadsheets/d/1wkXSDV1ZCEfaKdB49mZnOu8VS2EGkPxku6fvgtVBB5M/edit), aba COTEPs 2026, linhas 7 a 18.
+## Segurança e integridade
+- Escrita somente pela RPC `sig_cotep_acao` (SECURITY DEFINER, valida conta ativa, gestor e administrador). Tabelas com RLS e apenas SELECT para contas ativas; auditoria visível só à DTS-1.
+- **Concorrência:** cada alteração que aumenta o valor ocupado obtém bloqueio transacional por (exercício, UG, elemento-item) e o gatilho `sig_cotep_*_limite` reconfere o saldo antes do COMMIT. Duas reservas simultâneas que juntas excedem o saldo: só a primeira é aceita.
+- Exceção ao limite (registrar fato já homologado acima do teto): somente administrador, com justificativa ≥ 20 caracteres, registrada no histórico.
+- Nenhum registro pode ser excluído (gatilho bloqueia DELETE); itens retirados de uma COTEP são inativados.
+- Histórico: `sig_cotep_eventos` (trilha legível com valor e elemento-item) e `sig_cotep_auditoria` (antes/depois de cada linha).
+- Não altera V5/V6/V7, AIPC, processos, empenhos, cotas ou almoxarifado; a tabela antiga `sig_cotep_bases` foi mantida apenas para consulta.
 
-- **8 linhas «Realizada (a conferir)»**: R$ 169.876,62 de valores informados, sem inventar valor homologado ou o tipo exato do valor informado.
-- **1 linha «Finalizada» (126/2026)**: R$ 2.896,00 homologado e negociado; estimativa do aviso R$ 2.896,14.
-- **2 linhas «Em andamento» (130/2026)**: R$ 24.273,95 divididos em 3016 e 5207.
-- **1 linha «Fracassada» (122/2026)**: sem elemento-item e sem valor informados, respeitados com NULL e referência técnica zero.
-- **Total de valores conhecidos: R$ 197.046,57**; não corresponde ao limite jurídico já consumido.
+## Implantação
+1. No Supabase (SQL Editor), aplicar `database/migrations/20261021_sig_cotep_v2_elemento_item.sql` (transação única; pode ser reaplicada).
+2. Conferir: `select * from sig_cotep_saldos where ano = 2026 order by elemento_item;` — 3016 saldo 5.874,54 e 5207 saldo 1.193,11.
+3. Administrador confirma gestores DTS-1 e, após manifestação jurídica, marca o limite como «Validada».
+4. DTS-1 confirma o homologado das COTEPs «Realizada (a conferir)» (43, 48, 64, 95 e outras) e a UG provisória 1250071.
 
-**Cuidado:** a planilha não traz a UG individual de cada lançamento. Por isso, a unidade **1250071 foi atribuída como referência operacional PROVISÓRIA** a todos os registros, com aviso no campo documental de cada linha; não está comprovada. Ramo de atividade e categoria também ficam sem preenchimento até revisão pela DTS-1. Bases anuais não foram marcadas como conferidas, e o sistema não libera reservas baseadas no histórico parcial.
-
-A observação da COTEP 126/2026 foi atualizada manualmente na planilha (célula K16), preservando F16 = R$ 2.896,00 e fórmulas. O SIG não sincroniza automaticamente com a planilha. Antes de compartilhar o módulo operacional com todos os centros, validar formalmente o ambiente externo, perfis e governança de dados.
-
-## Banco e permissões
-Tabelas: sig_cotep_intencoes, sig_cotep_procedimentos, sig_cotep_bases, sig_cotep_gestores e sig_cotep_eventos.
-- RLS e SELECT exclusivo para contas ativas; identificação de gestores visível apenas ao próprio gestor e ao administrador.
-- Sem INSERT, UPDATE ou DELETE diretamente por REST para contas autenticadas. Toda escrita passa pelo RPC sig_cotep_acao, com autenticação e controle de função (usuário x gestor x administrador).
-- Trilhas registradas em sig_cotep_eventos. Locks transacionais para reserva e alteração de procedimentos no mesmo agrupamento.
-- Não modifica V5/V6/V6.1/V7, AIPC, processos, empenhos, cotas ou almoxarifado.
-
-Arquivos:
-- gestao/database/migrations/20261021_sig_cotep_intencoes_reservas.sql
-- gestao/database/migrations/20261021_sig_cotep_hardening.sql
-- gestao/database/migrations/20261021_cotep_historico_sem_homologacao.sql
-- gestao/database/migrations/20261021_cotep_historico_edicao_estavel.sql
-- gestao/assets/cotep.js
-- gestao/assets/cotep.css
-- gestao/index.html
-- gestao/assets/app.js
-
-## Validações
-- Quatro migrations aplicadas com sucesso no projeto Supabase piloto.
-- Sintaxe dos JavaScript verificada.
-- Transação reversível no banco criou intenção de teste, validou base fictícia e reservou valor sem deixar dados persistidos.
-- Um usuário setorial sem autorização tentou validar base e recebeu bloqueio do banco.
-- Teste do componente com dados em memória confirmou formatação de valor homologado.
-- Importação conferida com consulta SQL: 12 registros, 11 números únicos, somas por situação reconciliadas com a planilha, e 12 eventos de auditoria.
-- **Ainda não foi executado teste funcional real no navegador com diferentes contas e celulares.**
-
-## Ativação operacional
-1. Confirmar aprovação institucional de segurança para o ambiente externo de dados.
-2. Convidar militares dos centros para o SIG.
-3. Administrador delega os responsáveis DTS-1 em Gestores DTS-1.
-4. DTS-1 reconcilia os procedimentos históricos e confere a base por ramo, UG e exercício.
-5. Só após validar a base, aprovar reservas; conferir periodicamente e ao final de cada COTEP.
+## Testes
+- `node gestao/tests/teste_cotep_calculo.cjs` — motor de cálculo com os dados de validação.
+- `gestao/tests/sql/run.sh` — PostgreSQL local (≥ 15) com simulação do Supabase: aplica as migrations sobre o histórico importado e executa 64 verificações (saldos, permissões, RLS, conversão sem dupla contagem, liberação de diferença, exceção, exclusão bloqueada) e o teste de concorrência com duas sessões simultâneas.
+- `gestao/tests/smoke.html?auto` — inclui 5 testes do painel em modo demonstração (desktop e celular 375 px).

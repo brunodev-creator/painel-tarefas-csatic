@@ -213,6 +213,118 @@ test('Menu intersetorial se chama "Acompanhar seções"',async()=>{
  noErrors();
 });
 
+// ===== Intenções de COTEP (limite por elemento-item, dados fictícios da demonstração) =====
+const cotepCard=code=>$('.cotep-card[data-el="'+code+'"]');
+const cotepSaldo=code=>(cotepCard(code)?.querySelector('.cotep-card-saldo b')?.textContent||'').replace(/\s/g,' ');
+async function openCotep(opts){await loadApp(opts);win.confirm=()=>true;click('#nav [data-view=cotep]');await until(()=>$('.cotep-grid'),'painel COTEP não abriu');}
+test('COTEP: painel por elemento-item com limite, saldo e alertas',async()=>{
+ await openCotep({role:'admin'});
+ assert(/65\.492,11/.test($('.cotep-page .sub')?.textContent||''),'Limite anual não exibido');
+ assert($$('.cotep-card[data-el]').length>=4,'Cartões de elemento-item ausentes');
+ // 3016: 30.250,50 + 19.800,00 consumidos + 6.500,00 em andamento = 56.550,50 → saldo 8.941,61
+ assert(/8\.941,61/.test(cotepSaldo('3016')),'Saldo 3016 incorreto: '+cotepSaldo('3016'));
+ // 5207: 47.100,00 + 12.000,00 = 59.100,00 → saldo 6.392,11 (90,2%: utilização elevada)
+ assert(/6\.392,11/.test(cotepSaldo('5207')),'Saldo 5207 incorreto: '+cotepSaldo('5207'));
+ assert(/Utilização elevada/.test(cotepCard('5207').textContent),'Alerta de utilização elevada ausente');
+ assert(/Saldo/.test($('.cotep-legend')?.textContent||''),'Legenda ausente');
+ noErrors();
+});
+test('COTEP: centro registra intenção em poucos cliques a partir do cartão',async()=>{
+ await openCotep({role:'compras'});
+ assert(!$('[data-action=cotepParametros]'),'Parâmetros visíveis para perfil sem gestão');
+ click(cotepCard('3016'));
+ await until(()=>$('#modal-root form[data-form=cotepIntencao]'),'formulário rápido não abriu');
+ assert($('#modal-root .timeline, #modal-root .cotep-list'),'Histórico do elemento-item ausente');
+ const f=$('#modal-root form[data-form=cotepIntencao]');
+ assert(f.querySelector('[name=elemento_item]').value==='3016','Elemento-item não veio preenchido');
+ setValue(f.querySelector('[name=centro]'),'Centro de Videomonitoramento (fictício)');
+ setValue(f.querySelector('[name=objeto]'),'Toner para impressoras do centro');
+ setValue(f.querySelector('[name=valor_estimado]'),'9.000,00');
+ await until(()=>/acima do saldo/.test(f.querySelector('[data-cotep-sim]').textContent),'simulação de saldo não atualizou');
+ setValue(f.querySelector('[name=valor_estimado]'),'1.000,00');
+ setValue(f.querySelector('[name=justificativa]'),'Reposição do estoque do semestre');
+ f.querySelector('button[type=submit]').click();
+ await until(()=>!$('#modal-root form'),'modal não fechou após registrar');
+ assert(/8\.941,61/.test(cotepSaldo('3016')),'Intenção pendente não pode abater saldo');
+ assert(/2 pendente/.test(cotepCard('3016').textContent),'Pendência não contabilizada no cartão');
+ noErrors();
+});
+test('COTEP: DTS-1 reserva, bloqueia excesso e gera COTEP sem dupla contagem',async()=>{
+ await openCotep({role:'admin'});
+ click('[data-action=cotepAba][data-tab=intencoes]');await wait(40);
+ const linha=[...$$('.cotep-table tbody tr')].find(tr=>/Cartuchos/.test(tr.textContent));
+ assert(linha,'Intenção fictícia não listada');
+ click(linha.querySelector('[data-action=cotepReservar]'));await wait(60);
+ assert(/Reservada/.test([...$$('.cotep-table tbody tr')].find(tr=>/Cartuchos/.test(tr.textContent)).textContent),'Reserva não aplicada');
+ click('[data-action=cotepAba][data-tab=elementos]');await wait(40);
+ assert(/4\.741,61/.test(cotepSaldo('3016')),'Reserva não abateu o saldo: '+cotepSaldo('3016'));
+ // Excesso: reserva de 3.500,00 em 5207 é possível; depois tentar reservar acima do saldo.
+ click('[data-action=cotepAba][data-tab=intencoes]');await wait(40);
+ const sw=[...$$('.cotep-table tbody tr')].find(tr=>/Switches/.test(tr.textContent));
+ click(sw.querySelector('[data-action=cotepIntencao]'));
+ const dec=await until(()=>$('#modal-root form[data-form=cotepDecisao]'),'formulário de decisão');
+ setValue(dec.querySelector('[name=valor]'),'3.500,00');
+ dec.querySelector('button[type=submit]').click();
+ await until(()=>!$('#modal-root form'),'decisão não concluiu');
+ // Seleciona duas intenções reservadas e gera uma COTEP com dois elementos-itens.
+ for(const nome of ['Cartuchos','Switches']){const tr=[...$$('.cotep-table tbody tr')].find(t=>t.textContent.includes(nome));click(tr.querySelector('.cotep-check'));await wait(40);}
+ assert(/2 selecionada/.test($('.cotep-bulk')?.textContent||''),'Seleção em lote não exibida');
+ click('[data-action=cotepGerarCotep]');
+ const conv=await until(()=>$('#modal-root form[data-form=cotepConverter]'),'modal gerar COTEP');
+ setValue(conv.querySelector('[name=numero]'),'D-40/2026');
+ setValue(conv.querySelector('[name=objeto]'),'Suprimentos e rede (fictício)');
+ conv.querySelector('button[type=submit]').click();
+ await until(()=>!$('#modal-root form'),'COTEP não gerada');
+ const row=[...$$('.cotep-table tbody tr')].find(tr=>/D-40\/2026/.test(tr.textContent));
+ assert(row&&/3016/.test(row.textContent)&&/5207/.test(row.textContent),'COTEP com dois elementos-itens não listada');
+ click('[data-action=cotepAba][data-tab=elementos]');await wait(40);
+ assert(/4\.741,61/.test(cotepSaldo('3016'))&&/2\.892,11/.test(cotepSaldo('5207')),'Conversão alterou saldo (dupla contagem): '+cotepSaldo('3016')+' / '+cotepSaldo('5207'));
+ // Finaliza com homologado menor: diferença volta ao saldo de cada código.
+ click('[data-action=cotepAba][data-tab=coteps]');await wait(40);
+ click([...$$('.cotep-table tbody tr')].find(tr=>/D-40\/2026/.test(tr.textContent)).querySelector('[data-action=cotepCotep]'));
+ const cf=await until(()=>$('#modal-root form[data-form=cotepCotep]'),'formulário da COTEP');
+ setValue(cf.querySelector('[name=situacao]'),'Finalizada','change');
+ for(const r of cf.querySelectorAll('[data-item]')){const el=r.querySelector('[name=item_elemento]').value;setValue(r.querySelector('[name=item_homologado]'),el==='3016'?'4000':'3000');}
+ cf.querySelector('button[type=submit]').click();
+ await until(()=>!$('#modal-root form'),'COTEP não finalizada');
+ click('[data-action=cotepAba][data-tab=elementos]');await wait(40);
+ assert(/4\.941,61/.test(cotepSaldo('3016'))&&/3\.392,11/.test(cotepSaldo('5207')),'Diferença não liberada: '+cotepSaldo('3016')+' / '+cotepSaldo('5207'));
+ noErrors();
+});
+test('COTEP: reserva acima do saldo é recusada',async()=>{
+ await openCotep({role:'admin'});
+ click('[data-action=cotepNova]');
+ const f=await until(()=>$('#modal-root form[data-form=cotepIntencao]'),'nova intenção');
+ setValue(f.querySelector('[name=centro]'),'Centro de Telecomunicações (fictício)');
+ setValue(f.querySelector('[name=elemento_item]'),'5207');
+ setValue(f.querySelector('[name=objeto]'),'Servidores de borda para salas técnicas');
+ setValue(f.querySelector('[name=valor_estimado]'),'7000');
+ setValue(f.querySelector('[name=justificativa]'),'Ampliação da capacidade de processamento');
+ f.querySelector('button[type=submit]').click();
+ await until(()=>!$('#modal-root form'),'intenção não registrada');
+ click('[data-action=cotepAba][data-tab=intencoes]');await wait(40);
+ const tr=[...$$('.cotep-table tbody tr')].find(t=>/Servidores de borda/.test(t.textContent));
+ click(tr.querySelector('[data-action=cotepReservar]'));
+ const dec=await until(()=>$('#modal-root form[data-form=cotepDecisao]'),'saldo insuficiente deve abrir a análise');
+ setValue(dec.querySelector('[name=valor]'),'7000');
+ dec.querySelector('button[type=submit]').click();await wait(120);
+ assert(/Saldo insuficiente/.test(doc.getElementById('toast-root').textContent),'Bloqueio por saldo não informado');
+ click('[data-action=closeModal]');await wait(40);
+ assert(/Pendente/.test([...$$('.cotep-table tbody tr')].find(t=>/Servidores de borda/.test(t.textContent)).textContent),'Intenção mudou de situação após bloqueio');
+ noErrors();
+});
+test('COTEP: celular 375px sem rolagem horizontal e com cartões em coluna',async()=>{
+ await openCotep({role:'leitura',width:375,height:812});
+ assert(doc.documentElement.scrollWidth<=376,'Painel com rolagem horizontal: '+doc.documentElement.scrollWidth);
+ const cards=$$('.cotep-card');assert(cards.length>1&&Math.abs(cards[0].getBoundingClientRect().left-cards[1].getBoundingClientRect().left)<2,'Cartões não empilhados');
+ click('[data-action=cotepAba][data-tab=intencoes]');await wait(40);
+ assert(doc.documentElement.scrollWidth<=376,'Fila com rolagem horizontal');
+ assert(!$('[data-action=cotepReservar]'),'Perfil de leitura vê ação da DTS-1');
+ click(cotepCard('3016')||'[data-action=cotepElemento]');await wait(60);
+ const m=$('#modal-root .modal');assert(m&&m.getBoundingClientRect().right<=376,'Modal ultrapassa a tela');
+ noErrors();
+});
+
 async function run(){
  runButton.disabled=true;list.innerHTML='';summary.className='';summary.textContent='Executando…';
  const saved=Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]));

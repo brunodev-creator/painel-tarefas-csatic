@@ -1,51 +1,135 @@
-/* SIG / DTS-1: COTEPs, mantendo identidade institucional e layout responsivo. */
-.cotep-page{display:grid;gap:18px;max-width:1550px;margin:0 auto}
-.cotep-note{background:#f8f4e9;border:1px solid #ded2b9;border-left:4px solid #9c8657;border-radius:12px;color:#544c3e;padding:14px 17px;line-height:1.6;font-size:13px}
-.cotep-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.cotep-kpis>div{background:white;border:1px solid #e9e5da;box-shadow:var(--shadow);border-radius:13px;padding:18px;min-width:0}
-.cotep-kpis span{display:block;color:#68655e;font-size:12px;margin-bottom:8px}
-.cotep-kpis strong{display:block;color:#33302b;font:800 clamp(17px,1.65vw,24px) Manrope,Arial,sans-serif;overflow-wrap:anywhere}
-.cotep-heading{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:16px}
-.cotep-heading h2{font-size:20px;margin:0}
-.cotep-heading>span{color:#716a5d;font-size:12px}
-.cotep-actions{display:flex;flex-wrap:wrap;gap:8px}
-.cotep-table{min-width:780px}
+/* SIG / DTS-1: Intenções de COTEP — painel por elemento-item. Usa os tokens institucionais do SIG. */
+.cotep-page{display:grid;gap:16px;max-width:1550px;margin:0 auto;--cot-consumido:#5f5236;--cot-comprometido:#b8964f;--cot-pendente:#d9cfb8;--cot-livre:#eeebe4;--cot-red:var(--sig-danger,#9e3f3c);--cot-amber:#a3742b}
+.cotep-page .pagehead{margin-bottom:4px}
+.cotep-page .sub strong{color:var(--ink)}
+.cotep-ano{min-width:96px;height:38px}
+.cotep-note{margin:0;background:var(--sig-primary-soft,#f3efe4);border:1px solid #e2d9c4;border-left:4px solid var(--sig-primary,#796a46);border-radius:10px;color:#4f4636;padding:11px 14px;line-height:1.55;font-size:12.5px}
+.cotep-note.danger{background:var(--sig-danger-soft,#fbeceb);border-color:#efc9c6;border-left-color:var(--cot-red);color:#7c3330}
+.cotep-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cotep-kpis>div{background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-radius:var(--radius);padding:16px 18px;min-width:0}
+.cotep-kpis span{display:block;color:var(--muted);font-size:12px;font-weight:600}
+.cotep-kpis strong{display:block;margin:8px 0 4px;color:var(--ink);font:800 clamp(18px,1.7vw,24px) Manrope,Arial,sans-serif;letter-spacing:-.5px;overflow-wrap:anywhere}
+.cotep-kpis small{display:block;color:var(--sig-text-subtle,#6b6f75);font-size:11px}
+.cotep-tabs{margin:2px 0 0;flex-wrap:wrap}
+.cotep-bubble{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;margin-left:4px;border-radius:20px;background:var(--cot-comprometido);color:#fff;font-size:10.5px}
+.cotep-chips{display:flex;gap:6px;flex-wrap:wrap}
+.cotep-chip{border:1px solid var(--line);background:#fff;color:#55534d;border-radius:20px;padding:8px 13px;font-size:12px;font-weight:700}
+.cotep-chip.active{background:var(--sig-primary-soft,#f3efe4);border-color:#cdbf9c;color:var(--sig-primary-strong,#5f5236)}
+.cotep-legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin:2px 0 14px;font-size:11px;color:var(--muted)}
+.cotep-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.cotep-legend .consumido,.cotep-bar .consumido{background:var(--cot-consumido)}
+.cotep-legend .comprometido,.cotep-bar .comprometido{background:var(--cot-comprometido)}
+.cotep-legend .pendente,.cotep-bar .pendente{background:repeating-linear-gradient(135deg,var(--cot-pendente) 0 4px,#efe9da 4px 8px)}
+.cotep-legend .livre{background:var(--cot-livre);border:1px solid #dcd7cc}
+/* Cartões de elemento-item */
+.cotep-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.cotep-card{display:flex;flex-direction:column;gap:9px;text-align:left;background:#fff;border:1px solid var(--line);border-top:4px solid #cfc8b8;border-radius:12px;padding:14px 15px 13px;color:var(--ink);font:inherit;min-width:0;transition:box-shadow .15s,transform .15s}
+.cotep-card:hover{box-shadow:0 8px 22px rgba(34,30,22,.09);transform:translateY(-1px)}
+.cotep-card:focus-visible{outline:2px solid #a58f63;outline-offset:2px}
+.cotep-card.nivel-elevado,.cotep-card.nivel-insuficiente{border-top-color:var(--cot-comprometido)}
+.cotep-card.nivel-atingido,.cotep-card.nivel-excedido{border-top-color:var(--cot-red)}
+.cotep-card.nivel-ok{border-top-color:#8fa596}
+.cotep-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cotep-code{font:800 22px Manrope,Arial,sans-serif;letter-spacing:-.5px}
+.cotep-card-desc{font-size:12px;color:#55534d;line-height:1.4;min-height:17px}
+.cotep-card-desc.muted{color:#97938a;font-style:italic}
+.cotep-card-saldo{display:flex;align-items:flex-end;justify-content:space-between;gap:8px}
+.cotep-card-saldo small,.cotep-card-nums small{display:block;font-size:10.5px;color:var(--muted);font-weight:600}
+.cotep-card-saldo b{font:800 19px Manrope,Arial,sans-serif;letter-spacing:-.4px}
+.cotep-card.nivel-excedido .cotep-card-saldo b,.cotep-card.nivel-atingido .cotep-card-saldo b{color:var(--cot-red)}
+.cotep-card-saldo em{font-style:normal;font-weight:800;font-size:13px;color:#55534d}
+.cotep-card-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;font-weight:700}
+.cotep-card-foot{font-size:11px;color:var(--muted);border-top:1px solid #f0ede7;padding-top:8px;line-height:1.5}
+.cotep-card-foot b{color:var(--cot-amber)}
+.cotep-card-add{align-items:center;justify-content:center;text-align:center;border-style:dashed;border-top:1px dashed #cfc8b8;background:#fbfaf7;min-height:150px}
+.cotep-add-ico{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--sig-primary-soft,#f3efe4);color:var(--sig-primary,#796a46);font-size:22px;font-weight:800}
+.cotep-bar{display:flex;height:10px;border-radius:20px;overflow:hidden;background:var(--cot-livre)}
+.cotep-bar .seg{height:100%}
+/* Fila e tabelas */
+.cotep-table{min-width:900px}
 .cotep-table td{vertical-align:middle}
-.cotep-table strong{display:block;color:#27292d}
-.cotep-table small{display:block;font-size:11px;color:#77736e;line-height:1.5;margin-top:3px;max-width:420px}
-.cotep-status{display:inline-block;border-radius:20px;padding:5px 9px;background:#f1ece1;color:#655532;font-size:11px;font-weight:700}
-.cotep-filter{display:flex;flex-direction:column;gap:6px;margin:14px 0 12px;max-width:550px}
-.cotep-filter label{font-weight:700;font-size:12px;color:#58534a}
-.cotep-filter input{padding:11px 14px;background:#fff;border:1px solid #d9d4c8;border-radius:9px;width:100%;font-size:13px;color:#24262b}
-.cotep-tabs{display:flex;gap:8px;margin:0 0 15px}
-.cotep-bases{margin-top:20px;border-top:1px solid #e7e2d8;padding-top:14px}
-.cotep-bases>strong{display:block;margin-bottom:10px;font-size:12px}
-.cotep-bases>div{display:flex;flex-wrap:wrap;gap:8px}
-.cotep-base{font-size:11px;background:#fbf2e7;color:#8a5e34;padding:7px 10px;border-radius:8px}
-.cotep-base.ok{background:#e9f2e8;color:#3f674c}
-.cotep-danger{color:#a74f4c;font-size:13px}
-.cotep-empty{padding:24px 14px;color:#777;text-align:center}
-.cotep-ramo-list{display:grid;gap:12px}
-.cotep-ramo-list>div{padding:12px;border:1px solid #ebe6dc;border-radius:9px}
-.cotep-ramo-list p{font-size:12px;color:#655c4c;margin:8px 0 0}
-.cotep-form{padding:10px 22px 20px}
-.cotep-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
-.cotep-field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#58534a;font-weight:700}
-.cotep-field input,.cotep-field select,.cotep-field textarea{width:100%;padding:10px 12px;border:1px solid #d8d4cd;border-radius:8px;background:#fff;color:#292b30;font:400 13px DM Sans,Arial,sans-serif}
-.cotep-field input[type="hidden"]{display:none}
-.cotep-field.cotep-wide{grid-column:1/-1}
-.cotep-hint{font-size:12px;padding:12px;border-radius:8px;color:#655b4c;background:#f5f1e7;line-height:1.5}
-.cotep-form .modal-footer{padding:16px 0 0}
-@media(max-width:900px){.cotep-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:650px){
- .cotep-page{gap:13px}.cotep-kpis{gap:9px}.cotep-kpis>div{padding:12px}
- .cotep-heading h2{font-size:17px}.cotep-fields{grid-template-columns:1fr}
- .cotep-form{padding:8px 12px 16px}
+.cotep-td-check{width:34px}
+.cotep-check{width:18px;height:18px;accent-color:var(--sig-primary,#796a46)}
+.cotep-obj{max-width:340px;font-size:12px;line-height:1.45;color:#3c3a35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.cotep-row-actions{display:flex;gap:6px;flex-wrap:wrap}
+.cotep-warn{color:var(--cot-amber);font-weight:700}
+.cotep-bulk{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 12px;margin:0 0 12px;border-radius:10px;background:#f8f6f1;border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.cotep-bulk.on{background:var(--sig-primary-soft,#f3efe4);border-color:#d9ccac;color:var(--ink);position:sticky;top:76px;z-index:5}
+.cotep-itens{display:flex;flex-wrap:wrap;gap:5px}
+.cotep-item-chip{border:1px solid #e1dbcd;background:#faf8f3;border-radius:7px;padding:4px 7px;font-size:11px;font-weight:700;color:#4f4636}
+.cotep-item-chip:not(:disabled):hover{border-color:#bfae86}
+.cotep-empty{padding:24px 14px;color:var(--muted);text-align:center}
+/* Modais */
+.cotep-detail h3{margin:20px 0 10px}
+.cotep-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.cotep-metrics>div{background:#f8f6f1;border-radius:10px;padding:11px 12px;min-width:0}
+.cotep-metrics small{display:block;font-size:11px;color:var(--muted);font-weight:600}
+.cotep-metrics strong{display:block;margin-top:5px;font:800 16px Manrope,Arial,sans-serif;overflow-wrap:anywhere}
+.cotep-metrics .saldo{background:var(--sig-success-soft,#e9f1ec)}
+.cotep-alert{margin:0 0 12px;padding:9px 12px;border-radius:9px;font-weight:700;font-size:12.5px;background:#fff2df;color:#7d5a1f}
+.cotep-alert.nivel-excedido,.cotep-alert.nivel-atingido{background:var(--sig-danger-soft,#fbeceb);color:#7c3330}
+.cotep-alert.nivel-sem-limite{background:#f0f2f5;color:#4e5a6b}
+.cotep-quick{margin:16px 0 4px;border:1px solid #e3dccb;border-radius:12px;background:#fdfcf9}
+.cotep-quick>summary{cursor:pointer;padding:12px 14px;font-weight:800;font-family:Manrope,Arial,sans-serif;color:var(--sig-primary-strong,#5f5236);list-style-position:inside}
+.cotep-quick[open]>summary{border-bottom:1px solid #eee8da}
+.cotep-quick .cotep-form{padding:14px}
+.cotep-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.cotep-list{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.cotep-list li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:9px 10px;border:1px solid #efebe3;border-radius:9px;font-size:12px}
+.cotep-list li small{flex-basis:100%;color:var(--muted);line-height:1.4}
+.cotep-li-val{margin-left:auto;font-weight:800}
+.cotep-li-act{flex-basis:100%;display:flex;justify-content:flex-end}
+.cotep-meta{margin-bottom:12px}
+.cotep-sim{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:14px;padding:10px 12px;border-radius:9px;background:#f8f6f1;font-size:12px;color:#4f4c45}
+.cotep-sim .neg,.cotep-item-info.neg{color:var(--cot-red);font-weight:700}
+.cotep-sim .muted{flex-basis:100%;font-size:11px}
+.cotep-decisao{margin-top:12px;padding:14px;border:1px solid #e3dccb;border-radius:12px;background:#fdfcf9}
+.cotep-decisao h3{margin-top:0}
+.cotep-h3{margin:18px 0 4px}
+.cotep-itens-form{display:grid;gap:8px;margin:10px 0}
+.cotep-item-row{display:grid;grid-template-columns:110px 1fr 1fr 34px;gap:8px;align-items:end;padding:10px;border:1px solid #ece7dc;border-radius:10px;background:#fcfbf8}
+.cotep-item-del{align-self:end;margin-bottom:5px}
+.cotep-item-info{grid-column:1/-1;margin:0;font-size:11.5px;color:var(--muted)}
+.cotep-item-info:empty{display:none}
+.cotep-excecao{margin-top:12px}
+.cotep-param{padding:4px 0 16px;border-bottom:1px solid #eee9df}
+.cotep-param:last-child{border-bottom:0}
+.cotep-param h3{margin-top:12px}
+.cotep-inline-form{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 10px}
+.cotep-inline-form input,.cotep-inline-form select{border:1px solid #dcd6ca;border-radius:8px;padding:9px 10px;font-size:12px;min-width:0}
+.cotep-inline-form input[name=codigo]{width:90px}
+.cotep-inline-form input[name=descricao],.cotep-inline-form input[name=nome]{flex:1 1 200px}
+.cotep-catalogo{display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow:auto}
+.cotep-catalogo span{font-size:11px;background:#f6f3ec;border-radius:7px;padding:5px 8px;color:#4f4636}
+.cotep-catalogo span.off{opacity:.55;text-decoration:line-through}
+@media(max-width:1000px){.cotep-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){
+ .cotep-page{gap:12px}
+ .cotep-page .head-actions{flex-direction:row;flex-wrap:wrap;align-items:center}
+ .cotep-page .head-actions .btn{flex:1 1 auto}
+ .cotep-page .head-actions .cotep-ano{flex:0 0 92px}
+ .cotep-page .head-actions [data-action=cotepRecarregar]{flex:0 0 44px}
+ .cotep-page .head-actions .btn.primary{flex-basis:100%;order:-1;min-height:44px}
+ .cotep-note{font-size:12px;padding:9px 12px}
+ .cotep-kpis{gap:8px}.cotep-kpis>div{padding:12px}
+ .cotep-grid{grid-template-columns:1fr}
+ .cotep-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .cotep-cols{grid-template-columns:1fr}
+ .cotep-item-row{grid-template-columns:1fr 1fr 34px}
+ .cotep-item-row .form-row:first-of-type{grid-column:1/-1}
+ .cotep-item-row .form-row:nth-of-type(2){grid-column:1}
+ .cotep-bulk.on{top:62px}
  .cotep-table{min-width:0}
- .cotep-table thead{display:none}.cotep-table tbody,.cotep-table tr,.cotep-table td{display:block;width:100%}
- .cotep-table tr{border:1px solid #e9e4dc;border-radius:10px;margin:9px 0;padding:8px}
- .cotep-table td{display:flex;gap:12px;justify-content:space-between;align-items:start;overflow-wrap:anywhere;border:0!important;padding:7px}
- .cotep-table td:before{content:attr(data-label);display:block;flex:0 0 39%;font-weight:700;color:#82765e;font-size:11px}
- .cotep-table td[colspan]:before{content:none}
- .cotep-table td strong,.cotep-table td small{text-align:right}
+ .cotep-table thead{display:none}
+ .cotep-table tbody,.cotep-table tr,.cotep-table td{display:block;width:100%}
+ .cotep-table tr{border:1px solid #e9e4dc;border-radius:10px;margin:9px 0;padding:6px 8px;position:relative}
+ .cotep-table td{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;overflow-wrap:anywhere;border:0!important;padding:6px 4px}
+ .cotep-table td:before{content:attr(data-label);flex:0 0 34%;font-weight:700;color:#82765e;font-size:11px}
+ .cotep-table td[colspan]:before,.cotep-table td.cotep-td-check:before{content:none}
+ .cotep-table td.cotep-td-check{position:absolute;right:6px;top:6px;width:auto;padding:4px}
+ .cotep-table td.cotep-td-check:empty{display:none}
+ .cotep-obj{max-width:none;text-align:right}
+ .cotep-row-actions{justify-content:flex-end}
+ .cotep-row-actions .btn{min-height:38px}
+ .cotep-chip{padding:9px 12px}
 }

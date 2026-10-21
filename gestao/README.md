@@ -48,7 +48,7 @@ Perfis são guardados no banco e verificados por RLS e funções protegidas. O s
 - `index.html` / `assets/app.js` / `assets/styles.css`: site estático.
 - `functions/gerenciar-usuarios/index.ts`: função Supabase Deno, publicada no ambiente de teste.
 - `database/schema.sql`: esquema inicial; migrações v2 foram aplicadas diretamente ao banco de testes.
-- `tests/smoke.html` + `tests/smoke.js`: testes de fumaça no navegador, sem dependências, sobre o modo demonstração (18 verificações: menus de 6 perfis, celular 375px, painel inicial, tarefas, autopreenchimento, busca global, assistente e correções do lote de UX).
+- `tests/smoke.html` + `tests/smoke.js`: testes de fumaça no navegador, sem dependências, sobre o modo demonstração (28 verificações: menus de 6 perfis, celular 375px, painel inicial, tarefas, autopreenchimento, busca global, assistente, correções do lote de UX e Intenções de COTEP). O módulo COTEP também tem `tests/teste_cotep_calculo.cjs` (Node) e `tests/sql/run.sh` (PostgreSQL local); ver [GUIA_COTEP_INTENCOES.md](./GUIA_COTEP_INTENCOES.md).
 
 Não é necessário instalar dependências de frontend. Para testes locais, execute `python3 -m http.server 8080` na pasta raiz.
 
