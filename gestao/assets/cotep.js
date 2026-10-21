@@ -3,7 +3,7 @@
 'use strict';
 const url='/rest/v1/';
 const state={loaded:false,loading:false,error:'',identity:null,intencoes:[],procedimentos:[],bases:[],gestores:[],eventos:[],search:'',tab:'intencoes'};
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v)||0);
 const shortDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('pt-BR'):'—';
 const plain=v=>String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -33,7 +33,8 @@ function sameElement(code,year){
  const used=rows.filter(x=>x.situacao==='Finalizada').reduce((s,x)=>s+Number(x.valor_homologado||0),0);
  const active=rows.filter(x=>x.situacao==='Em andamento').reduce((s,x)=>s+Number(x.valor_estimado||0),0);
  const reserved=state.intencoes.filter(x=>x.elemento_item===code&&Number(x.ano)===Number(year)&&x.situacao==='Reservada').reduce((s,x)=>s+Number(x.valor_reservado||0),0);
- return {used,active,reserved,pending:state.intencoes.filter(x=>x.elemento_item===code&&Number(x.ano)===Number(year)&&x.situacao==='Pendente').length};
+ const unverified=rows.filter(x=>x.situacao==='Realizada (a conferir)').reduce((s,x)=>s+Number(x.valor_estimado||0),0);
+ return {used,active,unverified,reserved,pending:state.intencoes.filter(x=>x.elemento_item===code&&Number(x.ano)===Number(year)&&x.situacao==='Pendente').length};
 }
 function fields(d){
  const i=(name,label,value='',type='text',attr='')=>'<label class="cotep-field"><span>'+esc(label)+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+attr+'></label>';
@@ -63,15 +64,15 @@ function procedureForm(existing){
   f.i('ano','Exercício',x.ano||year,'number','min="2020" max="2100" required')+
   f.i('unidade_gestora','Unidade gestora',x.unidade_gestora||'1250071','text','required pattern="[0-9]{5,9}"')+
   f.i('numero','COTEP nº',x.numero||'','text','required placeholder="Ex.: 126/2026"')+
-  f.i('elemento_item','Elemento-item',x.elemento_item||'','text','required pattern="[0-9]{4}"')+
+  f.i('elemento_item','Elemento-item (vazio apenas se fracassada)',x.elemento_item||'','text','pattern="[0-9]{4}"')+
   f.i('ramo_atividade','Ramo de atividade (conferido)',x.ramo_atividade||'','text','placeholder="Ex.: suprimentos de impressão"')+
   f.select('categoria','Categoria do limite',['','geral','engenharia'],x.categoria||'')+
-  f.select('situacao','Situação',['Em andamento','Finalizada','Fracassada','Cancelada'],x.situacao||'Em andamento')+
+  f.select('situacao','Situação',['Em andamento','Realizada (a conferir)','Finalizada','Fracassada','Cancelada'],x.situacao||'Em andamento')+
   f.i('valor_estimado','Valor inicial estimado (R$)',x.valor_estimado??'','number','min="0" step="0.01" required')+
   f.i('valor_homologado','Valor final homologado/negociado (R$)',x.valor_homologado??'','number','min="0" step="0.01"')+
   f.area('objeto','Objeto',x.objeto||'')+
   f.area('documento','Documento ou referência da conferência',x.documento||''),
-  'Uma COTEP com dois elementos-itens deve ter dois lançamentos, um por item, sem duplicar o valor do procedimento. Não cadastre valor estimado como homologado.');
+  'Uma COTEP com dois elementos-itens deve ter dois lançamentos, um por item, sem duplicar o valor do procedimento. Para registros apenas informados como realizados, use «Realizada (a conferir)» sem preencher homologação. Confirme unidade gestora, ramo e valor final antes de mudar para Finalizada.');
 }
 function baseForm(){
  const f=fields();const year=new Date().getFullYear();
@@ -121,20 +122,21 @@ function view(ctx){
  const procedures=filtered(state.procedimentos).sort((a,b)=>b.ano-a.ano||String(b.numero).localeCompare(String(a.numero),'pt-BR',{numeric:true}));
  const open=state.intencoes.filter(x=>['Pendente','Devolvida'].includes(x.situacao)).length;
  const reserved=state.intencoes.filter(x=>x.situacao==='Reservada').reduce((s,x)=>s+Number(x.valor_reservado||0),0);
+ const unverified=state.procedimentos.filter(x=>x.situacao==='Realizada (a conferir)').reduce((s,x)=>s+Number(x.valor_estimado||0),0);
  const finalized=state.procedimentos.filter(x=>x.situacao==='Finalizada').reduce((s,x)=>s+Number(x.valor_homologado||0),0);
  const codes=[...new Set([...state.procedimentos.filter(x=>Number(x.ano)===year).map(x=>x.elemento_item),...state.intencoes.filter(x=>Number(x.ano)===year).map(x=>x.elemento_item)])].sort();
- const items=codes.map(code=>{const x=sameElement(code,year);return '<tr><td><strong>'+esc(code)+'</strong></td><td>'+money(x.used)+'</td><td>'+money(x.active)+'</td><td>'+money(x.reserved)+'</td><td>'+x.pending+'</td></tr>';}).join('');
- const itemRows=items||'<tr><td colspan="5">Nenhuma classificação cadastrada para '+year+'.</td></tr>';
- const intentions=intents.map(x=>'<tr><td><strong>'+esc(x.centro)+'</strong><small>'+esc(x.ano)+' · UG '+esc(x.unidade_gestora)+'</small></td><td><strong>'+esc(x.elemento_item)+'</strong><small>'+esc(x.objeto)+'</small></td><td>'+money(x.valor_estimado)+'</td><td>'+money(x.valor_reservado)+'</td><td><span class="cotep-status">'+esc(x.situacao)+'</span>'+(x.situacao==='Reservada'&&x.reserva_ate&&x.reserva_ate<new Date().toISOString().slice(0,10)?'<small>Reserva vencida — conferir</small>':'')+'</td><td>'+ (manage&&['Pendente','Devolvida','Reservada'].includes(x.situacao)?'<button class="btn small" data-action="cotepDecidir" data-id="'+esc(x.id)+'">Analisar</button>':'<button class="btn small" data-action="cotepDetalhes" data-id="'+esc(x.id)+'">Ver</button>')+'</td></tr>').join('');
+ const items=codes.map(code=>{const x=sameElement(code,year);return '<tr><td><strong>'+esc(code||'A confirmar')+'</strong></td><td>'+money(x.used)+'</td><td>'+money(x.unverified)+'</td><td>'+money(x.active)+'</td><td>'+money(x.reserved)+'</td><td>'+x.pending+'</td></tr>';}).join('');
+ const itemRows=items||'<tr><td colspan="6">Nenhuma classificação cadastrada para '+year+'.</td></tr>';
+ const intentions=intents.map(x=>'<tr><td><strong>'+esc(x.centro)+'</strong><small>'+esc(x.ano)+' · UG '+esc(x.unidade_gestora)+'</small></td><td><strong>'+esc(x.elemento_item||'A confirmar')+'</strong><small>'+esc(x.objeto)+'</small></td><td>'+money(x.valor_estimado)+'</td><td>'+money(x.valor_reservado)+'</td><td><span class="cotep-status">'+esc(x.situacao)+'</span>'+(x.situacao==='Reservada'&&x.reserva_ate&&x.reserva_ate<new Date().toISOString().slice(0,10)?'<small>Reserva vencida — conferir</small>':'')+'</td><td>'+ (manage&&['Pendente','Devolvida','Reservada'].includes(x.situacao)?'<button class="btn small" data-action="cotepDecidir" data-id="'+esc(x.id)+'">Analisar</button>':'<button class="btn small" data-action="cotepDetalhes" data-id="'+esc(x.id)+'">Ver</button>')+'</td></tr>').join('');
  const acts=manage?'<button class="btn" data-action="cotepProcedimento">+ COTEP / resultado</button><button class="btn" data-action="cotepBase">Conferir base</button>':'';
  const admin=ctx.admin?'<button class="btn" data-action="cotepGestor">Gestores DTS-1</button>':'';
- const proceduresRows=procedures.map(x=>'<tr><td><strong>'+esc(x.numero)+'</strong><small>UG '+esc(x.unidade_gestora)+'</small></td><td><strong>'+esc(x.elemento_item)+'</strong><small>'+esc(x.objeto)+'</small></td><td>'+money(x.valor_estimado)+'</td><td>'+ (x.valor_homologado===null?'—':money(x.valor_homologado))+'</td><td>'+esc(x.situacao)+'</td><td>'+(manage?'<button class="btn small" data-action="cotepEditarProcedimento" data-id="'+esc(x.id)+'">Editar</button>':'—')+'</td></tr>').join('');
+ const proceduresRows=procedures.map(x=>'<tr><td><strong>'+esc(x.numero)+'</strong><small>UG '+esc(x.unidade_gestora)+'</small></td><td><strong>'+esc(x.elemento_item||'A confirmar')+'</strong><small>'+esc(x.objeto)+'</small></td><td>'+money(x.valor_estimado)+'</td><td>'+ (x.valor_homologado===null?'—':money(x.valor_homologado))+'</td><td>'+esc(x.situacao)+'</td><td>'+(manage?'<button class="btn small" data-action="cotepEditarProcedimento" data-id="'+esc(x.id)+'">Editar</button>':'—')+'</td></tr>').join('');
  const bases=state.bases.map(x=>'<span class="cotep-base '+(x.conferida?'ok':'')+'">'+esc(x.ano)+' · UG '+esc(x.unidade_gestora)+' · '+esc(x.categoria)+' · '+(x.conferida?'conferida':'pendente')+'</span>').join('');
  return '<div class="cotep-page">'+
  '<div class="pagehead"><div><div class="eyebrow">DTS-1 · Gestão compartilhada</div><h1>Planejamento de COTEPs</h1><div class="sub">Intenções dos centros, reservas internas e procedimentos por elemento-item, ramo e unidade gestora.</div></div><div class="head-actions"><button class="btn primary" data-action="cotepNova">+ Nova intenção</button><button class="btn" data-action="cotepRecarregar">↻ Atualizar</button></div></div>'+
- '<div class="cotep-note"><strong>Importante:</strong> a comparação por elemento-item é gerencial. O limite legal depende de exercício, unidade gestora, ramo de atividade e enquadramento jurídico. Histórico parcial não comprova saldo disponível. As reservas não constituem contratação ou empenho.</div>'+
- '<div class="cotep-kpis"><div><span>Intenções para análise</span><strong>'+open+'</strong></div><div><span>Reservas gerenciais</span><strong>'+money(reserved)+'</strong></div><div><span>COTEPs/itens registrados</span><strong>'+state.procedimentos.length+'</strong></div><div><span>Valores finais cadastrados</span><strong>'+money(finalized)+'</strong></div></div>'+
- '<section class="card section"><div class="cotep-heading"><h2>Panorama por elemento-item · '+year+'</h2><span>Valores não equivalem ao limite legal disponível</span></div><div class="table-scroll"><table class="data-table cotep-table"><thead><tr><th>Elemento-item</th><th>Final homologado</th><th>Em andamento (estimado)</th><th>Reservado</th><th>Intenções pendentes</th></tr></thead><tbody>'+itemRows+'</tbody></table></div><p class="helper">Somente procedimentos cadastrados neste módulo entram no panorama. Não há importação automática do Portal de Compras.</p></section>'+
+ '<div class="cotep-note"><strong>Importante:</strong> a comparação por elemento-item é gerencial. Histórico realizado sem valor homologado confirmado aparece separado e BLOQUEIA reservas até conferência. O limite legal depende de exercício, unidade gestora, ramo de atividade e enquadramento jurídico. Histórico parcial não comprova saldo disponível. As reservas não constituem contratação ou empenho.</div>'+
+ '<div class="cotep-kpis"><div><span>Intenções para análise</span><strong>'+open+'</strong></div><div><span>Histórico a conferir</span><strong>'+money(unverified)+'</strong></div><div><span>Reservas gerenciais</span><strong>'+money(reserved)+'</strong></div><div><span>Valores finais confirmados</span><strong>'+money(finalized)+'</strong></div></div>'+
+ '<section class="card section"><div class="cotep-heading"><h2>Panorama por elemento-item · '+year+'</h2><span>Valores não equivalem ao limite legal disponível</span></div><div class="table-scroll"><table class="data-table cotep-table"><thead><tr><th>Elemento-item</th><th>Final homologado</th><th>Realizada (a conferir)</th><th>Em andamento (estimado)</th><th>Reservado</th><th>Intenções pendentes</th></tr></thead><tbody>'+itemRows+'</tbody></table></div><p class="helper">Somente procedimentos cadastrados neste módulo entram no panorama. Não há importação automática do Portal de Compras.</p></section>'+
  '<section class="card section"><div class="cotep-heading"><h2>Fila compartilhada DTS-1</h2><div class="cotep-actions">'+acts+admin+'<button class="btn" data-action="cotepExportar">Exportar intenções CSV</button></div></div>'+
  '<div class="cotep-filter"><label for="cotep-busca">Buscar por centro, COTEP, objeto, elemento-item ou UG</label><input id="cotep-busca" value="'+esc(state.search)+'" placeholder="Ex.: 3016, Videomonitoramento, plotter" autocomplete="off"></div>'+
  '<div class="cotep-tabs"><button class="btn '+(state.tab==='intencoes'?'primary':'')+'" data-action="cotepAba" data-tab="intencoes">Intenções ('+intents.length+')</button><button class="btn '+(state.tab==='procedimentos'?'primary':'')+'" data-action="cotepAba" data-tab="procedimentos">COTEPs ('+procedures.length+')</button></div>'+
