@@ -26,7 +26,7 @@ A reserva é transacional, com bloqueio de concorrência por exercício, UG, cat
 
 A COTEP 130/2026 possui lançamentos em 3016 e 5207 no mesmo procedimento. Não duplicar o total. A COTEP 122/2026 foi registrada no levantamento como fracassada. Ferramentas elétricas segue como intenção sem número/valor/código confirmados.
 
-**Nenhum histórico institucional real foi semeado no Supabase piloto** por não haver aprovação documentada de hospedagem externa. A planilha de COTEPs no Google Drive não foi modificada nem sincronizada automaticamente por esta implementação.
+**Nenhum histórico institucional real foi semeado no Supabase piloto** por não haver aprovação documentada de hospedagem externa. A observação da COTEP 126/2026 foi atualizada manualmente na planilha de controle do Google Drive (aba COTEPs 2026, célula K16) para distinguir valor homologado de estimativa, mantendo F16 = R$ 2.896,00 e as fórmulas existentes. O novo módulo do SIG ainda NÃO sincroniza automaticamente com essa planilha.
 
 ## Banco e permissões
 Tabelas: sig_cotep_intencoes, sig_cotep_procedimentos, sig_cotep_bases, sig_cotep_gestores e sig_cotep_eventos.
