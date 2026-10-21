@@ -3,7 +3,7 @@
 'use strict';
 const KEYS={data:'sig-csatic-demo-v1',settings:'sig-csatic-connect-v1',session:'sig-csatic-auth-v1',profile:'sig-csatic-role-v1'};
 const TABLES=['licitacao_demo','aipc','aipc_revisoes','processos','tarefas','contratos','repasses','empenhos','eventos','tramites','usuarios','notificacoes','solicitacoes_empenho','competencias_contratuais'];
-const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['almoxarifado','⬡','Almoxarifado'],['tarefas','☑','Minhas tarefas'],['processos','▤','Acompanhar seções'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
+const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['chefia','▥','Painel da chefia'],['dashboard','◫','Visão geral'],['almoxarifado','⬡','Almoxarifado'],['cotep','▦','Intenções COTEP'],['tarefas','☑','Minhas tarefas'],['processos','▤','Acompanhar seções'],['compras','◈','Compras'],['licitacao','⚖','Licitação'],['importacoes','⇥','Motor de Dados'],['cotas','◔','Cota orçamentária'],['conciliacao','▥','Conciliação V6'],['auditoria','◇','Auditoria de Compras'],['sofi','▥','SOFI'],['contratos','▣','Contratos'],['assistente','✧','Assistente de IA'],['recebimentos','⇄','Recebimentos'],['usuarios','♙','Usuários']];
 // Menus institucionais por perfil. A ordem aqui é a ordem exibida na barra lateral.
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
 const SIG_CHIEF_ROLES=['chefia',...Object.keys(SIG_CHIEF_SECTIONS)];
@@ -20,14 +20,14 @@ function syncUserRoleSetor(){
  else{sector.disabled=false;if(hidden){hidden.name='';hidden.value='';}}
 }
 const SIG_ROLE_MENUS=Object.freeze({
- compras:['notificacoes','tarefas','compras','almoxarifado','cotas','processos','assistente'],
- licitacao:['notificacoes','tarefas','licitacao','almoxarifado','cotas','processos','assistente'],
- sofi:['notificacoes','tarefas','sofi','almoxarifado','cotas','processos','assistente'],
- chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','almoxarifado','cotas','processos','assistente'],
- chefe_compras:['notificacoes','chefia','tarefas','compras','almoxarifado','cotas','processos','assistente'],
- chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','almoxarifado','cotas','processos','assistente'],
- chefe_sofi:['notificacoes','chefia','tarefas','sofi','almoxarifado','cotas','processos','assistente'],
- leitura:['notificacoes','tarefas','processos','assistente']
+ compras:['notificacoes','tarefas','compras','almoxarifado','cotep','cotas','processos','assistente'],
+ licitacao:['notificacoes','tarefas','licitacao','almoxarifado','cotep','cotas','processos','assistente'],
+ sofi:['notificacoes','tarefas','sofi','almoxarifado','cotep','cotas','processos','assistente'],
+ chefia:['notificacoes','chefia','tarefas','licitacao','compras','sofi','almoxarifado','cotep','cotas','processos','assistente'],
+ chefe_compras:['notificacoes','chefia','tarefas','compras','almoxarifado','cotep','cotas','processos','assistente'],
+ chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','almoxarifado','cotep','cotas','processos','assistente'],
+ chefe_sofi:['notificacoes','chefia','tarefas','sofi','almoxarifado','cotep','cotas','processos','assistente'],
+ leitura:['notificacoes','tarefas','processos','cotep','assistente']
 });
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
 function currentMenus(){return menusForRole(effectiveRole());}
@@ -1830,7 +1830,10 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   const message=cloudLoadError?'Falha ao sincronizar: '+esc(cloudLoadError):cloudDataReady?'Finalizando a sincronização dos módulos…':'Validando seu acesso e carregando os dados principais…';
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
- let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'almoxarifado':
+ let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'cotep':
+  window.SIG_COTEP.syncIdentity(session?.user?.id||null);
+  if(cloud()&&session&&!window.SIG_COTEP.isLoaded())window.SIG_COTEP.load(rest).then(()=>{if(view==='cotep')render();});
+  html=window.SIG_COTEP.view({online:cloud()&&!!session,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios});break;case'almoxarifado':
   if(cloud()&&session&&canVisitMenu('almoxarifado')&&window.SIG_ALMOX&&!window.SIG_ALMOX.isLoaded()){
     window.SIG_ALMOX.load(rest).then(()=>{if(view==='almoxarifado')render();}).catch(()=>{if(view==='almoxarifado')render();});
   }
@@ -2137,7 +2140,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='andamento')return submitProgress(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type?.startsWith('cotep'))return window.SIG_COTEP.submit(form,{rest,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole});if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='andamento')return submitProgress(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -2234,6 +2237,10 @@ async function handleClick(e){if(!e.target.closest?.('#sig-global-search'))close
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
+ if(action?.startsWith('cotep')){
+  if(!canVisitMenu('cotep'))return showToast('Acesso não autorizado ao módulo de COTEP.','error');
+  return window.SIG_COTEP.click(action,btn,{rest,openModal,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole});
+ }
  switch(action){
  case 'almoxPick':if(!canVisitMenu('almoxarifado'))return;window.SIG_ALMOX.pick(btn.dataset.rpm||'');break;
  case 'almoxClear':if(!canVisitMenu('almoxarifado'))return;window.SIG_ALMOX.clear();break;
@@ -2328,6 +2335,7 @@ function submitFeedback(e){
 function handleFilter(e){const target=e.target;if(!target.dataset?.filter)return;const key=target.dataset.filter;filters[key]=target.value;const selection=key==='q'?target.selectionStart:null;render();if(key==='q'){const inp=document.getElementById('filter-q');if(inp){inp.focus();inp.setSelectionRange(selection,selection)}}}
 function init(){document.addEventListener('click',e=>{handleClick(e).catch(x=>showToast(errMsg(x),'error'))});document.getElementById('shade').addEventListener('click',()=>{document.getElementById('sidebar').classList.remove('open');document.getElementById('shade').classList.remove('visible')});document.addEventListener('submit',e=>{const done=submitFeedback(e);handleSubmit(e).catch(x=>showToast(errMsg(x),'error')).finally(done)});document.addEventListener('input',e=>{
   if(e.target.id==='sig-global-q'){renderGlobalSearch(e.target.value);return;}
+  if(e.target.id==='cotep-busca'){const cursor=e.target.selectionStart;window.SIG_COTEP.filter(e.target.value);render();const q=document.getElementById('cotep-busca');if(q){q.focus();q.setSelectionRange(cursor,cursor)}return;}
   if(e.target.id==='almox-q'){if(canVisitMenu('almoxarifado'))window.SIG_ALMOX.input('almox-q',e.target.value);return;}
  if(e.target.id==='sig-fonte-busca'&&window.SIG_FONTE){
   window.SIG_FONTE.setQuery(e.target.value);
