@@ -154,3 +154,8 @@ body.sig-cotep-visitante .avatar-button,body.sig-cotep-visitante .refresh-button
 .cotep-pend{margin-top:12px;border-left:4px solid #b7791f}
 .cotep-pend .cotep-list li .btn{margin-left:auto}
 .cotep-token{width:100%;font-family:ui-monospace,monospace;font-size:13px;padding:10px;border:1px solid #d8d0bd;border-radius:8px;word-break:break-all}
+/* Chamada para registrar intenção no cartão */
+.cotep-card-cta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;white-space:nowrap;padding:8px 10px;border-radius:8px;background:var(--sig-primary-soft,#f3efe4);color:var(--sig-primary,#796a46);font-size:12px;font-weight:700;transition:background .15s,color .15s}
+.cotep-card-cta i{font-style:normal;transition:transform .15s}
+.cotep-card:hover .cotep-card-cta,.cotep-card:focus-visible .cotep-card-cta{background:var(--sig-primary,#796a46);color:#fff}
+.cotep-card:hover .cotep-card-cta i,.cotep-card:focus-visible .cotep-card-cta i{transform:translateX(3px)}

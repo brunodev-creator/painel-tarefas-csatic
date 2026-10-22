@@ -282,12 +282,13 @@ function linhaVazia(code,res){
 }
 function cartao(r){
  const desc=r.descricao||'Descrição a cadastrar pela DTS-1';
- return '<button type="button" class="cotep-card nivel-'+r.alerta.nivel+'" data-action="cotepElemento" data-el="'+esc(r.codigo)+'" aria-label="'+esc('Elemento-item '+r.codigo+': saldo '+moneyC(r.saldo)+', '+r.alerta.texto)+'">'+
+ return '<button type="button" class="cotep-card nivel-'+r.alerta.nivel+'" data-action="cotepElemento" data-el="'+esc(r.codigo)+'" aria-label="'+esc('Elemento-item '+r.codigo+': saldo '+moneyC(r.saldo)+', '+r.alerta.texto+'. Abrir para registrar intenção de COTEP')+'">'+
   '<span class="cotep-card-top"><strong class="cotep-code">'+esc(r.codigo)+'</strong>'+(r.alerta.nivel==='ok'?(meta(r.codigo).relacao_tic?'<span class="cotep-rel">'+esc(meta(r.codigo).relacao_tic)+'</span>':''):flag(r.alerta.texto,ALERTA_FLAG[r.alerta.nivel]))+'</span>'+
   '<span class="cotep-card-desc'+(r.descricao?'':' muted')+'">'+esc(desc)+'</span>'+barra(r)+
   '<span class="cotep-card-saldo"><span><small>Saldo disponível</small><b>'+moneyC(r.saldo)+'</b></span><em>'+pct(r.percentual)+'</em></span>'+
   '<span class="cotep-card-nums"><span><small>Consumido</small>'+moneyC(r.consumido)+'</span><span><small>Comprometido</small>'+moneyC(r.comprometido)+'</span></span>'+
-  '<span class="cotep-card-foot">'+r.coteps.length+' COTEP(s) · '+r.intencoes.length+' intenção(ões)'+(r.pendentes_qtd?' · <b>'+r.pendentes_qtd+' pendente(s) '+moneyC(r.pendentes_valor)+'</b>':'')+(r.a_conferir?' · '+r.a_conferir+' a conferir':'')+'</span></button>';
+  '<span class="cotep-card-foot">'+r.coteps.length+' COTEP(s) · '+r.intencoes.length+' intenção(ões)'+(r.pendentes_qtd?' · <b>'+r.pendentes_qtd+' pendente(s) '+moneyC(r.pendentes_valor)+'</b>':'')+(r.a_conferir?' · '+r.a_conferir+' a conferir':'')+'</span>'+
+  '<span class="cotep-card-cta" aria-hidden="true">＋ Clique para registrar intenção <i>→</i></span></button>';
 }
 function cabecalho(ctx,res){
  const l=res.limite,manage=gestor(ctx),d=dados();
