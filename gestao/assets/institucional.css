@@ -1085,3 +1085,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .sig-buy-metric small{display:none}
  .sig-buy-metric strong{font-size:22px}
 }
+
+/* Perfil DTS-1: Intenções COTEP, Almoxarifado, Cota orçamentária e Acompanhar seções */
+body[data-sig-visible-role="dts1"] #nav .navitem:not([data-view="cotep"]):not([data-view="almoxarifado"]):not([data-view="cotas"]):not([data-view="processos"]){display:none!important}

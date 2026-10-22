@@ -139,7 +139,7 @@ function ugPadrao(){
  const d=dados();const l=(d.limites||[]).filter(x=>Number(x.ano)===Number(state.ano));
  return (l.find(x=>x.padrao)||l[0]||{}).unidade_gestora||'';
 }
-function gestor(ctx){if(ctx.visitante)return false;return !!ctx.admin||dados().gestores.some(g=>g.auth_id===ctx.authId&&g.ativo);}
+function gestor(ctx){if(ctx.visitante)return false;return !!ctx.admin||ctx.role==='dts1'||dados().gestores.some(g=>g.auth_id===ctx.authId&&g.ativo);}
 function nomeUsuario(ctx,id){const u=(ctx.users||[]).find(x=>x.auth_id===id);return u?u.nome:'';}
 
 // ===== Modo demonstração (dados fictícios em memória, mesmas regras do banco) =====

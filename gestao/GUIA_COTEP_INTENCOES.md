@@ -36,6 +36,11 @@ A COTEP 130/2026 é **um** procedimento (`sig_cotep_coteps`) com **dois** lança
 
 Alertas no cartão: **utilização elevada** (≥ 80%), **saldo insuficiente** (pendentes > saldo), **limite atingido** e **limite excedido**.
 
+## Perfil DTS-1
+- Perfil `dts1` (setor DTS-1), criado pelo administrador em **Usuários**: acessa somente **Intenções COTEP**, **Almoxarifado**, **Cota orçamentária** e **Acompanhar seções**, e abre direto em Intenções COTEP.
+- Quem tem esse perfil já é gestor das Intenções COTEP (reserva, prioriza, agrupa, gera e edita COTEPs, parâmetros e acesso de visitante) sem precisar de delegação em *Gestores DTS-1*. Não administra usuários nem gestores.
+- Migration: `database/migrations/20261022_perfil_dts1.sql`; a função `gerenciar-usuarios` aceita o novo perfil.
+
 ## Acesso de visitante (sem conta)
 - Na tela de login, abaixo de **Entrar**, o botão **COTEP** abre o SIG em modo visitante: só o menu *Intenções de COTEP* aparece (busca, perfil, demais menus e configurações ficam ocultos). O botão *Sair · entrar com conta* volta ao login.
 - O visitante consulta o painel por elemento-item e registra intenções informando **nome (posto/graduação)** e **contato**; a intenção entra como *Pendente* (origem «Visitante») e nunca reserva saldo. A DTS-1 vê o solicitante e o contato na análise.

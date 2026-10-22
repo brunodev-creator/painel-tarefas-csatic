@@ -18,3 +18,6 @@ CREATE TABLE IF NOT EXISTS public.processos(id uuid PRIMARY KEY DEFAULT gen_rand
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.usuarios TO authenticated;
 CREATE POLICY usuarios_ler ON public.usuarios FOR SELECT TO authenticated USING(true);
+-- Regra existente no SIG (migrations anteriores ao módulo COTEP), usada por cota e almoxarifado.
+CREATE OR REPLACE FUNCTION private.can_view_cota() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO ''
+AS $f$ SELECT EXISTS (SELECT 1 FROM public.usuarios u WHERE u.auth_id=auth.uid() AND u.ativo AND u.role IN ('admin','chefia','sofi','chefe_sofi','compras','licitacao','chefe_compras','chefe_licitacao')) $f$;

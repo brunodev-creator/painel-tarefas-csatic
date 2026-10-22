@@ -8,13 +8,13 @@ const NAV=[['notificacoes','♢','Avisos'],['alertas','⚠','Pendências'],['che
 const SIG_CHIEF_SECTIONS=Object.freeze({chefe_compras:'Compras',chefe_licitacao:'Licitação',chefe_sofi:'SOFI'});
 const SIG_CHIEF_ROLES=['chefia',...Object.keys(SIG_CHIEF_SECTIONS)];
 const isSectionChiefRole=r=>SIG_CHIEF_ROLES.includes(r);
-const SIG_ROLE_CHOICES=[['compras','Compras'],['licitacao','Licitação'],['sofi','SOFI'],['chefe_compras','Chefe da Compras'],['chefe_licitacao','Chefe da Licitação'],['chefe_sofi','Chefe da SOFI'],['chefia','Chefia (perfil existente)'],['leitura','Consulta / Leitura']];
+const SIG_ROLE_CHOICES=[['compras','Compras'],['licitacao','Licitação'],['sofi','SOFI'],['chefe_compras','Chefe da Compras'],['chefe_licitacao','Chefe da Licitação'],['chefe_sofi','Chefe da SOFI'],['chefia','Chefia (perfil existente)'],['dts1','DTS-1 · gestão das Intenções COTEP'],['leitura','Consulta / Leitura']];
 const labelRole=r=>SIG_ROLE_CHOICES.find(x=>x[0]===r)?.[1]||({admin:'Administrador'})[r]||r;
 function syncUserRoleSetor(){
  const form=document.querySelector('#modal-root form[data-form="inviteUser"],#modal-root form[data-form="updateUser"]');
  if(!form)return;
  const role=form.querySelector('#f-role'),sector=form.querySelector('#f-setor');if(!role||!sector)return;
- const fixed=SIG_CHIEF_SECTIONS[role.value]||({compras:'Compras',licitacao:'Licitação',sofi:'SOFI'})[role.value]||null;
+ const fixed=SIG_CHIEF_SECTIONS[role.value]||({compras:'Compras',licitacao:'Licitação',sofi:'SOFI',dts1:'DTS-1'})[role.value]||null;
  const hidden=form.querySelector('#sig-fixed-sector');
  if(fixed){sector.value=fixed;sector.disabled=true;if(hidden){hidden.name='setor';hidden.value=fixed;}}
  else{sector.disabled=false;if(hidden){hidden.name='';hidden.value='';}}
@@ -27,12 +27,14 @@ const SIG_ROLE_MENUS=Object.freeze({
  chefe_compras:['notificacoes','chefia','tarefas','compras','almoxarifado','cotep','cotas','processos','assistente'],
  chefe_licitacao:['notificacoes','chefia','tarefas','licitacao','almoxarifado','cotep','cotas','processos','assistente'],
  chefe_sofi:['notificacoes','chefia','tarefas','sofi','almoxarifado','cotep','cotas','processos','assistente'],
- leitura:['notificacoes','tarefas','processos','cotep','assistente']
+ leitura:['notificacoes','tarefas','processos','cotep','assistente'],
+ // DTS-1: gestora das Intenções de COTEP (gestão automática no banco), com consulta a almoxarifado, cotas e seções.
+ dts1:['cotep','almoxarifado','cotas','processos']
 });
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
 function currentMenus(){return visitorMode()?['cotep']:menusForRole(effectiveRole());}
 function canVisitMenu(id){return currentMenus().includes(id);}
-function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':isSectionChiefRole(role)?'chefia':role==='compras'?'compras':'tarefas';}
+function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':role==='dts1'?'cotep':isSectionChiefRole(role)?'chefia':role==='compras'?'compras':'tarefas';}
 // Visões que usam somente as tabelas carregadas na etapa rápida do login.
 const SIG_FAST_VIEWS=['dashboard','tarefas','compras','licitacao','processos'];
 const SECTORS=['Compras','Licitação','SOFI'];
@@ -121,6 +123,7 @@ const SIG_PREVIEW_ROLES=[
   {id:'chefe_compras',label:'Chefe da Compras',desc:'Painel e tarefas da seção Compras'},
   {id:'chefe_licitacao',label:'Chefe da Licitação',desc:'Painel e tarefas da seção Licitação'},
   {id:'chefe_sofi',label:'Chefe da SOFI',desc:'Painel e tarefas da seção SOFI'},
+ {id:'dts1',label:'DTS-1',desc:'Gestão das Intenções COTEP, almoxarifado, cotas e seções'},
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
@@ -179,7 +182,7 @@ if(cloud()&&session){db=Object.fromEntries(TABLES.map(t=>[t,[]]));profile={nome:
 function saveLocal(){if(!cloud())localStorage.setItem(KEYS.data,JSON.stringify(db))}
 function canWrite(sector){if(!cloud())return true;if(!session||!profile.ativo)return false;const role=effectiveRole();return role==='admin'||(isSectionChiefRole(role)&&profile.setor===sector&&(!SIG_CHIEF_SECTIONS[role]||SIG_CHIEF_SECTIONS[role]===sector))||role===({'Compras':'compras','Licitação':'licitacao','SOFI':'sofi'}[sector]);}
 function canFinance(){return !cloud()||['admin','chefia','sofi','chefe_sofi'].includes(effectiveRole())}
-function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao','chefe_compras','chefe_licitacao','chefe_sofi'].includes(effectiveRole())}
+function canViewCota(){return !cloud()||['admin','chefia','sofi','compras','licitacao','chefe_compras','chefe_licitacao','chefe_sofi','dts1'].includes(effectiveRole())}
 function isAdmin(){return !previewRole&&profile.role==='admin'&&(!cloud()||!!session)}
 function currentAuthId(){return session?.user?.id||'demo-admin'}
 function setorUsuario(){return ({compras:'Compras',licitacao:'Licitação',sofi:'SOFI',...SIG_CHIEF_SECTIONS})[effectiveRole()]||profile.setor||'Compras'}
@@ -2044,7 +2047,7 @@ function settingsModal(){const html=`<div class="info-note warning-note"><strong
 function profileModal(){const html=cloud()?`<div class="card section"><h3>${esc(profile.nome||'Usuário')}</h3><p class="sub">Perfil real: ${esc(labelRole(profile.role))} · setor: ${esc(profile.setor||'—')}</p><div class="detail-actions">${canPreviewRole()?'<button class="btn" data-action="previewProfiles">Visualizar outros perfis</button>':''}<button class="btn danger" data-action="signOut">Sair da conta</button></div></div>`:`<div class="info-note">A demonstração não possui autenticação. Perfis nesta tela apenas ilustram possíveis permissões, sem restringir dados reais.</div><div class="card section"><h3>Perfil de simulação</h3><p class="sub">Atual: ${esc(profile.role)}</p><div class="detail-actions">${['admin','chefia','chefe_compras','chefe_licitacao','chefe_sofi','compras','licitacao','sofi','leitura'].map(r=>`<button class="btn small" data-action="demoRole" data-role="${r}">${r}</button>`).join('')}</div></div>`;openModal('Perfil de acesso',cloud()?'Sessão autorizada pelo banco':'Somente para navegação demonstrativa.',html)}
 // Camada de dados: demo local ou Supabase REST + GoTrue (chave pública, políticas RLS).
 // Contexto entregue ao módulo Intenções de COTEP (assets/cotep.js).
-function cotepCtx(){return {rest,openModal,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole,online:cloud()&&(!!session||visitorMode()),demo:!cloud(),visitante:visitorMode(),profile,processos:db.processos};}
+function cotepCtx(){return {rest,openModal,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole,online:cloud()&&(!!session||visitorMode()),demo:!cloud(),visitante:visitorMode(),role:effectiveRole(),profile,processos:db.processos};}
 async function rest(path,method='GET',payload=null,token=session?.access_token){
  if(!cloud())throw Error('Projeto em nuvem não configurado.');
  const headers={'apikey':config.key,'Accept':'application/json'};

@@ -5,11 +5,12 @@ const URL = Deno.env.get("SUPABASE_URL") || "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const PUBLISHABLE = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const ALLOWED = new Set(["https://brunodev-creator.github.io", "http://localhost:8080", "http://127.0.0.1:8080"]);
-const ROLES = new Set(["chefia","compras","licitacao","sofi","leitura","chefe_compras","chefe_licitacao","chefe_sofi"]);
+const ROLES = new Set(["chefia","compras","licitacao","sofi","leitura","chefe_compras","chefe_licitacao","chefe_sofi","dts1"]);
 const SECTORS = new Set(["Compras","Licitação","SOFI"]);
 const roleSetor: Record<string,string> = {
  compras:"Compras",licitacao:"Licitação",sofi:"SOFI",
- chefe_compras:"Compras",chefe_licitacao:"Licitação",chefe_sofi:"SOFI"
+ chefe_compras:"Compras",chefe_licitacao:"Licitação",chefe_sofi:"SOFI",
+ dts1:"DTS-1"
 };
 const supabase = createClient(URL, SERVICE_KEY, { auth:{ autoRefreshToken:false, persistSession:false } });
 function respond(req:Request, data:unknown, status=200) {

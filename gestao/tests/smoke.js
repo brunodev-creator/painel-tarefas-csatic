@@ -42,7 +42,7 @@ function noErrors(){assert(!errors.length,'Erros no console: '+errors.join(' | '
 const tests=[];
 const test=(name,fn)=>tests.push({name,fn});
 
-for(const role of ['admin','compras','licitacao','sofi','chefe_compras','leitura']){
+for(const role of ['admin','compras','licitacao','sofi','chefe_compras','leitura','dts1']){
  test('Perfil '+role+': todos os menus abrem sem erro',async()=>{
   await loadApp({role});
   const views=$$('#nav [data-view]').map(b=>b.dataset.view);
@@ -326,11 +326,19 @@ test('COTEP: celular 375px sem rolagem horizontal e com cartões em coluna',asyn
 });
 
 test('COTEP: menu visível na barra lateral para todos os perfis',async()=>{
- for(const role of ['compras','licitacao','sofi','chefia','chefe_compras','chefe_licitacao','chefe_sofi','leitura']){
+ for(const role of ['compras','licitacao','sofi','chefia','chefe_compras','chefe_licitacao','chefe_sofi','leitura','dts1']){
   await loadApp({role});
   const item=$('#nav [data-view=cotep]');
   assert(item&&win.getComputedStyle(item).display!=='none','Menu Intenções COTEP oculto para '+role);
  }
+ noErrors();
+});
+
+test('Perfil DTS-1: só COTEP, Almoxarifado, Cota e Acompanhar seções, abrindo em COTEP',async()=>{
+ await loadApp({role:'dts1'});
+ const views=$$('#nav [data-view]').filter(b=>win.getComputedStyle(b).display!=='none').map(b=>b.dataset.view).sort().join(',');
+ assert(views==='almoxarifado,cotas,cotep,processos','Menus do perfil DTS-1: '+views);
+ assert(/Intenções de COTEP/.test(heading()),'Perfil DTS-1 não abriu em Intenções COTEP: '+heading());
  noErrors();
 });
 
