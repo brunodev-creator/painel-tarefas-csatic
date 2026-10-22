@@ -133,3 +133,10 @@
  .cotep-row-actions .btn{min-height:38px}
  .cotep-chip{padding:9px 12px}
 }
+/* Modo visitante: somente o menu Intenções de COTEP */
+body.sig-cotep-visitante #sig-global-search,body.sig-cotep-visitante .v3-bell,body.sig-cotep-visitante #sig-preview-button,
+body.sig-cotep-visitante .avatar-button,body.sig-cotep-visitante .refresh-button,body.sig-cotep-visitante .sidebar-settings{display:none!important}
+.sig-visitor-exit{white-space:nowrap}
+.cotep-codigo{max-width:520px}
+.cotep-check-label{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#55534d}
+@media(max-width:700px){.sig-visitor-exit{padding:7px 9px;font-size:11px}}

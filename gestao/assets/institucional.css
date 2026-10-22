@@ -184,11 +184,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 @media(max-width:510px){.sig-preview-trigger{padding:8px 9px}.sig-preview-trigger span{display:none}.sig-preview-grid{grid-template-columns:1fr}.sig-preview-banner{padding:12px;align-items:stretch}.sig-preview-return{width:100%}}
 
 /* Proteção visual adicional: nunca exibir menus fora do perfil ativo. */
-body[data-sig-visible-role="compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="chefia"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="compras"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="tarefas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefia"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="compras"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="tarefas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 
 
 /* Compras — etapa 1 de UX: fila operacional, ações objetivas e formulário compacto. */
@@ -325,9 +325,9 @@ body[data-sig-visible-role="leitura"] #nav .navitem:not([data-view="notificacoes
 @media(max-width:420px){.sig-chief-team{grid-template-columns:1fr}.sig-chief-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* Visibilidade setorial dos novos perfis de chefia. */
-body[data-sig-visible-role="chefe_compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="chefe_licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
-body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefe_compras"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="compras"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefe_licitacao"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="licitacao"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
+body[data-sig-visible-role="chefe_sofi"] #nav .navitem:not([data-view="notificacoes"]):not([data-view="cotep"]):not([data-view="chefia"]):not([data-view="tarefas"]):not([data-view="sofi"]):not([data-view="cotas"]):not([data-view="processos"]):not([data-view="assistente"]){display:none!important}
 
 
 /* SIG fluxo hibrido – 4 tipos de Compras, filas e consulta intersetorial. */

@@ -325,6 +325,15 @@ test('COTEP: celular 375px sem rolagem horizontal e com cartões em coluna',asyn
  noErrors();
 });
 
+test('COTEP: menu visível na barra lateral para todos os perfis',async()=>{
+ for(const role of ['compras','licitacao','sofi','chefia','chefe_compras','chefe_licitacao','chefe_sofi','leitura']){
+  await loadApp({role});
+  const item=$('#nav [data-view=cotep]');
+  assert(item&&win.getComputedStyle(item).display!=='none','Menu Intenções COTEP oculto para '+role);
+ }
+ noErrors();
+});
+
 async function run(){
  runButton.disabled=true;list.innerHTML='';summary.className='';summary.textContent='Executando…';
  const saved=Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]));

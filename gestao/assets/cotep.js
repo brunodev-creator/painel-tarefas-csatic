@@ -93,16 +93,40 @@ const PRI_ORD={Alta:0,'Média':1,Baixa:2};
 const TABELAS=['sig_cotep_limites','sig_cotep_elementos','sig_cotep_centros','sig_cotep_coteps','sig_cotep_procedimentos','sig_cotep_intencoes','sig_cotep_eventos','sig_cotep_gestores','sig_cotep_saldos'];
 const CHAVES=['limites','elementos','centros','coteps','procedimentos','intencoes','eventos','gestores','saldos'];
 const vazio=()=>Object.fromEntries(CHAVES.map(k=>[k,[]]));
-const state={identity:null,loaded:false,loading:false,error:'',d:vazio(),ano:anoAtual(),tab:'elementos',busca:'',filtro:'todos',filaFiltro:'abertas',sel:new Set(),demo:null};
+const state={identity:null,loaded:false,loading:false,error:'',d:vazio(),ano:anoAtual(),tab:'elementos',busca:'',filtro:'todos',filaFiltro:'abertas',sel:new Set(),demo:null,
+ visitante:false,precisaCodigo:false,acesso:null};
+// Visitante: código da DTS-1 dura a sessão do navegador; intenções enviadas ficam lembradas neste aparelho.
+const VIS_CODIGO='sig-cotep-codigo',VIS_MINHAS='sig-cotep-minhas',VIS_SOLICITANTE='sig-cotep-solicitante';
+const lerJson=(store,k,def)=>{try{return JSON.parse(store.getItem(k))??def;}catch{return def;}};
+const gravar=(store,k,v)=>{try{v==null?store.removeItem(k):store.setItem(k,JSON.stringify(v));}catch{}};
+const minhasVisitante=()=>new Set(lerJson(localStorage,VIS_MINHAS,[]));
 let ctxAtual=null;
 function syncIdentity(id){if(state.identity!==id){state.identity=id;state.loaded=false;state.loading=false;state.error='';state.d=vazio();state.sel.clear();}}
-async function load(rest,force=false){
- if(!state.identity||state.loading||(state.loaded&&!force))return;
- state.loading=true;state.error='';
+async function loadVisitante(rest){
+ const st=await rest('/rest/v1/rpc/sig_cotep_publico_status','POST',{});
+ if(!st?.ativo)throw Error('O acesso de visitante às Intenções de COTEP está desativado pela DTS-1.');
+ const codigo=lerJson(sessionStorage,VIS_CODIGO,null);
+ if(st.exige_codigo&&!codigo){state.precisaCodigo=true;state.loaded=true;return;}
  try{
+  const d=await rest('/rest/v1/rpc/sig_cotep_publico_dados','POST',{p_codigo:codigo||null});
+  state.d={...vazio(),...Object.fromEntries(CHAVES.map(k=>[k,Array.isArray(d?.[k])?d[k]:[]]))};
+  state.precisaCodigo=false;state.loaded=true;
+ }catch(e){
+  if(/código de acesso/i.test(e.message||'')){gravar(sessionStorage,VIS_CODIGO,null);state.precisaCodigo=true;state.loaded=true;state.erroCodigo=e.message;return;}
+  throw e;
+ }
+}
+async function load(rest,force=false,opts={}){
+ if(!state.identity||state.loading||(state.loaded&&!force))return;
+ state.loading=true;state.error='';state.visitante=!!opts.visitante;
+ try{
+  if(state.visitante){await loadVisitante(rest);return;}
   const q={sig_cotep_eventos:'?select=*&order=criado_em.desc&limit=2000',sig_cotep_intencoes:'?select=*&order=criado_em.desc&limit=5000'};
   const rows=await Promise.all(TABELAS.map(t=>rest('/rest/v1/'+t+(q[t]||'?select=*&limit=5000'))));
   state.d=Object.fromEntries(CHAVES.map((k,i)=>[k,Array.isArray(rows[i])?rows[i]:[]]));
+  // Situação do acesso de visitante (o código nunca é lido; só se é exigido).
+  state.acesso=await rest('/rest/v1/rpc/sig_cotep_publico_status','POST',{}).catch(()=>null);
+  if(state.acesso)state.acesso.limite_por_hora=(await rest('/rest/v1/sig_cotep_acesso_publico?select=limite_por_hora').catch(()=>[]))?.[0]?.limite_por_hora;
   state.loaded=true;
  }catch(e){
   state.error=/sig_cotep_(limites|saldos|coteps)/.test(e.message||'')?'A atualização do banco (migration 20261021_sig_cotep_v2_elemento_item.sql) ainda não foi aplicada. Detalhe: '+e.message:(e.message||String(e));
@@ -115,7 +139,7 @@ function ugPadrao(){
  const d=dados();const l=(d.limites||[]).filter(x=>Number(x.ano)===Number(state.ano));
  return (l.find(x=>x.padrao)||l[0]||{}).unidade_gestora||'';
 }
-function gestor(ctx){return !!ctx.admin||dados().gestores.some(g=>g.auth_id===ctx.authId&&g.ativo);}
+function gestor(ctx){if(ctx.visitante)return false;return !!ctx.admin||dados().gestores.some(g=>g.auth_id===ctx.authId&&g.ativo);}
 function nomeUsuario(ctx,id){const u=(ctx.users||[]).find(x=>x.auth_id===id);return u?u.nome:'';}
 
 // ===== Modo demonstração (dados fictícios em memória, mesmas regras do banco) =====
@@ -253,7 +277,7 @@ function cartao(r){
 function cabecalho(ctx,res){
  const l=res.limite,manage=gestor(ctx),d=dados();
  const anos=[...new Set([state.ano,anoAtual(),...(d.limites||[]).map(x=>Number(x.ano))])].sort((a,b)=>b-a);
- return '<div class="pagehead"><div><div class="eyebrow">DTS-1 · Limite anual de COTEP por elemento-item</div><h1>Intenções de COTEP</h1>'+
+ return '<div class="pagehead"><div><div class="eyebrow">'+(ctx.visitante?'Acesso de visitante · Limite anual por elemento-item':'DTS-1 · Limite anual de COTEP por elemento-item')+'</div><h1>Intenções de COTEP</h1>'+
   '<div class="sub">'+(l?'Limite de <strong>'+money(l.valor_limite)+'</strong> por elemento-item · Exercício '+esc(state.ano)+' · UG '+esc(l.unidade_gestora):'Limite do exercício '+esc(state.ano)+' ainda não configurado')+'</div></div>'+
   '<div class="head-actions"><label class="sr-only" for="cotep-ano">Exercício</label><select id="cotep-ano" class="field-select cotep-ano" data-cotep-ano>'+anos.map(a=>'<option'+(a===state.ano?' selected':'')+'>'+a+'</option>').join('')+'</select>'+
   '<button class="btn primary" data-action="cotepNova">+ Nova intenção</button>'+(manage?'<button class="btn" data-action="cotepParametros">Parâmetros</button>':'')+
@@ -302,7 +326,7 @@ function abaElementos(res){
 }
 function linhaIntencao(i,ctx,res,manage){
  const r=res.porCodigo.get(i.elemento_item);
- const pode=manage&&INT_ABERTAS.includes(i.situacao),meu=i.criado_por===ctx.authId&&['Pendente','Devolvida'].includes(i.situacao);
+ const pode=manage&&INT_ABERTAS.includes(i.situacao),meu=!ctx.visitante&&i.criado_por&&i.criado_por===ctx.authId&&['Pendente','Devolvida'].includes(i.situacao);
  const sel=manage&&['Pendente','Reservada'].includes(i.situacao)?'<input type="checkbox" class="cotep-check" data-action="cotepSel" data-id="'+esc(i.id)+'"'+(state.sel.has(i.id)?' checked':'')+' aria-label="Selecionar intenção de '+esc(i.centro)+'">':'';
  const acoes=[];
  if(pode&&i.situacao!=='Reservada')acoes.push('<button class="btn small primary" data-action="cotepReservar" data-id="'+esc(i.id)+'">Reservar</button>');
@@ -311,7 +335,7 @@ function linhaIntencao(i,ctx,res,manage){
  else acoes.push('<button class="btn small ghost" data-action="cotepIntencao" data-id="'+esc(i.id)+'">Ver</button>');
  const venc=i.situacao==='Reservada'&&i.reserva_ate&&i.reserva_ate<new Date().toISOString().slice(0,10);
  return '<tr><td class="cotep-td-check">'+sel+'</td><td>'+flag(i.prioridade||'Média',i.prioridade==='Alta'?'red':i.prioridade==='Baixa'?'gray':'amber')+'</td>'+
-  '<td><div class="cell-main">'+esc(i.centro)+'</div><div class="cell-sub">'+dia(i.criado_em)+(i.grupo?' · grupo '+esc(i.grupo):'')+'</div></td>'+
+  '<td><div class="cell-main">'+esc(i.centro)+'</div><div class="cell-sub">'+dia(i.criado_em)+(i.grupo?' · grupo '+esc(i.grupo):'')+(i.origem==='Visitante'?' · visitante'+(i.solicitante_nome?': '+esc(i.solicitante_nome):''):'')+'</div></td>'+
   '<td><button class="link-button" data-action="cotepElemento" data-el="'+esc(i.elemento_item)+'">'+esc(i.elemento_item)+'</button><div class="cell-sub">saldo '+moneyC(r?.saldo)+'</div></td>'+
   '<td><div class="cotep-obj">'+esc(i.objeto)+'</div></td><td><div class="cell-main">'+money(i.valor_estimado)+'</div>'+(i.situacao==='Reservada'?'<div class="cell-sub">reservado '+money(i.valor_reservado)+'</div>':'')+'</td>'+
   '<td>'+flag(i.situacao)+(i.cotep_numero&&['Em COTEP','Finalizada'].includes(i.situacao)?'<div class="cell-sub">COTEP '+esc(i.cotep_numero)+'</div>':'')+(venc?'<div class="cell-sub cotep-warn">validade vencida</div>':'')+'</td>'+
@@ -321,13 +345,13 @@ function abaIntencoes(ctx,res){
  const manage=gestor(ctx),q=plain(state.busca),d=dados();
  let rows=d.intencoes.filter(i=>Number(i.ano)===state.ano);
  if(state.filaFiltro==='abertas')rows=rows.filter(i=>INT_ABERTAS.includes(i.situacao));
- if(state.filaFiltro==='minhas')rows=rows.filter(i=>i.criado_por===ctx.authId);
+ if(state.filaFiltro==='minhas'){const mv=minhasVisitante();rows=rows.filter(i=>(i.criado_por&&i.criado_por===ctx.authId)||mv.has(i.id));}
  if(q)rows=rows.filter(i=>plain([i.centro,i.elemento_item,i.objeto,i.situacao,i.grupo,i.cotep_numero].join(' ')).includes(q));
  rows.sort((a,b)=>(INT_ABERTAS.includes(b.situacao)-INT_ABERTAS.includes(a.situacao))||(PRI_ORD[a.prioridade]??1)-(PRI_ORD[b.prioridade]??1)||String(a.criado_em).localeCompare(String(b.criado_em)));
  for(const id of [...state.sel])if(!d.intencoes.some(i=>i.id===id&&['Pendente','Reservada'].includes(i.situacao)))state.sel.delete(id);
  const n=state.sel.size;
  const lote=manage?'<div class="cotep-bulk'+(n?' on':'')+'" aria-live="polite">'+(n?'<strong>'+n+' selecionada(s)</strong><button class="btn small primary" data-action="cotepGerarCotep">Gerar COTEP</button><button class="btn small" data-action="cotepAgrupar">Agrupar</button><button class="btn small" data-action="cotepPriorizarLote">Prioridade</button><button class="btn small ghost" data-action="cotepLimparSel">Limpar</button>':'<span>Selecione intenções para agrupar, priorizar ou gerar uma COTEP (vários elementos-itens são permitidos).</span>')+'</div>':'';
- return '<section class="card section"><div class="toolbar">'+busca('Centro, objeto, elemento-item ou grupo')+chips([['abertas','Em aberto'],['todas','Todas'],['minhas','Minhas']],state.filaFiltro,'cotepFila')+'</div>'+lote+
+ return '<section class="card section"><div class="toolbar">'+busca('Centro, objeto, elemento-item ou grupo')+chips([['abertas','Em aberto'],['todas','Todas'],['minhas',ctx.visitante?'Enviadas deste aparelho':'Minhas']],state.filaFiltro,'cotepFila')+'</div>'+lote+
   '<div class="table-scroll"><table class="data-table cotep-table"><thead><tr><th><span class="sr-only">Seleção</span></th><th>Prioridade</th><th>Centro</th><th>Elemento-item</th><th>Objeto</th><th>Valor</th><th>Situação</th><th>Ações</th></tr></thead><tbody>'+
   (rows.map(i=>linhaIntencao(i,ctx,res,manage)).join('')||'<tr><td colspan="8" class="table-empty">Nenhuma intenção neste filtro.</td></tr>')+'</tbody></table></div></section>';
 }
@@ -353,7 +377,13 @@ function view(ctx){
  if(ctx.demo&&!state.demo)state.demo=demoSeed();
  if(!ctx.demo)state.demo=null;
  const titulo='<div class="pagehead"><div><div class="eyebrow">DTS-1 · Limite anual de COTEP por elemento-item</div><h1>Intenções de COTEP</h1></div></div>';
- if(!ctx.demo){
+ if(ctx.visitante){
+  if(state.error)return titulo+'<section class="card section"><p class="cotep-note danger">'+esc(state.error)+'</p><button class="btn" data-action="cotepRecarregar">Tentar novamente</button></section>';
+  if(!state.loaded)return titulo+'<section class="card section"><p role="status" class="cotep-empty">Carregando…</p></section>';
+  if(state.precisaCodigo)return titulo+'<section class="card section cotep-codigo"><h2>Código de acesso</h2><p class="sub">Informe o código de acesso COTEP divulgado pela DTS-1.</p>'+
+   (state.erroCodigo?'<p class="cotep-note danger">'+esc(state.erroCodigo)+'</p>':'')+
+   '<form data-form="cotepCodigo" class="cotep-inline-form"><input name="codigo" type="password" required minlength="6" autocomplete="off" aria-label="Código de acesso"><button class="btn primary">Continuar</button></form></section>';
+ }else if(!ctx.demo){
   if(!ctx.online)return titulo+'<section class="card section"><p class="cotep-empty">Entre na sessão institucional para consultar e registrar intenções.</p></section>';
   if(state.error)return titulo+'<section class="card section"><p class="cotep-note danger">'+esc(state.error)+'</p><button class="btn" data-action="cotepRecarregar">Tentar novamente</button></section>';
   if(!state.loaded)return titulo+'<section class="card section"><p role="status" class="cotep-empty">Carregando dados protegidos…</p></section>';
@@ -370,6 +400,7 @@ const opcoes=(arr,val)=>arr.map(a=>{const [v,t]=Array.isArray(a)?a:[a,a];return 
 const selecao=(name,label,arr,val,attr='')=>'<div class="form-row"><label for="cf-'+name+'">'+esc(label)+'</label><select id="cf-'+name+'" name="'+name+'" '+attr+'>'+opcoes(arr,val)+'</select></div>';
 const rodape=(txt='Salvar')=>'<div class="modal-footer"><button class="btn" type="button" data-action="closeModal">Cancelar</button><button class="btn primary" type="submit">'+esc(txt)+'</button></div>';
 function centroPadrao(ctx){
+ if(ctx.visitante)return lerJson(localStorage,VIS_SOLICITANTE,{}).centro||'';
  const d=dados(),meu=d.intencoes.filter(i=>i.criado_por===ctx.authId).sort((a,b)=>String(b.criado_em).localeCompare(String(a.criado_em)))[0];
  if(meu)return meu.centro;
  const setor=ctx.profile?.setor||'';
@@ -384,6 +415,8 @@ function formIntencao(ctx,el,i){
   '<div class="form-grid">'+
   '<div class="form-row"><label for="cf-centro">Centro solicitante</label><input id="cf-centro" name="centro" list="cotep-centros" required maxlength="120" value="'+esc(x.centro||centroPadrao(ctx))+'" placeholder="Selecione ou digite"><datalist id="cotep-centros">'+centros+'</datalist></div>'+
   '<div class="form-row"><label for="cf-elemento_item">Elemento-item</label><input id="cf-elemento_item" name="elemento_item" list="cotep-elementos" required pattern="[0-9]{4}" inputmode="numeric" maxlength="4" value="'+esc(x.elemento_item||el||'')+'" placeholder="Ex.: 3016"'+(el&&!i?' readonly':'')+'><datalist id="cotep-elementos">'+elems+'</datalist></div>'+
+  (ctx.visitante?(()=>{const sol=lerJson(localStorage,VIS_SOLICITANTE,{});return campo('solicitante_nome','Seu nome (posto/graduação e nome)',sol.nome||'','text','required minlength="3" maxlength="120" autocomplete="name"')+
+   campo('solicitante_contato','Contato (e-mail funcional ou telefone)',sol.contato||'','text','required minlength="5" maxlength="160"');})():'')+
   area('objeto','Objeto',x.objeto||'','required minlength="8" maxlength="1500" placeholder="O que será contratado"')+
   campo('valor_estimado','Valor estimado (R$)',x.valor_estimado??'','text','required inputmode="decimal" placeholder="0,00" autocomplete="off"')+
   selecao('prioridade','Prioridade',PRIORIDADES,x.prioridade||'Média')+
@@ -429,7 +462,7 @@ function detalheIntencao(ctx,id){
  const info='<div class="meta-grid cotep-meta"><div><small>Centro</small><strong>'+esc(i.centro)+'</strong></div><div><small>Elemento-item</small><strong>'+esc(i.elemento_item)+' · saldo '+moneyC(r?.saldo)+'</strong></div>'+
   '<div><small>Valor estimado</small><strong>'+money(i.valor_estimado)+'</strong></div><div><small>Reserva</small><strong>'+(i.situacao==='Reservada'?money(i.valor_reservado)+(i.reserva_ate?' até '+dia(i.reserva_ate):''):'—')+'</strong></div>'+
   '<div><small>Prioridade</small><strong>'+esc(i.prioridade||'Média')+(i.grupo?' · grupo '+esc(i.grupo):'')+'</strong></div><div><small>Registrada</small><strong>'+dia(i.criado_em)+(nomeUsuario(ctx,i.criado_por)?' · '+esc(nomeUsuario(ctx,i.criado_por)):'')+'</strong></div></div>'+
-  '<p><strong>Objeto:</strong> '+esc(i.objeto)+'</p><p><strong>Justificativa:</strong> '+esc(i.justificativa||'—')+'</p>'+(i.observacao_gestor?'<p class="cotep-note">DTS-1: '+esc(i.observacao_gestor)+'</p>':'')+(i.cotep_numero?'<p>COTEP vinculada: <strong>'+esc(i.cotep_numero)+'</strong></p>':'');
+  (i.origem==='Visitante'?'<p class="cotep-note">Registrada sem conta (visitante)'+(i.solicitante_nome?': <strong>'+esc(i.solicitante_nome)+'</strong>':'')+(i.solicitante_contato?' · '+esc(i.solicitante_contato):'')+'</p>':'')+'<p><strong>Objeto:</strong> '+esc(i.objeto)+'</p><p><strong>Justificativa:</strong> '+esc(i.justificativa||'—')+'</p>'+(i.observacao_gestor?'<p class="cotep-note">DTS-1: '+esc(i.observacao_gestor)+'</p>':'')+(i.cotep_numero?'<p>COTEP vinculada: <strong>'+esc(i.cotep_numero)+'</strong></p>':'');
  let acoes='';
  if(manage&&INT_ABERTAS.includes(i.situacao)){
   const sug=r&&r.saldo!==null?Math.min(CENT(i.valor_estimado),Math.max(0,r.saldo+(i.situacao==='Reservada'?CENT(i.valor_reservado):0))):CENT(i.valor_estimado);
@@ -505,6 +538,13 @@ function formParametros(ctx){
   '</div>'+rodape('Salvar limite')+'</form></section>'+
   '<section class="cotep-param"><h3>Catálogo de elementos-itens ('+elems.length+')</h3><form data-form="cotepElementoCat" class="cotep-inline-form"><input name="codigo" required pattern="[0-9]{4}" maxlength="4" placeholder="Código" aria-label="Código" inputmode="numeric"><input name="descricao" maxlength="200" placeholder="Descrição" aria-label="Descrição"><select name="ativo" aria-label="Situação"><option value="true">Ativo</option><option value="false">Inativo</option></select><button class="btn small primary">Salvar</button></form>'+
   '<div class="cotep-catalogo">'+elems.map(e=>'<span class="'+(e.ativo===false?'off':'')+'"><b>'+esc(e.codigo)+'</b> '+esc(e.descricao||'sem descrição')+(e.ativo===false?' (inativo)':'')+'</span>').join('')+'</div></section>'+
+  '<section class="cotep-param"><h3>Acesso de visitante (sem conta)</h3><p class="helper">Botão «COTEP» da tela de login: o visitante só vê este menu e registra intenções pendentes, identificando-se por nome e contato. '+
+  (state.acesso?'Situação: <strong>'+(state.acesso.ativo?'ativo':'desativado')+'</strong> · '+(state.acesso.exige_codigo?'exige código':'sem código')+(state.acesso.limite_por_hora?' · até '+esc(state.acesso.limite_por_hora)+' envios/hora':''):'')+'</p>'+
+  '<form data-form="cotepAcesso" class="cotep-inline-form"><select name="ativo" aria-label="Situação do acesso"><option value="true"'+(state.acesso?.ativo!==false?' selected':'')+'>Ativo</option><option value="false"'+(state.acesso?.ativo===false?' selected':'')+'>Desativado</option></select>'+
+  '<input name="codigo" type="password" minlength="6" autocomplete="new-password" placeholder="Novo código (vazio mantém)" aria-label="Novo código de acesso">'+
+  '<label class="cotep-check-label"><input type="checkbox" name="sem_codigo"> dispensar código</label>'+
+  '<input name="limite_por_hora" type="number" min="1" max="1000" value="'+esc(state.acesso?.limite_por_hora||60)+'" aria-label="Limite de envios por hora" title="Envios por hora">'+
+  '<button class="btn small primary">Salvar</button></form></section>'+
   '<section class="cotep-param"><h3>Centros solicitantes</h3><form data-form="cotepCentro" class="cotep-inline-form"><input name="nome" required maxlength="120" placeholder="Nome do centro" aria-label="Nome do centro"><select name="ativo" aria-label="Situação"><option value="true">Ativo</option><option value="false">Inativo</option></select><button class="btn small primary">Salvar</button></form>'+
   '<div class="cotep-catalogo">'+d.centros.map(c=>'<span class="'+(c.ativo===false?'off':'')+'">'+esc(c.nome)+(c.ativo===false?' (inativo)':'')+'</span>').join('')+'</div></section>'+gest+'</div>';
 }
@@ -512,6 +552,14 @@ function formParametros(ctx){
 // ===== Eventos =====
 async function enviar(ctx,payload){
  if(ctx.demo)return demoAcao(payload,ctx);
+ if(ctx.visitante){
+  if(payload.acao!=='criar_intencao')throw Error('Ação disponível apenas para a DTS-1');
+  const {acao,ano,unidade_gestora,...dadosIntencao}=payload;
+  const out=await ctx.rest('/rest/v1/rpc/sig_cotep_publico_intencao','POST',{p:{...dadosIntencao,codigo:lerJson(sessionStorage,VIS_CODIGO,null)}});
+  if(out?.id){const m=minhasVisitante();m.add(out.id);gravar(localStorage,VIS_MINHAS,[...m].slice(-200));}
+  await load(ctx.rest,true,{visitante:true});if(state.error)throw Error(state.error);
+  return out;
+ }
  const out=await ctx.rest('/rest/v1/rpc/sig_cotep_acao','POST',{p:payload});
  await load(ctx.rest,true);if(state.error)throw Error(state.error);
  return out;
@@ -523,7 +571,7 @@ async function click(name,el,ctx){
  const leitura=['cotepAba','cotepFiltro','cotepFila','cotepElemento','cotepIntencao','cotepCotep','cotepRecarregar','cotepSel','cotepLimparSel','cotepItemAdd','cotepItemRemover'];
  if(ctx.preview&&!leitura.includes(name))return ctx.toast('Prévia somente leitura.');
  switch(name){
- case 'cotepRecarregar':if(!ctx.demo)await load(ctx.rest,true);ctx.render();return;
+ case 'cotepRecarregar':if(!ctx.demo)await load(ctx.rest,true,{visitante:!!ctx.visitante});ctx.render();return;
  case 'cotepAba':state.tab=['elementos','intencoes','coteps'].includes(el.dataset.tab)?el.dataset.tab:'elementos';state.busca='';ctx.render();return;
  case 'cotepFiltro':state.filtro=el.dataset.val;ctx.render();return;
  case 'cotepFila':state.filaFiltro=el.dataset.val;ctx.render();return;
@@ -579,6 +627,14 @@ async function submit(form,ctx){
  ctxAtual=ctx;
  if(ctx.preview)throw Error('Prévia somente leitura');
  const type=form.dataset.form,f=Object.fromEntries(new FormData(form).entries());
+ if(type==='cotepCodigo'){
+  gravar(sessionStorage,VIS_CODIGO,String(f.codigo||'').trim());state.erroCodigo='';
+  await load(ctx.rest,true,{visitante:true});ctx.render();
+  if(state.precisaCodigo)throw Error(state.erroCodigo||'Código de acesso COTEP inválido');
+  return;
+ }
+ if(ctx.visitante&&type!=='cotepIntencao')throw Error('Ação disponível apenas para a DTS-1');
+ if(ctx.visitante)gravar(localStorage,VIS_SOLICITANTE,{nome:f.solicitante_nome,contato:f.solicitante_contato,centro:f.centro});
  const ids=[...state.sel];let msg='Registro confirmado no banco.',out;
  if(type==='cotepIntencao'){
   out=await enviar(ctx,{acao:f.id?'editar_intencao':'criar_intencao',...f,valor_estimado:valorForm(f.valor_estimado),ano:state.ano,unidade_gestora:ugPadrao()||undefined});
@@ -603,6 +659,12 @@ async function submit(form,ctx){
    out=await enviar(ctx,{acao:'limite',...f,valor_limite:valorForm(f.valor_limite),ano:Number(f.ano)});msg='Limite do exercício salvo.';
   }else if(type==='cotepElementoCat'){out=await enviar(ctx,{acao:'elemento',...f,ativo:f.ativo==='true'});msg='Catálogo atualizado.';}
   else if(type==='cotepCentro'){out=await enviar(ctx,{acao:'centro',...f,ativo:f.ativo==='true'});msg='Centro atualizado.';}
+  else if(type==='cotepAcesso'){
+   const p={ativo:f.ativo==='true',limite_por_hora:f.limite_por_hora};
+   if(f.sem_codigo)p.codigo='';else if(String(f.codigo||'').trim())p.codigo=f.codigo.trim();
+   if(ctx.demo)throw Error('Disponível somente no banco institucional');
+   out=await ctx.rest('/rest/v1/rpc/sig_cotep_acesso_publico_definir','POST',{p});await load(ctx.rest,true);msg='Acesso de visitante atualizado.';
+  }
   else if(type==='cotepGestor'){out=await enviar(ctx,{acao:'definir_gestor',auth_id:f.auth_id,ativo:f.ativo==='true'});msg='Permissão atualizada.';}
   else throw Error('Formulário desconhecido');
  }

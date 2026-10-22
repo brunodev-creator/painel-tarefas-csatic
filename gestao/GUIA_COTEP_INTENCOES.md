@@ -36,6 +36,13 @@ A COTEP 130/2026 é **um** procedimento (`sig_cotep_coteps`) com **dois** lança
 
 Alertas no cartão: **utilização elevada** (≥ 80%), **saldo insuficiente** (pendentes > saldo), **limite atingido** e **limite excedido**.
 
+## Acesso de visitante (sem conta)
+- Na tela de login, abaixo de **Entrar**, o botão **COTEP** abre o SIG em modo visitante: só o menu *Intenções de COTEP* aparece (busca, perfil, demais menus e configurações ficam ocultos). O botão *Sair · entrar com conta* volta ao login.
+- O visitante consulta o painel por elemento-item e registra intenções informando **nome (posto/graduação)** e **contato**; a intenção entra como *Pendente* (origem «Visitante») e nunca reserva saldo. A DTS-1 vê o solicitante e o contato na análise.
+- O banco libera ao visitante apenas `sig_cotep_publico_status`, `sig_cotep_publico_dados` (sem contatos, autores ou trilha interna) e `sig_cotep_publico_intencao`. Tabelas e a RPC interna continuam fechadas ao papel anônimo.
+- Proteções: limite global por hora (padrão 60) e de 10 envios/hora por rede, bloqueio de envio duplicado e, opcionalmente, **código de acesso** definido pela DTS-1 em *Parâmetros → Acesso de visitante* (também é possível desativar o acesso).
+- Migration: `database/migrations/20261021_sig_cotep_visitante.sql`.
+
 ## Segurança e integridade
 - Escrita somente pela RPC `sig_cotep_acao` (SECURITY DEFINER, valida conta ativa, gestor e administrador). Tabelas com RLS e apenas SELECT para contas ativas; auditoria visível só à DTS-1.
 - **Concorrência:** cada alteração que aumenta o valor ocupado obtém bloqueio transacional por (exercício, UG, elemento-item) e o gatilho `sig_cotep_*_limite` reconfere o saldo antes do COMMIT. Duas reservas simultâneas que juntas excedem o saldo: só a primeira é aceita.

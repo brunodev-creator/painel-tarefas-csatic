@@ -30,7 +30,7 @@ const SIG_ROLE_MENUS=Object.freeze({
  leitura:['notificacoes','tarefas','processos','cotep','assistente']
 });
 function menusForRole(role){return role==='admin'?NAV.map(([id])=>id):(SIG_ROLE_MENUS[role]||SIG_ROLE_MENUS.leitura).slice();}
-function currentMenus(){return menusForRole(effectiveRole());}
+function currentMenus(){return visitorMode()?['cotep']:menusForRole(effectiveRole());}
 function canVisitMenu(id){return currentMenus().includes(id);}
 function firstRoleView(){const role=effectiveRole();return role==='admin'?'dashboard':isSectionChiefRole(role)?'chefia':role==='compras'?'compras':'tarefas';}
 // Visões que usam somente as tabelas carregadas na etapa rápida do login.
@@ -124,6 +124,11 @@ const SIG_PREVIEW_ROLES=[
  {id:'leitura',label:'Consulta / Leitura',desc:'Somente consulta, sem editar registros'}
 ];
 let previewRole=null;
+// Visitante sem conta: acesso exclusivo ao menu Intenções de COTEP (funções públicas do banco).
+const SIG_VISITOR_KEY='sig-cotep-visitante';
+let cotepVisitor=(()=>{try{return sessionStorage.getItem(SIG_VISITOR_KEY)==='1'}catch{return false}})();
+const visitorMode=()=>cotepVisitor&&cloud()&&!session;
+function setVisitor(on){cotepVisitor=!!on;try{on?sessionStorage.setItem(SIG_VISITOR_KEY,'1'):sessionStorage.removeItem(SIG_VISITOR_KEY)}catch{}}
 let purchaseFilter='all',purchaseLimit=12,serviceFilter='Todos';
 let sharedProcessRows=[],sharedProcessHistory=[],sharedLoadError='';
 const PURCHASE_SERVICES=[
@@ -208,7 +213,11 @@ function empty(label='Nenhum registro encontrado'){return `<div class="empty"><d
 function periodNotice(){return cloud()?`<div class="info-note">Dados consultados no banco da organização ${lastLoad?'· última atualização '+new Date(lastLoad).toLocaleTimeString('pt-BR'):''}. Confirme a completude das importações antes de tomar decisões orçamentárias.</div>`:`<div class="info-note warning-note">Indicadores baseados exclusivamente em <strong>registros fictícios</strong>. Os cálculos não representam saldos oficiais ou situação real de qualquer processo.</div>`}
 function updateChrome(){
  // Estado visual separado do perfil real: o CSS também oculta menus não autorizados.
- document.body.dataset.sigVisibleRole=effectiveRole();
+ document.body.dataset.sigVisibleRole=visitorMode()?'visitante':effectiveRole();
+ document.body.classList.toggle('sig-cotep-visitante',visitorMode());
+ let exitVisitor=document.getElementById('sig-visitor-exit');
+ if(visitorMode()&&!exitVisitor){document.querySelector('.top-right')?.insertAdjacentHTML('afterbegin','<button type="button" class="btn small sig-visitor-exit" id="sig-visitor-exit" data-action="sairVisitante">Sair · entrar com conta</button>');}
+ else if(!visitorMode()&&exitVisitor)exitVisitor.remove();
  const search=document.getElementById('sig-global-search');
  if(search)search.hidden=!!(cloud()&&(!session||!cloudDataReady))||inviteActive;
  document.body.classList.toggle('sig-role-preview',!!previewRole);
@@ -218,7 +227,7 @@ function updateChrome(){
  document.getElementById('crumb').textContent=NAV.find(x=>x[0]===view)?.[2]||'Visão geral';
  const indicator=document.getElementById('sync-indicator');
  indicator.classList.toggle('online',cloud()&&!!session);
- indicator.lastElementChild.textContent=cloud()?(session?'Conectado · banco em nuvem':'Conexão pendente'):'Modo demonstração';
+ indicator.lastElementChild.textContent=cloud()?(session?'Conectado · banco em nuvem':visitorMode()?'Visitante · Intenções de COTEP':'Conexão pendente'):'Modo demonstração';
  document.getElementById('demo-banner').style.display=cloud()?'none':'block';
  document.getElementById('avatar-initial').textContent=(profile.nome||'D').charAt(0).toUpperCase();
  const avatar=document.querySelector('.avatar-button');
@@ -1818,7 +1827,7 @@ function labelTables(root){
   table.querySelectorAll('tbody tr').forEach(tr=>[...tr.children].forEach((td,i)=>{if(heads[i]&&!td.hasAttribute('colspan'))td.dataset.label=heads[i];}));
  });
 }
-function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canVisitMenu(view))view=firstRoleView();updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
+function render(){if(visitorMode())view='cotep';else if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canVisitMenu(view))view=firstRoleView();updateChrome();const content=document.getElementById('content');if(inviteActive){content.innerHTML=heading('Primeiro acesso','Definir senha','Seu convite foi validado. Crie uma senha para acessar o sistema.')+activateAccountView();return}if(cloud()&&!session&&!visitorMode()){content.innerHTML=heading('Acesso restrito','Entrar no sistema','Autenticação necessária para consultar a base compartilhada.')+loginView();return}
  if(cloud()&&session&&(!cloudDataReady||(cloudExtraState!=='ready'&&!SIG_FAST_VIEWS.includes(view)))){
   // Durante o primeiro login, preserve a paisagem e o formulário já visível
   // até confirmar o perfil e os dados principais, evitando troca brusca de tela.
@@ -1831,8 +1840,8 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   content.innerHTML='<section class="card section" role="status" aria-live="polite" style="max-width:640px;margin:9vh auto;padding:32px"><h2>'+(cloudLoadError?'Sincronização pendente':'Preparando o SIG')+'</h2><p class="sub">'+message+'</p>'+(cloudLoadError?'<button type="button" class="btn primary" data-action="retryCloudLoad">Tentar novamente</button>':'<p class="sub">O painel aparecerá automaticamente.</p>')+'</section>';return;
  }
  let html='';switch(view){case'dashboard':html=dashboardView();break;case'processos':html=sharedProcessesView();break;case'compras':html=processView('Compras');break;case'licitacao':html=licDemoView();break;case'tarefas':html=tasksView();break;case'contratos':html=v4ContractsView();break;case'cotep':
-  window.SIG_COTEP.syncIdentity(session?.user?.id||null);
-  if(cloud()&&session&&!window.SIG_COTEP.isLoaded())window.SIG_COTEP.load(rest).then(()=>{if(view==='cotep')render();});
+  window.SIG_COTEP.syncIdentity(session?.user?.id||(visitorMode()?'visitante':null));
+  if(cloud()&&(session||visitorMode())&&!window.SIG_COTEP.isLoaded())window.SIG_COTEP.load(rest,false,{visitante:visitorMode()}).then(()=>{if(view==='cotep')render();});
   html=window.SIG_COTEP.view(cotepCtx());break;case'almoxarifado':
   if(cloud()&&session&&canVisitMenu('almoxarifado')&&window.SIG_ALMOX&&!window.SIG_ALMOX.isLoaded()){
     window.SIG_ALMOX.load(rest).then(()=>{if(view==='almoxarifado')render();}).catch(()=>{if(view==='almoxarifado')render();});
@@ -1843,7 +1852,7 @@ function render(){if((!cloud()||(session&&cloudDataReady))&&!inviteActive&&!canV
   }
   html=window.SIG_COTAS.view(canViewCota(),canFinance(),canVisitMenu('conciliacao'));break;case'auditoria':html=window.SIG_V7.view(canFinance());break;case'sofi':html=v4SofiView();break;case'assistente':html=assistantView();break;case'recebimentos':html=v3ReceiptView();break;case'notificacoes':html=v3NotificationsView();break;case'alertas':html=v3AlertView();break;case'chefia':html=v3ChiefView();break;case'usuarios':html=usuariosView();break;default:html=dashboardView();}if(view==='tarefas')html=actionNowPanel()+html;if(previewRole){const active=SIG_PREVIEW_ROLES.find(r=>r.id===previewRole);
  html='<div class="sig-preview-banner" role="status"><div><strong>Prévia: '+esc(active?.label||previewRole)+'</strong><span>Somente leitura. Sua sessão permanece administradora; não simula a conta nem as políticas RLS de outra pessoa.</span></div><button type="button" class="btn sig-preview-return" data-action="exitRolePreview">Voltar ao administrador</button></div>'+html;}
- if(cloud()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;labelTables(content);if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
+ if(cloud()&&!visitorMode()&&cloudExtraState!=='ready')html='<div class="info-note" role="status">'+(cloudLoadError?'Dados complementares indisponíveis: '+esc(cloudLoadError)+' <button type="button" class="btn small" data-action="retryCloudLoad">Tentar novamente</button>':'Painel liberado. Sincronizando dados complementares em segundo plano…')+'</div>'+html;content.innerHTML=html;labelTables(content);if(previewRole)content.querySelectorAll('input[type="file"]').forEach(x=>x.disabled=true);document.querySelectorAll('[data-filter="setor"]').forEach(el=>el.value=filters.setor);document.querySelectorAll('[data-filter="status"]').forEach(el=>el.value=filters.status);if(view==='assistente'){const e=document.getElementById('chat-history');if(e)e.scrollTop=e.scrollHeight}if(view==='almoxarifado')window.SIG_ALMOX?.afterRender();}
 function inputField(name,label,value='',type='text',extra=''){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><input id="f-${name}" name="${name}" type="${type}" value="${esc(value)}" ${extra}></div>`}
 function selectField(name,label,choices,value){return `<div class="form-row"><label for="f-${name}">${esc(label)}</label><select id="f-${name}" name="${name}">${optionList(choices,value)}</select></div>`}
 function textareaField(name,label,val){return `<div class="form-row full"><label for="f-${name}">${esc(label)}</label><textarea id="f-${name}" name="${name}">${esc(val)}</textarea></div>`}
@@ -2029,13 +2038,13 @@ async function requestRecovery(d){
  }catch(e){showToast('Falha ao solicitar recuperação: '+errMsg(e))}
  finally{busy=false}
 }
-function loginView(){return `<div class="login-wrapper"><h2>Identificação do usuário</h2><p class="sub">Somente contas liberadas pelo administrador podem acessar o banco.</p><form data-form="login" style="margin-top:18px"><div class="form-grid">${inputField('email','E-mail','', 'email','required autocomplete="username"')}${inputField('password','Senha','', 'password','required autocomplete="current-password"')}</div><div class="modal-footer"><button type="button" class="btn" data-action="settings">Configurações</button><button type="submit" class="btn primary">Entrar</button></div></form><p class="helper">As senhas são enviadas diretamente à autenticação do projeto Supabase; não são gravadas pelo protótipo.</p><div class="card section" style="margin-top:20px"><h3>Primeiro acesso ou esqueceu a senha?</h3><p class="sub">Se o convite direcionou para localhost ou você ainda não definiu sua senha, solicite um novo link. O administrador deve configurar a URL pública no Supabase antes do envio.</p><form data-form="recover" style="margin-top:12px">${inputField('email','E-mail da sua conta','', 'email','required autocomplete="email"')}<div class="modal-footer"><button type="submit" class="btn">Enviar link de definição de senha</button></div></form></div></div>`}
+function loginView(){return `<div class="login-wrapper"><h2>Identificação do usuário</h2><p class="sub">Somente contas liberadas pelo administrador podem acessar o banco.</p><form data-form="login" style="margin-top:18px"><div class="form-grid">${inputField('email','E-mail','', 'email','required autocomplete="username"')}${inputField('password','Senha','', 'password','required autocomplete="current-password"')}</div><div class="modal-footer"><button type="button" class="btn" data-action="settings">Configurações</button><button type="submit" class="btn primary">Entrar</button></div><div class="sig-auth-visitor"><button type="button" class="sig-auth-cotep" data-action="entrarVisitante">COTEP</button><small>Registrar intenção de COTEP sem conta</small></div></form><p class="helper">As senhas são enviadas diretamente à autenticação do projeto Supabase; não são gravadas pelo protótipo.</p><div class="card section" style="margin-top:20px"><h3>Primeiro acesso ou esqueceu a senha?</h3><p class="sub">Se o convite direcionou para localhost ou você ainda não definiu sua senha, solicite um novo link. O administrador deve configurar a URL pública no Supabase antes do envio.</p><form data-form="recover" style="margin-top:12px">${inputField('email','E-mail da sua conta','', 'email','required autocomplete="email"')}<div class="modal-footer"><button type="submit" class="btn">Enviar link de definição de senha</button></div></form></div></div>`}
 function settingsModal(){const html=`<div class="info-note warning-note"><strong>Atenção:</strong> o site compartilhado não é local apropriado para dados internos antes de autorização institucional, revisão de segurança e configuração das permissões do banco.</div><form data-form="settings"><div class="form-grid">${inputField('url','URL do projeto Supabase',config.url,'url','placeholder="https://projeto.supabase.co"')}${inputField('key','Chave pública (anon/publishable)',config.key,'text','autocomplete="off" placeholder="sb_publishable_..."')}</div><div class="modal-footer"><button type="button" class="btn" data-action="disconnect">${cloud()?'Desconectar / voltar à demo':'Restaurar demonstração'}</button><button type="submit" class="btn primary">Salvar conexão</button></div></form><div class="card section" style="margin-top:17px"><h3>Modo demonstração</h3><p class="sub">Permite testar todas as funcionalidades no navegador, sem servidor e sem criar conta.</p><div class="detail-actions"><button class="btn" data-action="export">↓ Exportar JSON</button><button class="btn" data-action="import">↑ Importar JSON</button><button class="btn danger" data-action="resetDemo">Reiniciar demo</button></div><p class="helper">Sincronização multiusuário só funciona com um projeto PostgreSQL configurado. As credenciais de serviço não devem ser inseridas neste aplicativo.</p></div><div class="card section"><h3>Como ativar a versão compartilhada</h3><p class="sub">1. Criar um projeto no Supabase sob conta aprovada. 2. Executar <span class="code">database/schema.sql</span>. 3. Cadastrar usuários no Authentication e autorizar os perfis na tabela <span class="code">usuarios</span>. 4. Informar aqui a URL e a chave pública do projeto.</p></div>`;
  openModal('Configurações e conexão','Administração local e conexão do banco de dados.',html,true)}
 function profileModal(){const html=cloud()?`<div class="card section"><h3>${esc(profile.nome||'Usuário')}</h3><p class="sub">Perfil real: ${esc(labelRole(profile.role))} · setor: ${esc(profile.setor||'—')}</p><div class="detail-actions">${canPreviewRole()?'<button class="btn" data-action="previewProfiles">Visualizar outros perfis</button>':''}<button class="btn danger" data-action="signOut">Sair da conta</button></div></div>`:`<div class="info-note">A demonstração não possui autenticação. Perfis nesta tela apenas ilustram possíveis permissões, sem restringir dados reais.</div><div class="card section"><h3>Perfil de simulação</h3><p class="sub">Atual: ${esc(profile.role)}</p><div class="detail-actions">${['admin','chefia','chefe_compras','chefe_licitacao','chefe_sofi','compras','licitacao','sofi','leitura'].map(r=>`<button class="btn small" data-action="demoRole" data-role="${r}">${r}</button>`).join('')}</div></div>`;openModal('Perfil de acesso',cloud()?'Sessão autorizada pelo banco':'Somente para navegação demonstrativa.',html)}
 // Camada de dados: demo local ou Supabase REST + GoTrue (chave pública, políticas RLS).
 // Contexto entregue ao módulo Intenções de COTEP (assets/cotep.js).
-function cotepCtx(){return {rest,openModal,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole,online:cloud()&&!!session,demo:!cloud(),profile,processos:db.processos};}
+function cotepCtx(){return {rest,openModal,closeModal,render,toast:showToast,admin:isAdmin(),authId:currentAuthId(),users:db.usuarios,preview:!!previewRole,online:cloud()&&(!!session||visitorMode()),demo:!cloud(),visitante:visitorMode(),profile,processos:db.processos};}
 async function rest(path,method='GET',payload=null,token=session?.access_token){
  if(!cloud())throw Error('Projeto em nuvem não configurado.');
  const headers={'apikey':config.key,'Accept':'application/json'};
@@ -2142,7 +2151,7 @@ async function persist(table,record,existing){if(!TABLES.includes(table))throw E
 async function addEvent(processId,type,desc,user){if(cloud())return rest('/rest/v1/rpc/registrar_ocorrencia','POST',{p_processo_id:processId,p_tipo:type,p_descricao:desc});const log={id:uuid(),processo_id:processId,tipo:type,descricao:desc,usuario:user||profile.nome||'Usuário',criado_em:nowIso()};await persist('eventos',log,false)}
 function gather(form){return Object.fromEntries(new FormData(form).entries())}
 async function handleSubmit(e){const form=e.target;if(!form.matches('form'))return;e.preventDefault();if(previewRole){showToast('Prévia somente de leitura. Volte ao administrador para alterar registros.');return;}if(busy)return;
- const type=form.dataset.form;if(type?.startsWith('cotep'))return window.SIG_COTEP.submit(form,cotepCtx());if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='andamento')return submitProgress(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
+ const type=form.dataset.form;if(type?.startsWith('cotep'))return window.SIG_COTEP.submit(form,cotepCtx());if(visitorMode())return;if(type==='licDemoSpecs')return licDemoSaveSpecs(form);if(type==='aipc')return submitAipc(form,e.submitter?.value);if(type==='chiefReassign')return chiefReassignSubmit(form);if(type==='vault')return vaultSubmit(form);if(type==='v4Request')return v4HandleRequest(form);if(type==='v4Competence')return v4HandleCompetence(form);if(type==='v4FinishTask')return v4HandleFinishTask(form,e.submitter?.value);if(type==='andamento')return submitProgress(form);if(type==='activateAccount')return activateAccount(gather(form));if(type==='login')return signIn(gather(form));if(type==='recover')return requestRecovery(gather(form));if(type==='transfer')return submitTransfer(form);if(type==='inviteUser'||type==='updateUser')return submitUser(form);if(type==='settings')return saveSettings(gather(form));if(type==='chat')return ask(new FormData(form).get('question'));
  const d=gather(form),id=form.dataset.id,oldType={process:'processos',task:'tarefas',contract:'contratos',repasse:'repasses',empenho:'empenhos'}[type];
  if(!oldType&&type!=='log')return;
  if(type==='log'){if(!d.descricao?.trim())return showToast('Informe a descrição da movimentação.');try{await addEvent(id,d.tipo,d.descricao,d.usuario);closeModal();showToast('Movimentação registrada.');await (cloud()?fetchCloud():Promise.resolve());render()}catch(ex){showToast('Erro: '+errMsg(ex))}return}
@@ -2187,7 +2196,7 @@ async function handleSubmit(e){const form=e.target;if(!form.matches('form'))retu
  closeModal();if(cloud()&&!((type==='process'||type==='task')&&record.setor==='Compras'))await fetchCloud();render();showToast(`${type==='process'?'Processo':type==='task'?'Tarefa':type==='contract'?'Contrato':type==='repasse'?'Repasse':'Empenho'} salvo com sucesso.`);
  }catch(ex){busy=false;showToast('Não foi possível salvar: '+errMsg(ex))}
 }
-async function signIn({email,password}){if(!cloud()||busy)return;
+async function signIn({email,password}){if(!cloud()||busy)return;setVisitor(false);
  busy=true;const button=document.querySelector('form[data-form="login"] button[type="submit"]');
  if(button){button.disabled=true;button.textContent='Autenticando…';}
  try{
@@ -2236,6 +2245,10 @@ function importData(){if(cloud())return showToast('Importação JSON não está 
 function resetDemo(){if(cloud())return showToast('Desconecte o banco antes de reiniciar a demo.');if(!confirm('Restaurar os dados fictícios? Suas edições locais serão substituídas.'))return;db=seed();saveLocal();closeModal();navigate('dashboard');showToast('Demonstração reiniciada.')}
 async function handleClick(e){if(!e.target.closest?.('#sig-global-search'))closeGlobalSearch(false);const btn=e.target.closest('[data-action],[data-view]');if(!btn){if(e.target.classList.contains('modal-backdrop'))closeModal();return}
  if(previewRole&&btn.dataset.action&&!['previewProfiles','setRolePreview','exitRolePreview','closeModal','globalOpen','profile','signOut','detail','sharedDetail','taskReadDetail','licDemoOpen','licDemoPreview','licDemoPrint','aipcView','aipcPrint','taskScope','receiptScope','chiefSector','cotaDetail','buyFilter','buyMore','chiefMember','v4ContractSchedule','v6ApplyFilter','v7ApplyFilter','v6ClearFilter','v7ClearFilter','sigFontePreview','sigFonteLoad','cotaToggleZeradas','almoxPick','almoxClear','almoxReload','almoxDetail','almoxZoomIn','almoxZoomOut','almoxZoomReset','almoxPrev','almoxNext','cotepAba','cotepFiltro','cotepFila','cotepElemento','cotepIntencao','cotepCotep','cotepRecarregar'].includes(btn.dataset.action)){showToast('Prévia somente de leitura. Volte ao administrador para executar esta ação.');return;}
+ if(btn.dataset.action==='entrarVisitante'){if(!cloud())return showToast('O acesso de visitante usa o banco institucional.');setVisitor(true);window.SIG_COTEP.syncIdentity(null);view='cotep';closeModal();render();window.scrollTo(0,0);return}
+ if(btn.dataset.action==='sairVisitante'){setVisitor(false);window.SIG_COTEP.syncIdentity(null);view='dashboard';render();window.scrollTo(0,0);return}
+ if(visitorMode()&&btn.dataset.view&&btn.dataset.view!=='cotep')return;
+ if(visitorMode()&&btn.dataset.action&&!btn.dataset.action.startsWith('cotep')&&!['closeModal','menu'].includes(btn.dataset.action))return;
  if(btn.dataset.view){navigate(btn.dataset.view);return}
  if(cloud()&&session&&(!cloudDataReady||cloudExtraState!=='ready')&&btn.dataset.action&&!['retryCloudLoad','profile','signOut'].includes(btn.dataset.action)){showToast('Sincronização em andamento. Aguarde para alterar registros.');return}
  const action=btn.dataset.action,id=btn.dataset.id;
