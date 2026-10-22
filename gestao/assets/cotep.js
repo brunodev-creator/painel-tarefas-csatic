@@ -282,7 +282,7 @@ function cabecalho(ctx,res){
   '<div class="head-actions"><label class="sr-only" for="cotep-ano">Exercício</label><select id="cotep-ano" class="field-select cotep-ano" data-cotep-ano>'+anos.map(a=>'<option'+(a===state.ano?' selected':'')+'>'+a+'</option>').join('')+'</select>'+
   '<button class="btn primary" data-action="cotepNova">+ Nova intenção</button>'+(manage?'<button class="btn" data-action="cotepParametros">Parâmetros</button>':'')+
   '<button class="btn" data-action="cotepRecarregar" aria-label="Atualizar dados">↻</button></div></div>'+
-  (l&&l.validacao_juridica!=='Validada'?'<p class="cotep-note">Critério operacional PMMG: limite anual controlado por elemento-item · <strong>base normativa pendente de validação jurídica institucional</strong>. Intenções pendentes não abatem o saldo; reservas aprovadas e COTEPs em andamento, sim.'+(ctx.demo?' <em>Demonstração: dados fictícios em memória, nada é gravado.</em>':'')+'</p>':'');
+  (l?'<p class="cotep-note">Critério operacional PMMG: limite anual controlado por elemento-item. Intenções pendentes não abatem o saldo; reservas aprovadas e COTEPs em andamento, sim.'+(ctx.demo?' <em>Demonstração: dados fictícios em memória, nada é gravado.</em>':'')+'</p>':'');
 }
 function divergencias(res){
  // Confere o cálculo local com a visão sig_cotep_saldos do banco (mesma fonte de dados).
