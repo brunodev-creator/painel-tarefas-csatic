@@ -189,9 +189,9 @@ function demoAcao(p,ctx){
    const v=valor(p.valor_estimado);
    if(!/^\d{4}$/.test(p.elemento_item||''))throw Error('Informe o elemento-item com 4 dígitos (ex.: 3016)');
    if(!(v>0))throw Error('Informe o valor estimado');
-   if(String(p.objeto||'').trim().length<8)throw Error('Descreva o objeto (mínimo 8 caracteres)');
-   if(String(p.justificativa||'').trim().length<10)throw Error('Informe a justificativa (mínimo 10 caracteres)');
-   if(String(p.centro||'').trim().length<2)throw Error('Informe o centro solicitante');
+   if(!String(p.objeto||'').trim())throw Error('Descreva o objeto');
+   if(!String(p.justificativa||'').trim())throw Error('Informe a justificativa');
+   if(!String(p.centro||'').trim())throw Error('Informe o centro solicitante');
    Object.assign(i,{centro:p.centro.trim(),objeto:p.objeto.trim(),elemento_item:p.elemento_item,valor_estimado:v,justificativa:p.justificativa.trim(),prioridade:p.prioridade||'Média',situacao:'Pendente',atualizado_em:agora});
    if(!d.elementos.some(e=>e.codigo===i.elemento_item))d.elementos.push({codigo:i.elemento_item,descricao:null,ativo:true});
    if(!d.centros.some(c=>plain(c.nome)===plain(i.centro)))d.centros.push({id:String(Date.now()),nome:i.centro,ativo:true});
@@ -207,7 +207,7 @@ function demoAcao(p,ctx){
    ev('Reserva','Reserva de '+money(v)+' aprovada',{intencao_id:i.id,elemento_item:i.elemento_item,valor:v});return {ok:true};
   }
   if(['liberar_reserva','devolver','rejeitar'].includes(ac)){
-   const i=intencao(p.id);if(ac!=='liberar_reserva'&&String(p.motivo||'').trim().length<5)throw Error('Informe o motivo para o centro solicitante');
+   const i=intencao(p.id);if(ac!=='liberar_reserva'&&!String(p.motivo||'').trim())throw Error('Informe o motivo para o centro solicitante');
    i.situacao={liberar_reserva:'Pendente',devolver:'Devolvida',rejeitar:'Rejeitada'}[ac];i.valor_reservado=0;i.observacao_gestor=p.motivo||i.observacao_gestor;
    ev(ac==='liberar_reserva'?'Liberação':i.situacao,p.motivo||'Reserva liberada',{intencao_id:i.id,elemento_item:i.elemento_item});return {ok:true};
   }
@@ -232,7 +232,7 @@ function demoAcao(p,ctx){
    return {ok:true,cotep_id:c.id};
   }
   if(ac==='salvar_cotep'){
-   if(!SIT_COTEP.includes(p.situacao)||String(p.objeto||'').trim().length<8||!String(p.numero||'').trim())throw Error('Revise número, objeto (mín. 8 caracteres) e situação da COTEP');
+   if(!SIT_COTEP.includes(p.situacao)||!String(p.objeto||'').trim()||!String(p.numero||'').trim())throw Error('Revise número, objeto e situação da COTEP');
    const itens=p.itens||[];const vistos=new Set();
    for(const x of itens){if(x.elemento_item&&!/^\d{4}$/.test(x.elemento_item))throw Error('Elemento-item inválido: '+x.elemento_item);if(vistos.has(x.elemento_item))throw Error('Elemento-item '+x.elemento_item+' repetido na COTEP');vistos.add(x.elemento_item);
     if(p.situacao==='Finalizada'&&x.ativo!==false&&(x.valor_homologado===''||x.valor_homologado==null))throw Error('Para finalizar, informe o valor homologado/negociado de cada elemento-item');}
@@ -449,12 +449,12 @@ function formIntencao(ctx,el,i){
   '<div class="form-grid">'+
   '<div class="form-row"><label for="cf-centro">Centro solicitante</label><input id="cf-centro" name="centro" list="cotep-centros" required maxlength="120" value="'+esc(x.centro||centroPadrao(ctx))+'" placeholder="Selecione ou digite"><datalist id="cotep-centros">'+centros+'</datalist></div>'+
   '<div class="form-row"><label for="cf-elemento_item">Elemento-item</label><input id="cf-elemento_item" name="elemento_item" list="cotep-elementos" required pattern="[0-9]{4}" inputmode="numeric" maxlength="4" value="'+esc(x.elemento_item||el||'')+'" placeholder="Ex.: 3016"'+(el&&!i?' readonly':'')+'><datalist id="cotep-elementos">'+elems+'</datalist></div>'+
-  (ctx.visitante?(()=>{const sol=lerJson(localStorage,VIS_SOLICITANTE,{});return campo('solicitante_nome','Seu nome (posto/graduação e nome)',sol.nome||'','text','required minlength="3" maxlength="120" autocomplete="name"')+
-   campo('solicitante_contato','Contato (e-mail funcional ou telefone)',sol.contato||'','text','required minlength="5" maxlength="160"');})():'')+
-  area('objeto','Objeto',x.objeto||'','required minlength="8" maxlength="1500" placeholder="O que será contratado"')+
+  (ctx.visitante?(()=>{const sol=lerJson(localStorage,VIS_SOLICITANTE,{});return campo('solicitante_nome','Seu nome (posto/graduação e nome)',sol.nome||'','text','required maxlength="120" autocomplete="name"')+
+   campo('solicitante_contato','Contato (e-mail funcional ou telefone)',sol.contato||'','text','required maxlength="160"');})():'')+
+  area('objeto','Objeto',x.objeto||'','required maxlength="1500" placeholder="O que será contratado"')+
   campo('valor_estimado','Valor estimado (R$)',x.valor_estimado??'','text','required inputmode="decimal" placeholder="0,00" autocomplete="off"')+
   selecao('prioridade','Prioridade',PRIORIDADES,x.prioridade||'Média')+
-  area('justificativa','Justificativa',x.justificativa||'','required minlength="10" maxlength="2000" placeholder="Por que a contratação é necessária"')+
+  area('justificativa','Justificativa',x.justificativa||'','required maxlength="2000" placeholder="Por que a contratação é necessária"')+
   '</div><div class="cotep-sim" data-cotep-sim aria-live="polite">'+simulacaoHtml(r,parseValor(x.valor_estimado))+'</div>'+
   (i?.observacao_gestor&&i.situacao==='Devolvida'?'<p class="cotep-note">Orientação da DTS-1: '+esc(i.observacao_gestor)+'</p>':'')+
   rodape(i?(i.situacao==='Devolvida'?'Reenviar à DTS-1':'Salvar alterações'):'Registrar intenção')+'</form>';
@@ -535,7 +535,7 @@ function formCotep(ctx,c){
  return '<form data-form="cotepCotep" class="cotep-form" data-cotep-live="cotep">'+(c?.id?'<input type="hidden" name="id" value="'+esc(c.id)+'">':'')+
   '<input type="hidden" name="ano" value="'+esc(c?.ano||state.ano)+'"><input type="hidden" name="unidade_gestora" value="'+esc(c?.unidade_gestora||ugPadrao())+'">'+
   '<div class="form-grid">'+campo('numero','Número da COTEP',c?.numero||'','text','required maxlength="35" placeholder="Ex.: 131/'+state.ano+'"')+
-  selecao('situacao','Situação',SIT_COTEP,c?.situacao||'Em andamento')+area('objeto','Objeto',c?.objeto||'','required minlength="8"')+
+  selecao('situacao','Situação',SIT_COTEP,c?.situacao||'Em andamento')+area('objeto','Objeto',c?.objeto||'','required')+
   campo('documento','Referência (SEI / Portal de Compras)',c?.documento||'','text','maxlength="1000"')+
   (procs.length?selecao('processo_id','Processo de compra vinculado',[['','— nenhum —'],...procs.map(p=>[p.id,(p.numero||'')+' · '+String(p.objeto||'').slice(0,60)])],c?.processo_id||''):'')+
   '</div><h3 class="cotep-h3">Elementos-itens desta COTEP</h3><p class="helper">Cada código é controlado individualmente. Em andamento conta o estimado; ao finalizar, informe o homologado de cada código e a diferença é liberada.</p>'+
@@ -571,7 +571,7 @@ function formParametros(ctx){
   campo('ano','Exercício',l.ano||state.ano,'number','min="2020" max="2100" required')+campo('unidade_gestora','Unidade gestora',l.unidade_gestora||'','text','required pattern="[0-9]{5,9}"')+
   campo('valor_limite','Limite por elemento-item (R$)',l.valor_limite!=null?String(l.valor_limite).replace('.',','):'','text','required inputmode="decimal"')+
   selecao('validacao_juridica','Validação jurídica institucional',ctx.admin?['Pendente','Validada']:[l.validacao_juridica||'Pendente'],l.validacao_juridica||'Pendente')+
-  area('base_normativa','Base normativa e critério adotado',l.base_normativa||'','required minlength="10"')+campo('documento_validacao','Documento da validação (parecer, nota técnica)',l.documento_validacao||'')+
+  area('base_normativa','Base normativa e critério adotado',l.base_normativa||'','required')+campo('documento_validacao','Documento da validação (parecer, nota técnica)',l.documento_validacao||'')+
   '</div>'+rodape('Salvar limite')+'</form></section>'+
   '<section class="cotep-param"><h3>Catálogo de elementos-itens ('+elems.length+')</h3><form data-form="cotepElementoCat" class="cotep-inline-form"><input name="codigo" required pattern="[0-9]{4}" maxlength="4" placeholder="Código" aria-label="Código" inputmode="numeric"><input name="descricao" maxlength="200" placeholder="Descrição" aria-label="Descrição"><select name="ativo" aria-label="Situação"><option value="true">Ativo</option><option value="false">Inativo</option></select><button class="btn small primary">Salvar</button></form>'+
   '<div class="cotep-catalogo">'+elems.map(e=>'<span class="'+(e.ativo===false?'off':'')+'"><b>'+esc(e.codigo)+'</b> '+esc(e.descricao||'sem descrição')+(e.ativo===false?' (inativo)':'')+'</span>').join('')+'</div></section>'+
@@ -649,7 +649,7 @@ async function click(name,el,ctx){
   ctx.openModal('Gerar COTEP','Agrupa '+ints.length+' intenção(ões) num único procedimento',
    '<form data-form="cotepConverter" class="cotep-form"><div class="form-grid">'+campo('numero','Número da COTEP','','text','required list="cotep-abertas" maxlength="35" placeholder="Ex.: 131/'+state.ano+'"')+
    '<datalist id="cotep-abertas">'+abertas.map(c=>'<option value="'+esc(c.numero)+'">'+esc(c.objeto)+'</option>').join('')+'</datalist>'+
-   campo('documento','Referência (SEI / Portal)','')+area('objeto','Objeto da COTEP',ints.length===1?ints[0].objeto:'','minlength="8"')+'</div>'+
+   campo('documento','Referência (SEI / Portal)','')+area('objeto','Objeto da COTEP',ints.length===1?ints[0].objeto:'','')+'</div>'+
    '<ul class="cotep-list">'+Object.entries(porEl).map(([el,v])=>'<li><strong>'+esc(el)+'</strong><span class="cotep-li-val">'+moneyC(v)+'</span><small>reservas são transferidas ao item, sem dupla contagem; pendentes passam a comprometer o saldo</small></li>').join('')+'</ul>'+
    '<p class="helper">Informe o número de uma COTEP em andamento para acrescentar estas intenções a ela.</p>'+rodape('Gerar COTEP')+'</form>',true);return;
  }
