@@ -342,6 +342,17 @@ test('Perfil DTS-1: só COTEP, Almoxarifado, Cota e Acompanhar seções, abrindo
  noErrors();
 });
 
+test('COTEP: os 15 elementos-itens de TIC aparecem mesmo sem movimento',async()=>{
+ await openCotep({role:'admin'});
+ const tic=['3016','3015','3020','3022','3005','3017','3019','3021','3030','3031','3039','3041','3099','4002','4006'];
+ const faltam=tic.filter(c=>!cotepCard(c));
+ assert(!faltam.length,'Elementos TIC ausentes: '+faltam.join(', '));
+ assert(/Elementos-itens de TIC/.test($('.cotep-page').textContent),'Grupo TIC sem título');
+ click(cotepCard('4006'));await wait(60);
+ assert(/Aquisição de software/.test($('#modal-root').textContent),'Detalhe do 4006 sem descrição');
+ noErrors();
+});
+
 async function run(){
  runButton.disabled=true;list.innerHTML='';summary.className='';summary.textContent='Executando…';
  const saved=Object.fromEntries(Object.keys(localStorage).map(k=>[k,localStorage.getItem(k)]));

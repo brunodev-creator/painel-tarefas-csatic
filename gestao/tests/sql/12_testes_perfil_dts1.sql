@@ -13,4 +13,11 @@ SELECT teste.acao(jsonb_build_object('acao','reservar','id',:'dt1'));
 SELECT teste.ok((SELECT situacao FROM public.sig_cotep_intencoes WHERE id = :'dt1') = 'Reservada', 'Perfil DTS-1 aprova reservas');
 SELECT teste.falha('{"acao":"definir_gestor","auth_id":"00000000-0000-0000-0000-0000000000c1"}', 'administrador', 'Perfil DTS-1 não administra gestores');
 RESET ROLE;
-\echo 'TESTES DO PERFIL DTS-1 PASSARAM'
+-- Catálogo TIC (migration 20261022_sig_cotep_elementos_tic.sql)
+SELECT teste.ok((SELECT count(*) FROM public.sig_cotep_elementos WHERE grupo = 'TIC') = 15, 'Catálogo com os 15 elementos-itens de TIC');
+SELECT teste.ok((SELECT descricao = 'Material de informática' AND relacao_tic = 'Principal' FROM public.sig_cotep_elementos WHERE codigo = '3016'), '3016 com descrição oficial');
+UPDATE public.sig_cotep_acesso_publico SET ativo = true, codigo_hash = NULL;  -- reativa após os testes do visitante
+SET ROLE anon;
+SELECT teste.ok((SELECT count(*) FROM jsonb_array_elements(public.sig_cotep_publico_dados()->'elementos') e WHERE e->>'grupo' = 'TIC') = 15, 'Visitante recebe o catálogo TIC');
+RESET ROLE;
+\echo 'TESTES DO PERFIL DTS-1 E DO CATÁLOGO TIC PASSARAM'

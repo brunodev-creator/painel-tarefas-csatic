@@ -157,7 +157,12 @@ function demoSeed(){
  const intencao=(centro,el,valor,objeto,situacao,prioridade,extra={})=>({id:id(),ano,unidade_gestora:ug,centro,elemento_item:el,valor_estimado:valor,valor_reservado:situacao==='Reservada'?valor:0,
   objeto,justificativa:'Demanda fictícia para demonstração',situacao,prioridade,criado_por:'demo-centro',criado_em:t,atualizado_em:t,...extra});
  return {limites:[{ano,unidade_gestora:ug,valor_limite:65492.11,base_normativa:'Critério operacional PMMG (demonstração)',validacao_juridica:'Pendente',padrao:true}],
-  elementos:[{codigo:'3016',descricao:null,ativo:true},{codigo:'3024',descricao:null,ativo:true},{codigo:'3921',descricao:'Reparos de equipamentos, instalações e material permanente',ativo:true},{codigo:'5207',descricao:'Equipamentos de informática',ativo:true}],
+  elementos:[...[['3016','Material de informática','Principal'],['3015','Material fotográfico, cinematográfico e de comunicação','Relacionado'],['3020','Material elétrico e eletrônico','Relacionado'],
+   ['3022','Ferramentas, ferragens e utensílios','Complementar'],['3005','Material para escritório','Complementar'],['3017','Artigos para limpeza e higiene','Complementar'],
+   ['3019','Material para manutenção e reparos de imóveis de propriedade da Administração Pública','Condicional'],['3021','Material para manutenção e reparos de bens de domínio público ou de terceiros','Condicional'],
+   ['3030','Materiais para acondicionamento e embalagem','Complementar'],['3031','Livros técnicos','Complementar'],['3039','Material para confecção em geral','Condicional'],
+   ['3041','Material de proteção e segurança','Condicional'],['3099','Outros materiais','Residual'],['4002','Serviços de tecnologia da informação','EXCEÇÃO • Serviços TIC'],['4006','Aquisição de software','EXCEÇÃO • Ativo / investimento']]
+   .map(([codigo,descricao,relacao_tic],i)=>({codigo,descricao,relacao_tic,grupo:'TIC',ordem:i+1,ativo:true})),{codigo:'3024',descricao:null,ativo:true},{codigo:'3921',descricao:'Reparos de equipamentos, instalações e material permanente',ativo:true},{codigo:'5207',descricao:'Equipamentos de informática',ativo:true}],
   centros:[{id:'c1',nome:'Centro de Videomonitoramento (fictício)',ativo:true},{id:'c2',nome:'Centro de Telecomunicações (fictício)',ativo:true}],
   coteps:lista.map(x=>x[0]),procedimentos:lista.flatMap(x=>x[1]),
   intencoes:[intencao('Centro de Videomonitoramento (fictício)','3016',4200,'Cartuchos para impressoras do centro','Pendente','Alta'),
@@ -265,10 +270,17 @@ function barra(r){
   '<span class="seg consumido" style="width:'+c+'%"></span><span class="seg comprometido" style="width:'+m+'%"></span><span class="seg pendente" style="width:'+p+'%"></span></div>';
 }
 function legenda(){return '<div class="cotep-legend" aria-hidden="true"><span><i class="consumido"></i>Consumido</span><span><i class="comprometido"></i>Comprometido</span><span><i class="pendente"></i>Pendente (não abate)</span><span><i class="livre"></i>Saldo</span></div>';}
+const meta=code=>(dados().elementos||[]).find(e=>e.codigo===code)||{};
+// Elemento sem movimento no exercício: saldo integral.
+function linhaVazia(code,res){
+ const lim=res.limite?CENT(res.limite.valor_limite):null;
+ return {codigo:code,descricao:meta(code).descricao||'',limite:lim,consumido:0,comprometido:0,comprometido_coteps:0,reservado:0,pendentes_qtd:0,pendentes_valor:0,a_conferir:0,
+  coteps:[],intencoes:[],saldo:lim,percentual:0,alerta:{nivel:lim===null?'sem-limite':'ok',texto:lim===null?'Limite não configurado':'Dentro do limite'}};
+}
 function cartao(r){
  const desc=r.descricao||'Descrição a cadastrar pela DTS-1';
  return '<button type="button" class="cotep-card nivel-'+r.alerta.nivel+'" data-action="cotepElemento" data-el="'+esc(r.codigo)+'" aria-label="'+esc('Elemento-item '+r.codigo+': saldo '+moneyC(r.saldo)+', '+r.alerta.texto)+'">'+
-  '<span class="cotep-card-top"><strong class="cotep-code">'+esc(r.codigo)+'</strong>'+(r.alerta.nivel==='ok'?'':flag(r.alerta.texto,ALERTA_FLAG[r.alerta.nivel]))+'</span>'+
+  '<span class="cotep-card-top"><strong class="cotep-code">'+esc(r.codigo)+'</strong>'+(r.alerta.nivel==='ok'?(meta(r.codigo).relacao_tic?'<span class="cotep-rel">'+esc(meta(r.codigo).relacao_tic)+'</span>':''):flag(r.alerta.texto,ALERTA_FLAG[r.alerta.nivel]))+'</span>'+
   '<span class="cotep-card-desc'+(r.descricao?'':' muted')+'">'+esc(desc)+'</span>'+barra(r)+
   '<span class="cotep-card-saldo"><span><small>Saldo disponível</small><b>'+moneyC(r.saldo)+'</b></span><em>'+pct(r.percentual)+'</em></span>'+
   '<span class="cotep-card-nums"><span><small>Consumido</small>'+moneyC(r.consumido)+'</span><span><small>Comprometido</small>'+moneyC(r.comprometido)+'</span></span>'+
@@ -302,27 +314,29 @@ function abas(res){
  const d=dados(),abertas=d.intencoes.filter(i=>Number(i.ano)===state.ano&&(i.situacao==='Pendente'||i.situacao==='Devolvida')).length;
  const nc=d.coteps.filter(c=>Number(c.ano)===state.ano).length;
  const b=(id,txt)=>'<button class="mini-tab'+(state.tab===id?' active':'')+'" role="tab" aria-selected="'+(state.tab===id)+'" data-action="cotepAba" data-tab="'+id+'">'+txt+'</button>';
- return '<div class="mini-tabs cotep-tabs" role="tablist">'+b('elementos','Elementos-itens ('+res.itens.length+')')+b('intencoes','Fila de intenções'+(abertas?' <span class="cotep-bubble">'+abertas+'</span>':''))+b('coteps','COTEPs ('+nc+')')+'</div>';
+ return '<div class="mini-tabs cotep-tabs" role="tablist">'+b('elementos','Elementos-itens ('+new Set([...res.itens.map(r=>r.codigo),...(d.elementos||[]).filter(e=>e.grupo==='TIC'&&e.ativo!==false).map(e=>e.codigo)]).size+')')+b('intencoes','Fila de intenções'+(abertas?' <span class="cotep-bubble">'+abertas+'</span>':''))+b('coteps','COTEPs ('+nc+')')+'</div>';
 }
 function busca(ph){return '<div class="searchbox"><span aria-hidden="true">⌕</span><label class="sr-only" for="cotep-busca">Buscar</label><input id="cotep-busca" type="search" autocomplete="off" value="'+esc(state.busca)+'" placeholder="'+esc(ph)+'"></div>';}
 function chips(lista,atual,acao){return '<div class="cotep-chips" role="group">'+lista.map(([id,t])=>'<button type="button" class="cotep-chip'+(atual===id?' active':'')+'" aria-pressed="'+(atual===id)+'" data-action="'+acao+'" data-val="'+id+'">'+esc(t)+'</button>').join('')+'</div>';}
 function abaElementos(res){
  const q=plain(state.busca),d=dados();
- let itens=res.itens;
- if(q){
-  itens=itens.filter(r=>plain(r.codigo+' '+r.descricao).includes(q));
-  // Busca também no catálogo completo: elementos sem movimento aparecem com saldo integral.
-  const extra=(d.elementos||[]).filter(e=>e.ativo!==false&&!res.porCodigo.has(e.codigo)&&plain(e.codigo+' '+(e.descricao||'')).includes(q))
-   .map(e=>({codigo:e.codigo,descricao:e.descricao||'',limite:res.limite?CENT(res.limite.valor_limite):null,consumido:0,comprometido:0,comprometido_coteps:0,reservado:0,pendentes_qtd:0,pendentes_valor:0,a_conferir:0,coteps:[],intencoes:[],saldo:res.limite?CENT(res.limite.valor_limite):null,percentual:0,alerta:{nivel:'ok',texto:''}}));
-  itens=itens.concat(extra);
- }
- if(state.filtro==='alerta')itens=itens.filter(r=>r.alerta.nivel!=='ok');
- if(state.filtro==='pendentes')itens=itens.filter(r=>r.pendentes_qtd>0);
- const novo=/^\d{4}$/.test(state.busca.trim())&&!itens.some(r=>r.codigo===state.busca.trim())?state.busca.trim():'';
- return '<section class="card section"><div class="toolbar">'+busca('Código ou descrição do elemento-item (ex.: 3016)')+chips([['todos','Todos'],['alerta','Com alerta'],['pendentes','Com pendências']],state.filtro,'cotepFiltro')+'</div>'+legenda()+
-  '<div class="cotep-grid">'+itens.map(cartao).join('')+
-  '<button type="button" class="cotep-card cotep-card-add" data-action="cotepNova"'+(novo?' data-el="'+esc(novo)+'"':'')+'><span class="cotep-add-ico" aria-hidden="true">+</span><strong>'+(novo?'Registrar intenção no '+esc(novo):'Outro elemento-item')+'</strong><span class="cotep-card-desc muted">Qualquer código de 4 dígitos pode ser incluído; o catálogo é aberto.</span></button></div>'+
-  (itens.length?'':'<p class="cotep-empty">Nenhum elemento-item corresponde ao filtro.</p>')+'</section>';
+ // Os elementos-itens de TIC do catálogo aparecem sempre; os demais, quando têm movimento ou são buscados.
+ const tic=(d.elementos||[]).filter(e=>e.grupo==='TIC'&&e.ativo!==false).sort((a,b)=>(a.ordem??99)-(b.ordem??99)||a.codigo.localeCompare(b.codigo));
+ const ticSet=new Set(tic.map(e=>e.codigo));
+ let grupoTic=tic.map(e=>res.porCodigo.get(e.codigo)||linhaVazia(e.codigo,res));
+ let outros=res.itens.filter(r=>!ticSet.has(r.codigo));
+ const casa=r=>!q||plain(r.codigo+' '+r.descricao+' '+(meta(r.codigo).aplicacao||'')).includes(q);
+ grupoTic=grupoTic.filter(casa);outros=outros.filter(casa);
+ if(q)outros=outros.concat((d.elementos||[]).filter(e=>e.ativo!==false&&!ticSet.has(e.codigo)&&!res.porCodigo.has(e.codigo)).map(e=>linhaVazia(e.codigo,res)).filter(casa));
+ const filtro=r=>state.filtro==='alerta'?r.alerta.nivel!=='ok':state.filtro==='pendentes'?r.pendentes_qtd>0:true;
+ grupoTic=grupoTic.filter(filtro);outros=outros.filter(filtro);
+ const todos=grupoTic.concat(outros);
+ const novo=/^\d{4}$/.test(state.busca.trim())&&!todos.some(r=>r.codigo===state.busca.trim())?state.busca.trim():'';
+ const add='<button type="button" class="cotep-card cotep-card-add" data-action="cotepNova"'+(novo?' data-el="'+esc(novo)+'"':'')+'><span class="cotep-add-ico" aria-hidden="true">+</span><strong>'+(novo?'Registrar intenção no '+esc(novo):'Outro elemento-item')+'</strong><span class="cotep-card-desc muted">Qualquer código de 4 dígitos pode ser incluído; o catálogo é aberto.</span></button>';
+ return '<section class="card section"><div class="toolbar">'+busca('Código, descrição ou aplicação (ex.: 3016, toner, software)')+chips([['todos','Todos'],['alerta','Com alerta'],['pendentes','Com pendências']],state.filtro,'cotepFiltro')+'</div>'+legenda()+
+  (grupoTic.length?'<h2 class="cotep-grupo">Elementos-itens de TIC <span>'+grupoTic.length+(tic.length!==grupoTic.length?' de '+tic.length:'')+'</span></h2><div class="cotep-grid">'+grupoTic.map(cartao).join('')+'</div>':'')+
+  '<h2 class="cotep-grupo">'+(grupoTic.length?'Outros elementos-itens':'Elementos-itens')+' <span>'+outros.length+'</span></h2><div class="cotep-grid">'+outros.map(cartao).join('')+add+'</div>'+
+  (todos.length?'':'<p class="cotep-empty">Nenhum elemento-item corresponde ao filtro.</p>')+'</section>';
 }
 function linhaIntencao(i,ctx,res,manage){
  const r=res.porCodigo.get(i.elemento_item);
@@ -432,12 +446,13 @@ function simulacaoHtml(r,valor){
  return '<span>Saldo do '+esc(r.codigo)+': <b>'+moneyC(r.saldo)+'</b></span>'+(v?'<span class="'+(apos<0?'neg':'')+'">Se aprovada: <b>'+moneyC(apos)+'</b></span>':'')+
   (r.pendentes_qtd?'<span>Já há '+r.pendentes_qtd+' intenção(ões) pendente(s) ('+moneyC(r.pendentes_valor)+')</span>':'')+
   (v&&apos<0?'<span class="neg">Valor acima do saldo: a DTS-1 só poderá reservar até '+moneyC(Math.max(r.saldo,0))+'.</span>':'')+
+  (meta(r.codigo).orientacao?'<span class="cotep-sim-orient">'+esc((meta(r.codigo).descricao?meta(r.codigo).descricao+': ':'')+meta(r.codigo).orientacao)+'</span>':'')+
   '<span class="muted">A intenção fica pendente e não abate o saldo até a aprovação da DTS-1.</span>';
 }
 function detalheElemento(ctx,el){
  const d=dados(),res=calcular(d,state.ano,ugPadrao());
  const lim=res.limite?CENT(res.limite.valor_limite):null;
- const r=res.porCodigo.get(el)||{codigo:el,descricao:(d.elementos.find(e=>e.codigo===el)||{}).descricao||'',limite:lim,consumido:0,comprometido:0,comprometido_coteps:0,reservado:0,pendentes_qtd:0,pendentes_valor:0,coteps:[],intencoes:[],saldo:lim,percentual:0,alerta:{nivel:lim===null?'sem-limite':'ok',texto:lim===null?'Limite não configurado':'Dentro do limite'}};
+ const r=res.porCodigo.get(el)||linhaVazia(el,res),m=meta(el);
  const manage=gestor(ctx);
  const eventos=d.eventos.filter(e=>e.elemento_item===el||r.intencoes.some(i=>i.id===e.intencao_id)||r.coteps.some(x=>x.cotep.id===e.cotep_id)).slice(0,25);
  const met=(t,v,cls='')=>'<div class="'+cls+'"><small>'+t+'</small><strong>'+v+'</strong></div>';
@@ -448,6 +463,8 @@ function detalheElemento(ctx,el){
  const body='<div class="cotep-detail">'+(r.alerta.nivel!=='ok'?'<p class="cotep-alert nivel-'+r.alerta.nivel+'">'+esc(r.alerta.texto)+'</p>':'')+
   '<div class="cotep-metrics">'+met('Limite anual',moneyC(r.limite))+met('Consumido',moneyC(r.consumido))+met('Comprometido',moneyC(r.comprometido),'')+met('Saldo disponível',moneyC(r.saldo),'saldo')+'</div>'+barra(r)+
   '<p class="helper">'+pct(r.percentual)+' utilizado · comprometido = '+moneyC(r.comprometido_coteps)+' em COTEPs em andamento + '+moneyC(r.reservado)+' em reservas'+(r.pendentes_qtd?' · '+r.pendentes_qtd+' pendente(s) somando '+moneyC(r.pendentes_valor)+' (não abatem)':'')+'</p>'+
+  (m.aplicacao||m.orientacao?'<div class="cotep-orient">'+(m.relacao_tic?'<span class="cotep-rel">'+esc(m.relacao_tic)+'</span>':'')+(m.aplicacao?'<p><strong>Aplicação em TIC:</strong> '+esc(m.aplicacao)+'</p>':'')+
+   (m.orientacao?'<p><strong>Atenção ao enquadramento:</strong> '+esc(m.orientacao)+'</p>':'')+(/^https:\/\//.test(m.classificador_url||'')?'<p><a href="'+esc(m.classificador_url)+'" target="_blank" rel="noopener noreferrer">Classificador Econômico MG ↗</a></p>':'')+'</div>':'')+
   '<details class="cotep-quick"'+(r.saldo!==null&&r.saldo>0?' open':'')+'><summary>Registrar intenção neste elemento-item</summary>'+formIntencao(ctx,el)+'</details>'+
   '<div class="cotep-cols"><div><h3>COTEPs vinculadas ('+r.coteps.length+')</h3><ul class="cotep-list">'+(cot||'<li class="muted">Nenhuma COTEP neste exercício.</li>')+'</ul></div>'+
   '<div><h3>Intenções ('+r.intencoes.length+')</h3><ul class="cotep-list">'+(ints||'<li class="muted">Nenhuma intenção.</li>')+'</ul></div></div>'+
