@@ -145,14 +145,16 @@ function analisarGrupo(g,ctx){
  // ---- Tendência ----
  let tendencia='estavel';
  if(mediaRec!==null&&mediaHist){const r=mediaRec/mediaHist;tendencia=r>1.15?'alta':r<0.85?'queda':'estavel';}
- // ---- Projeção sequencial: mês corrente (restante) → meses-alvo; o saldo usado num mês não volta no seguinte ----
+ // ---- Projeção sequencial: mês corrente → meses-alvo; o saldo usado num mês não volta no seguinte ----
+ // O mês corrente entra inteiro: a nota de cada mês é paga (conformada) no mês seguinte, então o que já foi
+ // conformado no mês corrente refere-se ao mês anterior e já está refletido no saldo.
  const projecao=[];let s=saldo;
  const projetavel=referencia!==null;
  for(const m of mesesProjecao){
   let despesa=null,nota='';
   if(projetavel){
    if(vigenciaFim&&m>vigenciaFim.slice(0,7)){despesa=0;nota='Após a vigência informada';}
-   else if(m===mesAtual){despesa=Math.max(0,referencia-execMesAtual);nota=execMesAtual?'Restante estimado (já executado '+brl(execMesAtual)+')':'Mês corrente, ainda sem conformidade';}
+   else if(m===mesAtual){despesa=referencia;nota='Mês corrente completo (nota paga no mês seguinte)';}
    else despesa=referencia;
   }
   const inicioMes=s;
@@ -313,17 +315,14 @@ function classificar({grupos,reforcoTotal,porMes,semDados,referencia}){
 function resumir(c,ctx){
  if(c.situacao.nivel==='unico')return 'Pagamento único registrado; o sistema não projeta mensalidades. Informe a necessidade se houver renovação ou nova parcela até 31/12.';
  if(c.referencia===null)return 'Sem conformidade suficiente para estimar a despesa. A necessidade depende da avaliação do fiscal.';
- const alvo=c.porMes.filter(p=>p.alvo),frases=[];
- const corrente=c.porMes.find(p=>p.corrente);
- if(corrente&&corrente.reforco>0)frases.push('O saldo não cobre o restante de '+mesLongo(corrente.mes)+' (faltam '+brl(corrente.reforco)+').');
- const cobertos=alvo.filter(p=>p.reforco===0),faltam=alvo.filter(p=>p.reforco>0);
- if(!faltam.length)frases.push('O saldo cobre '+lista(alvo.map(p=>mesLongo(p.mes)))+'.');
- else if(!cobertos.length&&!(corrente&&corrente.reforco>0)&&faltam.length===alvo.length&&faltam[0].coberto>0)
-  frases.push('O saldo cobre parte de '+mesLongo(faltam[0].mes)+'. Reforço estimado: '+faltam.map(p=>brl(p.reforco)+' em '+mesLongo(p.mes)).join(' e ')+'.');
- else{
-  if(cobertos.length)frases.push('O saldo cobre '+lista(cobertos.map(p=>mesLongo(p.mes)))+'.');
-  frases.push((faltam.length===1?'Para '+mesLongo(faltam[0].mes)+', o reforço estimado é de '+brl(faltam[0].reforco):'Reforço estimado: '+faltam.map(p=>brl(p.reforco)+' em '+mesLongo(p.mes)).join(' e '))+'.');
- }
+ // Meses em ordem (mês corrente inteiro + meses-alvo): cobertos, primeiro mês coberto em parte e reforços.
+ const meses=c.porMes.filter(p=>p.alvo||p.corrente),frases=[];
+ const cobertos=meses.filter(p=>p.reforco===0),faltam=meses.filter(p=>p.reforco>0);
+ if(!faltam.length)return 'O saldo cobre '+lista(meses.map(p=>mesLongo(p.mes)))+'.';
+ const parcial=faltam[0].coberto>0?faltam[0]:null;
+ if(cobertos.length||parcial)frases.push('O saldo cobre '+lista([...cobertos.map(p=>mesLongo(p.mes)),...(parcial?['parte de '+mesLongo(parcial.mes)]:[])])+'.');
+ else frases.push('O saldo não cobre '+mesLongo(faltam[0].mes)+'.');
+ frases.push((faltam.length===1?'Para '+mesLongo(faltam[0].mes)+', o reforço estimado é de '+brl(faltam[0].reforco):'Reforço estimado: '+lista(faltam.map(p=>brl(p.reforco)+' em '+mesLongo(p.mes))))+'.');
  return frases.join(' ');
 }
 const lista=a=>a.length<=1?(a[0]||''):a.slice(0,-1).join(', ')+' e '+a[a.length-1];

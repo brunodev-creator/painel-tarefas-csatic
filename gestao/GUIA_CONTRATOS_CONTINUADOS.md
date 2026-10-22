@@ -30,7 +30,7 @@ Somente a **«agora vai - PLANILHA ATUAL»**:
 2. **Consolidação sem duplicidade.** Movimentos deduplicados por `ID_Execucao`; conformidades somadas por mês de referência e por **linha orçamentária** = contrato + unidade contábil + dotação até o elemento-item. Fontes do mesmo elemento-item e unidade são consolidadas (a execução pode migrar de fonte, como no contrato Motorola 139/2025, 60.2 → 10.1) e o detalhamento por fonte aparece no painel; **elementos, ações e unidades contábeis (TDCO) nunca se misturam** e o saldo de uma linha não cobre outra.
 3. **Médias explicáveis.** Meses sem conformidade dentro do período de execução contam como zero. Referência = maior entre a média do exercício e a dos últimos 3 meses **fechados** (critério prudencial), com a frase «Referência calculada com base na execução de julho a setembro». Média manual da planilha prevalece quando informada.
 4. **Periodicidade.** Pagamento único/anual (1 mês com conformidade e objeto anual/licença ou ≥ 90% do empenhado pago) **não vira mensalidade**. Histórico curto (1–2 meses) = estimativa de baixa confiança. Sem conformidade = sem estimativa: a necessidade fica com o fiscal. Empenho sem valor líquido não entra.
-5. **Projeção sequencial.** Mês corrente: só o **restante** (referência − já conformado no mês), sem descontar de novo o que a base já reflete. Depois novembro e dezembro: o saldo usado em um mês não volta no seguinte. Vigência informada pela gestão encerra a projeção.
+5. **Projeção sequencial.** Mês corrente projetado **inteiro**: a nota de cada mês é paga (conformada) no mês seguinte, então o que já foi conformado em outubro refere-se a setembro e já está no saldo. Depois novembro e dezembro: o saldo usado em um mês não volta no seguinte. Vigência informada pela gestão encerra a projeção.
 6. **Cinco grandezas separadas:** despesa projetada · saldo utilizável dos empenhos · necessidade de empenho/reforço · disponibilidade orçamentária compatível (V6, não oficial) · necessidade de orçamento adicional (**só** quando a cota de todos os empenhos da linha é identificada; TDCO ou cota não identificada ficam como necessidade de empenho/reforço).
 7. **Conformidade não é competência** nem comprovação de nota paga — o painel avisa isso junto da «última conformidade».
 
@@ -42,9 +42,8 @@ Somente a **«agora vai - PLANILHA ATUAL»**:
 | Médias por empenho somadas em períodos incompatíveis | Motorola 139/2025: 9 empenhos esgotados da fonte 60.2, cada um projetando 3× a própria média | Média por linha, sobre a série consolidada do contrato |
 | Pagamento anual repetido como mensalidade | Licenças TQS (1 ano): planilha projetava R$ 106.522,08 | Pagamento único: reforço 0, fiscal informa se houver renovação |
 | Meses sem conformidade ignorados na média | Empenho 56 (PD CASE): R$ 485.850,86 → R$ 369.195,99 | Zeros dentro da execução entram na média |
-| Outubro contado inteiro mesmo já pago | Todos os contratos (`× 3 meses − saldo`) | Mês corrente = só o restante |
 
-Total «reforço até o fim do exercício» somando os empenhos da planilha: **R$ 16.843.860,06**. Estimativa do SIG para os mesmos 67 empenhos (36 contratos): **R$ 7.239.259,75** (restante de outubro R$ 841.808,22 · novembro R$ 2.702.107,84 · dezembro R$ 3.695.343,69). 20 contratos com falta, 4 com saldo justo, 8 cobertos, 3 de pagamento único e 1 sem histórico. A diferença vem das correções acima; os valores continuam **estimativas** para planejamento, não saldo oficial.
+Total «reforço até o fim do exercício» somando os empenhos da planilha: **R$ 16.843.860,06**. Estimativa do SIG para os mesmos 67 empenhos (36 contratos), com outubro, novembro e dezembro inteiros: **R$ 9.424.720,29** (outubro R$ 2.351.848,10 · novembro R$ 3.361.520,14 · dezembro R$ 3.711.352,05). 22 contratos com falta, 2 com saldo justo, 8 cobertos, 3 de pagamento único e 1 sem histórico. A diferença vem das correções acima; os valores continuam **estimativas** para planejamento, não saldo oficial.
 
 ## Manifestação do fiscal, atendimento e planejamento
 
@@ -74,6 +73,6 @@ A gestão **não** registra manifestação em nome do fiscal. Tabelas sem `INSER
 
 ## Testes
 
-- `node gestao/tests/teste_continuados_motor.cjs` — 28 verificações com recorte real (`tests/fixtures/continuados_planilha_20261022.json`): consolidação = planilha, múltiplos empenhos, processo ≠ contrato, chave TDCO separada, TDCO sem compensação, novembro→dezembro sequencial, pagamento anual, histórico insuficiente, zeros na média, manifestação zero, atendimento parcial, planejamento sem dupla contagem, reimportação com duplicatas, período parametrizado, vigência.
+- `node gestao/tests/teste_continuados_motor.cjs` — 28 verificações com recorte real (`tests/fixtures/continuados_planilha_20261022.json`): consolidação = planilha, múltiplos empenhos, processo ≠ contrato, chave TDCO separada, TDCO sem compensação, outubro inteiro e outubro→novembro→dezembro sequencial, pagamento anual, histórico insuficiente, zeros na média, manifestação zero, atendimento parcial, planejamento sem dupla contagem, reimportação com duplicatas, período parametrizado, vigência.
 - `gestao/tests/sql/run.sh` — `15_testes_continuados.sql`: 41 verificações de token, origem, retrato vazio, RLS por fiscal/gestão/terceiro, só RPC grava, histórico imutável, reimportação sem duplicar e sem perder manifestação/vínculo.
 - `gestao/tests/smoke.html?auto` — 4 testes de interface (fiscal, campo único vazio × zero × valor, sugestão não salva sozinha, gestão, celular 375 px).

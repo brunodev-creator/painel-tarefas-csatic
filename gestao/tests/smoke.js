@@ -364,7 +364,7 @@ test('Contratos continuados: fiscal vê análise pronta, gráfico e seus contrat
  assert($('.cont-chart .proj-bg'),'Projeção não diferenciada no gráfico');
  assert($$('.cont-card').length===4,'Fiscal deveria ver só os 4 contratos vinculados: '+$$('.cont-card').length);
  assert(!$('[data-tab=gestao]'),'Visão gerencial visível para perfil sem atribuição de gestão');
- assert(/O saldo cobre novembro\. Para dezembro, o reforço estimado é de R\$/.test(contCard('Conectividade').textContent),'Resumo automático ausente');
+ assert(/O saldo (não )?cobre .*[Rr]eforço estimado/.test(contCard('Conectividade').textContent),'Resumo automático ausente: '+contCard('Conectividade').textContent);
  noErrors();
 });
 test('Contratos continuados: único campo do fiscal, vazio × zero × valor, sugestão não é salva sozinha',async()=>{

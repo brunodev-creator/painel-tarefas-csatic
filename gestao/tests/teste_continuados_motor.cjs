@@ -48,10 +48,10 @@ t(direta.reforcoTotal>0&&sobraTdco>0&&prod.reforcoTotal===direta.reforcoTotal,'0
 // 5. Projeção sequencial: saldo consumido em novembro não volta em dezembro
 const chips=porProc('1250071 000162/2022'),gc=chips.grupos[0];
 const [out,nov,dez]=gc.projecao;
-t(out.mes==='2026-10'&&out.despesa===Math.max(0,gc.referencia-gc.execMesAtual),'Mês corrente: projeta apenas o restante não conformado (sem descontar de novo o que já foi pago)');
+t(out.mes==='2026-10'&&out.despesa===gc.referencia,'Mês corrente projetado inteiro (nota de outubro paga em novembro)');
 t(nov.saldoInicio===out.saldoFim&&dez.saldoInicio===nov.saldoFim,'Saldo de dezembro parte do saldo que sobrou de novembro');
-t(nov.reforco===0&&dez.reforco===dez.despesa-Math.max(0,nov.saldoFim),'Chips 000162/2022: novembro coberto; dezembro com reforço de '+brl(dez.reforco));
-t(/O saldo cobre novembro\. Para dezembro, o reforço estimado é de R\$/.test(chips.resumo),'Resumo automático: «'+chips.resumo+'»');
+t(out.reforco===0&&nov.reforco===nov.despesa-Math.max(0,out.saldoFim)&&dez.reforco===dez.despesa,'Chips 000162/2022: outubro coberto; novembro usa só a sobra de outubro ('+brl(nov.coberto)+'); dezembro sem saldo ('+brl(dez.reforco)+')');
+t(/^O saldo cobre outubro e parte de novembro\. Reforço estimado: R\$ [\d.,]+ em novembro e R\$ [\d.,]+ em dezembro\.$/.test(chips.resumo),'Resumo automático: «'+chips.resumo+'»');
 
 // 6. Faturamento anual/único não vira mensalidade
 const tqs=porProc('1250071 000207/2022');

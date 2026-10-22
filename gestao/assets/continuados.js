@@ -160,7 +160,7 @@ function barraCobertura(c){
  const total=meses.reduce((t,p)=>t+p.despesa,0);
  return '<div class="cont-cover" role="img" aria-label="'+esc(meses.map(p=>M.mesLongo(p.mes)+': '+(p.reforco>0?'faltam '+brl(p.reforco):'coberto')).join('; '))+'">'+meses.map(p=>{
   const w=Math.max(8,p.despesa*100/total),cob=p.despesa?p.coberto*100/p.despesa:0;
-  return '<div class="cont-cover-seg" style="flex:'+w.toFixed(2)+'"><div class="cont-cover-bar"><span class="ok" style="width:'+cob.toFixed(1)+'%"></span><span class="falta" style="width:'+(100-cob).toFixed(1)+'%"></span></div><small>'+esc(p.corrente?M.mesLabel(p.mes).slice(0,3)+' (rest.)':M.mesLabel(p.mes).slice(0,3))+'</small></div>';
+  return '<div class="cont-cover-seg" style="flex:'+w.toFixed(2)+'"><div class="cont-cover-bar"><span class="ok" style="width:'+cob.toFixed(1)+'%"></span><span class="falta" style="width:'+(100-cob).toFixed(1)+'%"></span></div><small>'+esc(p.corrente?M.mesLabel(p.mes).slice(0,3):M.mesLabel(p.mes).slice(0,3))+'</small></div>';
  }).join('')+'</div>';
 }
 function cobreAteTexto(c){
@@ -246,7 +246,7 @@ function kpis(lista,analise){
   '<div><span>Saldo nos empenhos</span><strong>'+esc(curto(saldo))+'</strong><small>'+(ref>0?'≈ '+(saldo/ref).toLocaleString('pt-BR',{maximumFractionDigits:1})+' mês(es) do consumo atual':'—')+'</small></div>'+
   '<div><span>Despesa projetada · '+esc(mesesTxt)+'</span><strong>'+esc(curto(desp))+'</strong><small>Estimativa do sistema</small></div>'+
   '<div class="destaque'+(reforco>0?' falta':'')+'"><span>Reforço estimado até 31/12</span><strong>'+esc(curto(reforco))+'</strong><small>'+
-   analise.mesesAlvo.map(m=>esc(M.mesLabel(m).slice(0,3))+' '+esc(curto(refAlvo(m)))).join(' · ')+(corrente>0?' · restante de '+esc(M.mesLabel(analise.mesAtual).slice(0,3))+' '+esc(curto(corrente)):'')+
+   analise.mesesAlvo.map(m=>esc(M.mesLabel(m).slice(0,3))+' '+esc(curto(refAlvo(m)))).join(' · ')+(corrente>0?' · '+esc(M.mesLabel(analise.mesAtual).slice(0,3))+' '+esc(curto(corrente)):'')+
    ' · '+atencao+' contrato(s) com falta</small></div></div>';
 }
 function carimbo(){
@@ -380,7 +380,7 @@ function painel(ctx){
  // Decisão: sugestão do sistema × manifestação do fiscal (lado a lado, nunca somadas).
  const sug=c.reforcoTotal;
  h+='<div class="cont-decisao"><section class="cont-sugestao"><span class="cont-eyebrow escuro">Reforço sugerido pelo sistema</span><strong>'+esc(sug===null?'Sem base de cálculo':brl(sug))+'</strong>'+
-  '<small>Estimativa automática até 31/12/'+ano+'</small>'+(sug!==null?'<ul>'+c.porMes.filter(p=>p.reforco>0||p.alvo).map(p=>'<li><span>'+esc(p.corrente?'Restante de '+M.mesLongo(p.mes):M.mesLongo(p.mes)[0].toUpperCase()+M.mesLongo(p.mes).slice(1))+'</span><b>'+esc(brl(p.reforco))+'</b></li>').join('')+'</ul>':'')+'</section>';
+  '<small>Estimativa automática até 31/12/'+ano+'</small>'+(sug!==null?'<ul>'+c.porMes.filter(p=>p.reforco>0||p.alvo).map(p=>'<li><span>'+esc(M.mesLongo(p.mes)[0].toUpperCase()+M.mesLongo(p.mes).slice(1)+(p.corrente?' (mês corrente)':''))+'</span><b>'+esc(brl(p.reforco))+'</b></li>').join('')+'</ul>':'')+'</section>';
  h+='<section class="cont-fiscal-box'+(pode?' ativo':'')+'">'+formNecessidade(ctx,c,pode,fiscal)+'</section></div>';
  // Trilha: despesa → saldo utilizável → reforço → disponibilidade → orçamento adicional.
  h+=trilha(ctx,c);
@@ -388,7 +388,7 @@ function painel(ctx){
  h+=indicadores(c);
  // Projeção sequencial.
  h+='<section class="cont-sec"><h3>Projeção mês a mês <small>o saldo usado em um mês não volta no seguinte</small></h3><div class="cont-table-wrap"><table class="cont-table compacta"><thead><tr><th>Mês</th><th class="num">Despesa projetada</th><th class="num">Saldo no início</th><th class="num">Coberto pelo saldo</th><th class="num">Reforço necessário</th><th class="num">Saldo ao fim</th></tr></thead><tbody>'+
-  c.porMes.map(p=>'<tr'+(p.alvo?' class="alvo"':'')+'><td><b>'+esc(M.mesLabel(p.mes))+'</b>'+(p.corrente?'<small>restante do mês corrente</small>':p.alvo?'<small>mês de foco</small>':'')+'</td><td class="num">'+esc(brl(p.despesa))+' <em class="est">estimada</em></td>'+
+  c.porMes.map(p=>'<tr'+(p.alvo?' class="alvo"':'')+'><td><b>'+esc(M.mesLabel(p.mes))+'</b>'+(p.corrente?'<small>mês corrente completo · nota paga no mês seguinte</small>':p.alvo?'<small>mês de foco</small>':'')+'</td><td class="num">'+esc(brl(p.despesa))+' <em class="est">estimada</em></td>'+
    '<td class="num">'+esc(brl(c.grupos.filter(g=>g.referencia!==null).reduce((t,g)=>t+(g.projecao.find(x=>x.mes===p.mes)?.saldoInicio||0),0)))+'</td><td class="num">'+esc(brl(p.coberto))+'</td><td class="num'+(p.reforco>0?' falta':'')+'"><b>'+esc(brl(p.reforco))+'</b></td><td class="num">'+esc(brl(p.saldoFim))+'</td></tr>').join('')+
   '</tbody></table></div><p class="cont-note">Projeção por linha orçamentária, somada no contrato. Saldo negativo ao fim indica o valor acumulado sem cobertura até '+esc(M.mesLabel(ultimo))+'.</p></section>';
  h+=detalhesCalculo(c);
@@ -455,7 +455,7 @@ function detalhesCalculo(c){
    '<table class="cont-table compacta"><thead><tr><th>Fonte</th><th>Empenhos</th><th class="num">Empenhado líquido</th><th class="num">Conformado</th><th class="num">Saldo</th><th>Planilha (regra anterior)</th></tr></thead><tbody>'+
    g.fontes.map(f=>'<tr><td>'+esc(f.fonte)+'</td><td>'+esc(f.empenhos.map(k=>k.split('|').pop()+'/'+k.split('|')[0]).join(', '))+'</td><td class="num">'+esc(brl(f.empenhado))+'</td><td class="num">'+esc(brl(f.conformado))+'</td><td class="num">'+esc(brl(f.saldo))+'</td><td>'+
     esc(f.empenhos.map(k=>{const p=emp.get(k)?.planilha;return p&&p.Valor_Reforco_Ate_Fim_Exercicio!==undefined?'reforço até 31/12: '+brl(M.C(p.Valor_Reforco_Ate_Fim_Exercicio))+' ('+(p.Origem_Media_Referencia||'—')+')':'';}).filter(Boolean).join(' · ')||'—')+'</td></tr>').join('')+'</tbody></table></div>').join('')+
-  '<p class="cont-note">Regras: conformidades consolidadas por mês e por linha (contrato + unidade contábil + dotação até o elemento-item), sem duplicar movimentos; meses sem conformidade dentro do período de execução contam como zero; referência = maior entre a média do exercício e a dos últimos 3 meses fechados (critério prudencial); pagamento único/anual não vira mensalidade; o restante do mês corrente desconta o que já foi conformado. Coluna «Planilha» mostra o valor da regra anterior (CONTROLE_SERVICOS_CONTINUOS), por empenho, apenas para comparação. Motor '+esc(M.VERSAO)+' · calculado em '+esc(quando(state.calculadoEm))+'.</p></details>';
+  '<p class="cont-note">Regras: conformidades consolidadas por mês e por linha (contrato + unidade contábil + dotação até o elemento-item), sem duplicar movimentos; meses sem conformidade dentro do período de execução contam como zero; referência = maior entre a média do exercício e a dos últimos 3 meses fechados (critério prudencial); pagamento único/anual não vira mensalidade; o mês corrente entra inteiro, pois a nota de cada mês é paga no mês seguinte. Coluna «Planilha» mostra o valor da regra anterior (CONTROLE_SERVICOS_CONTINUOS), por empenho, apenas para comparação. Motor '+esc(M.VERSAO)+' · calculado em '+esc(quando(state.calculadoEm))+'.</p></details>';
 }
 function blocoAtendimento(c){
  const m=c.manifestacao,at=c.atendimento;
