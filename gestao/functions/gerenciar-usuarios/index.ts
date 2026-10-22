@@ -54,6 +54,44 @@ Deno.serve(async(req:Request)=>{
    });
    return respond(req,{usuarios,parcial:(authList.users||[]).length===1000});
   }
+  if(acao==="criar"){
+   // Conta criada já confirmada com senha provisória definida pelo administrador.
+   // O usuário pode trocá-la em «esqueceu a senha» ou seguir usando a provisória.
+   const email=clean(args.email,254).toLowerCase();
+   const role=clean(args.role,32),setor=clean(args.setor,30);
+   const senha=typeof args.senha==="string"?args.senha:"";
+   const nome=clean(args.nome,100)||email.split("@")[0];
+   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!validRoleAndSetor(role,setor))
+    return respond(req,{erro:"E-mail, perfil ou setor inválido"},400);
+   if(senha.length<8||senha.length>72||/^\s|\s$/.test(senha))
+    return respond(req,{erro:"Senha provisória deve ter de 8 a 72 caracteres, sem espaços nas pontas"},400);
+   const {data:existingList,error:usersError}=await supabase.auth.admin.listUsers({page:1,perPage:1000});
+   if(usersError)throw usersError;
+   let user=existingList.users.find(u=>u.email?.toLowerCase()===email);
+   let mensagem="Usuário criado. Informe a senha provisória ao usuário; ele pode trocá-la em «esqueceu a senha».";
+   if(!user){
+    const {data:created,error:createError}=await supabase.auth.admin.createUser({email,password:senha,email_confirm:true,user_metadata:{nome}});
+    if(createError)throw createError;
+    user=created.user;
+   }else{
+    const {data:old}=await supabase.from("usuarios").select("role").eq("auth_id",user.id).maybeSingle();
+    if(old?.role==="admin")return respond(req,{erro:"Não é permitido alterar um administrador"},403);
+    if(!user.last_sign_in_at){
+     // Conta que nunca entrou (ex.: convite antigo não aceito): recebe a senha provisória.
+     const {error:updError}=await supabase.auth.admin.updateUserById(user.id,{password:senha,email_confirm:true});
+     if(updError)throw updError;
+     mensagem="Conta existente (nunca acessada) recebeu a senha provisória e foi autorizada.";
+    }else{
+     mensagem="Este e-mail já usa o SIG: perfil autorizado e a senha atual dele foi mantida (a provisória não foi aplicada).";
+    }
+   }
+   if(!user)return respond(req,{erro:"Falha ao recuperar usuário criado"},500);
+   const {error:saveError}=await supabase.from("usuarios").upsert({
+     auth_id:user.id,nome,role,setor:setor||null,ativo:true
+   },{onConflict:"auth_id"});
+   if(saveError)throw saveError;
+   return respond(req,{ok:true,mensagem});
+  }
   if(acao==="convidar"){
    const email=clean(args.email,254).toLowerCase();
    const nome=clean(args.nome,100),role=clean(args.role,32),setor=clean(args.setor,30);
@@ -84,7 +122,7 @@ Deno.serve(async(req:Request)=>{
    const authId=clean(args.auth_id,60);
    const nome=clean(args.nome,100),role=clean(args.role,32),setor=clean(args.setor,30);
    const ativo=args.ativo===true;
-   if(!/^[0-9a-f-]{36}$/i.test(authId)||nome.length<3||!validRoleAndSetor(role,setor))
+   if(!/^[0-9a-f-]{36}$/i.test(authId)||!nome||!validRoleAndSetor(role,setor))
     return respond(req,{erro:"Dados de atualização inválidos"},400);
    if(authId===verified.user.id)return respond(req,{erro:"Não é permitido alterar seu próprio perfil por esta tela"},403);
    const {data:old,error:oldError}=await supabase.from("usuarios").select("role").eq("auth_id",authId).maybeSingle();

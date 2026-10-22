@@ -1088,3 +1088,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Perfil DTS-1: Intenções COTEP, Almoxarifado, Cota orçamentária e Acompanhar seções */
 body[data-sig-visible-role="dts1"] #nav .navitem:not([data-view="cotep"]):not([data-view="almoxarifado"]):not([data-view="cotas"]):not([data-view="processos"]){display:none!important}
+/* Senha provisória do novo usuário */
+.sig-senha-prov{display:flex;gap:8px}
+.sig-senha-prov input{flex:1;min-width:0;font-family:ui-monospace,monospace;letter-spacing:.03em}
