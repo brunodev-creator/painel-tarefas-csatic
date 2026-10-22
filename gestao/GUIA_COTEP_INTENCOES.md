@@ -20,10 +20,16 @@ Sem dupla contagem: ao gerar a COTEP, a reserva da intenção é **transferida**
 ## Validação com os dados de 2026
 | Elemento-item | COTEPs | Consumido + comprometido | Saldo |
 |---|---|---|---|
-| 3016 | 43, 48, 64, 126 (R$ 2.896,00 homologado) + 130 em andamento (R$ 674,95) | R$ 59.617,57 | **R$ 5.874,54** |
+| 3016 | 43 (R$ 28.247,79 homologado), 48, 64, 126 + 130 em andamento (R$ 674,95) | R$ 59.206,66 | **R$ 6.285,45** |
 | 5207 | 95 + 130 em andamento (R$ 23.599,00) | R$ 64.299,00 | **R$ 1.193,11** |
 
 A COTEP 130/2026 é **um** procedimento (`sig_cotep_coteps`) com **dois** lançamentos (3016 e 5207), cada um controlado no seu código. Os demais registros (3024, 5203, 3964, 3921 e 122/2026 fracassada) foram preservados.
+
+**Conciliação das 16 COTEPs (21/10/2026).** Total de 16 COTEPs distintas e 17 lançamentos, sendo 9 finalizadas com valor homologado registrado, 5 fracassadas (046, 056, 088, 118 e 122) e 2 em andamento (129 e 130). Fracassadas mantêm preço de referência apenas histórico, sem abatimento. A COTEP 043/2026 foi corrigida: referência R$ 28.658,70; homologado R$ 28.247,79. O valor estimado de R$ 24.271,00 da fracassada 122/2026 fica sem desdobramento de elemento-item até comprovação.
+
+**PENDÊNCIA IMPORTANTE — COTEP 129/2026:** ferramentas em andamento, R$ 6.817,05; os itens ainda não foram classificados por elemento-item. Há um lançamento sem código que NÃO compõe o saldo de nenhum elemento-item. O SIG exibe um aviso para evitar interpretar saldos como inteiramente livres enquanto esse valor não for classificado. Não atribuir elemento-item por suposição.
+
+**Limite:** o teto de R$ 65.492,11 por elemento-item continua como parâmetro gerencial com validação jurídica institucional pendente. Os dados de histórico não substituem a conferência da mesma natureza/ramo de atividade para fins da Lei nº 14.133/2021.
 
 ## Uso
 **Centros (qualquer conta ativa do SIG):** abrir *Intenções COTEP*, clicar no cartão do elemento-item e preencher centro, objeto, valor, prioridade e justificativa. O formulário mostra o saldo atual e o saldo se a intenção for aprovada. Para um código que não aparece, use *Outro elemento-item* (o catálogo é aberto). Intenções pendentes ou devolvidas podem ser editadas/canceladas pelo autor.
@@ -58,9 +64,9 @@ Alertas no cartão: **utilização elevada** (≥ 80%), **saldo insuficiente** (
 
 ## Implantação
 1. No Supabase (SQL Editor), aplicar `database/migrations/20261021_sig_cotep_v2_elemento_item.sql` (transação única; pode ser reaplicada).
-2. Conferir: `select * from sig_cotep_saldos where ano = 2026 order by elemento_item;` — 3016 saldo 5.874,54 e 5207 saldo 1.193,11.
+2. Conferir: `select * from sig_cotep_saldos where ano = 2026 order by elemento_item;` — 3016 saldo 6.285,45 e 5207 saldo 1.193,11 (antes da classificação da 129/2026).
 3. Administrador confirma gestores DTS-1 e, após manifestação jurídica, marca o limite como «Validada».
-4. DTS-1 confirma o homologado das COTEPs «Realizada (a conferir)» (43, 48, 64, 95 e outras) e a UG provisória 1250071.
+4. Homologações das COTEPs 23, 43, 48, 49, 64, 65, 92, 95 e 126/2026 registradas; DTS-1 deve validar a UG provisória 1250071 e classificar os itens da 129/2026.
 
 ## Testes
 - `node gestao/tests/teste_cotep_calculo.cjs` — motor de cálculo com os dados de validação.
