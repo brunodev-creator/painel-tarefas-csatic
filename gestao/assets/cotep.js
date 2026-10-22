@@ -190,7 +190,6 @@ function demoAcao(p,ctx){
    if(!/^\d{4}$/.test(p.elemento_item||''))throw Error('Informe o elemento-item com 4 dígitos (ex.: 3016)');
    if(!(v>0))throw Error('Informe o valor estimado');
    if(!String(p.objeto||'').trim())throw Error('Descreva o objeto');
-   if(!String(p.justificativa||'').trim())throw Error('Informe a justificativa');
    if(!String(p.centro||'').trim())throw Error('Informe o centro solicitante');
    Object.assign(i,{centro:p.centro.trim(),objeto:p.objeto.trim(),elemento_item:p.elemento_item,valor_estimado:v,justificativa:p.justificativa.trim(),prioridade:p.prioridade||'Média',situacao:'Pendente',atualizado_em:agora});
    if(!d.elementos.some(e=>e.codigo===i.elemento_item))d.elementos.push({codigo:i.elemento_item,descricao:null,ativo:true});
@@ -450,11 +449,11 @@ function formIntencao(ctx,el,i){
   '<div class="form-row"><label for="cf-centro">Centro solicitante</label><input id="cf-centro" name="centro" list="cotep-centros" required maxlength="120" value="'+esc(x.centro||centroPadrao(ctx))+'" placeholder="Selecione ou digite"><datalist id="cotep-centros">'+centros+'</datalist></div>'+
   '<div class="form-row"><label for="cf-elemento_item">Elemento-item</label><input id="cf-elemento_item" name="elemento_item" list="cotep-elementos" required pattern="[0-9]{4}" inputmode="numeric" maxlength="4" value="'+esc(x.elemento_item||el||'')+'" placeholder="Ex.: 3016"'+(el&&!i?' readonly':'')+'><datalist id="cotep-elementos">'+elems+'</datalist></div>'+
   (ctx.visitante?(()=>{const sol=lerJson(localStorage,VIS_SOLICITANTE,{});return campo('solicitante_nome','Seu nome (posto/graduação e nome)',sol.nome||'','text','required maxlength="120" autocomplete="name"')+
-   campo('solicitante_contato','Contato (e-mail funcional ou telefone)',sol.contato||'','text','required maxlength="160"');})():'')+
+   campo('solicitante_contato','Contato (opcional: e-mail funcional ou telefone)',sol.contato||'','text','maxlength="160"');})():'')+
   area('objeto','Objeto',x.objeto||'','required maxlength="1500" placeholder="O que será contratado"')+
   campo('valor_estimado','Valor estimado (R$)',x.valor_estimado??'','text','required inputmode="decimal" placeholder="0,00" autocomplete="off"')+
   selecao('prioridade','Prioridade',PRIORIDADES,x.prioridade||'Média')+
-  area('justificativa','Justificativa',x.justificativa||'','required maxlength="2000" placeholder="Por que a contratação é necessária"')+
+  area('justificativa','Justificativa (opcional)',x.justificativa||'','maxlength="2000" placeholder="Por que a contratação é necessária"')+
   '</div><div class="cotep-sim" data-cotep-sim aria-live="polite">'+simulacaoHtml(r,parseValor(x.valor_estimado))+'</div>'+
   (i?.observacao_gestor&&i.situacao==='Devolvida'?'<p class="cotep-note">Orientação da DTS-1: '+esc(i.observacao_gestor)+'</p>':'')+
   rodape(i?(i.situacao==='Devolvida'?'Reenviar à DTS-1':'Salvar alterações'):'Registrar intenção')+'</form>';

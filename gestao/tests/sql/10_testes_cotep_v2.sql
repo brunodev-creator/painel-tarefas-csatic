@@ -63,7 +63,6 @@ SELECT teste.falha('{"acao":"reservar","id":"00000000-0000-0000-0000-00000000000
 SELECT teste.falha('{"acao":"limite","ano":2026,"unidade_gestora":"1250071","valor_limite":"1","base_normativa":"xxxxxxxxxxxx"}', 'Somente gestor DTS-1', 'Centro não altera limite');
 
 -- 3. Fluxo do centro -------------------------------------------------------------------------
-SELECT teste.falha('{"acao":"criar_intencao","centro":"Centro A","objeto":"Toner para impressoras","elemento_item":"3016","valor_estimado":"5000"}', 'justificativa', 'Justificativa obrigatória');
 SELECT teste.falha('{"acao":"criar_intencao","centro":"Centro A","objeto":"Toner para impressoras","elemento_item":"30","valor_estimado":"5000","justificativa":"Reposição anual"}', '4 dígitos', 'Elemento-item validado');
 SELECT (teste.acao('{"acao":"criar_intencao","centro":"centro a","objeto":"Toner para impressoras","elemento_item":"3016","valor_estimado":"5.000,00","justificativa":"Reposição anual do estoque","prioridade":"Alta"}')->>'id') AS int1 \gset
 SELECT teste.ok((SELECT centro = 'Centro A' AND situacao = 'Pendente' AND prioridade = 'Alta' AND ano = 2026 AND unidade_gestora = '1250071' AND valor_estimado = 5000

@@ -13,5 +13,10 @@ SELECT teste.ok((teste.acao('{"acao":"criar_intencao","centro":"D","objeto":"TV"
 SELECT teste.acao(jsonb_build_object('acao','devolver','id',:'curto','motivo','ok'));
 SELECT teste.ok((SELECT situacao FROM public.sig_cotep_intencoes WHERE id = :'curto') = 'Devolvida', 'Motivo curto aceito na devolução');
 SELECT teste.ok((teste.acao('{"acao":"salvar_cotep","ano":2026,"unidade_gestora":"1250071","numero":"960/2026","objeto":"Cabo","situacao":"Em andamento","itens":[{"elemento_item":"3024","valor_estimado":"5"}]}')->>'id') IS NOT NULL, 'COTEP com objeto curto');
+SELECT teste.ok((teste.acao('{"acao":"criar_intencao","centro":"D","objeto":"Mouse","elemento_item":"3024","valor_estimado":"11"}')->>'id') IS NOT NULL, 'Justificativa opcional para usuário');
 RESET ROLE;
+SET ROLE anon;
+SELECT (public.sig_cotep_publico_intencao('{"centro":"D","objeto":"Teclado","elemento_item":"3017","valor_estimado":"20","justificativa":"","solicitante_nome":"T","solicitante_contato":""}')->>'id') AS opc \gset
+RESET ROLE;
+SELECT teste.ok((SELECT justificativa IS NULL AND solicitante_contato IS NULL FROM public.sig_cotep_intencoes WHERE id = :'opc'), 'Visitante sem justificativa e sem contato (gravados como nulo)');
 \echo 'TESTES SEM MÍNIMO DE CARACTERES PASSARAM'
