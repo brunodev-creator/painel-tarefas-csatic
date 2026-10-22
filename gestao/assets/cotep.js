@@ -375,10 +375,11 @@ function abaCoteps(ctx){
  let rows=d.coteps.filter(c=>Number(c.ano)===state.ano);
  if(q)rows=rows.filter(c=>plain([c.numero,c.objeto,c.situacao,...itens(c).map(x=>x.elemento_item)].join(' ')).includes(q));
  rows.sort((a,b)=>String(b.numero).localeCompare(String(a.numero),'pt-BR',{numeric:true}));
- const tr=c=>{const its=itens(c),tot=its.reduce((s,x)=>s+contribItem(x,c.situacao),0);
+ const tr=c=>{const its=itens(c),tot=its.reduce((s,x)=>s+(x.elemento_item?contribItem(x,c.situacao):0),0),
+  semClassificacao=its.filter(x=>!x.elemento_item&&c.situacao==='Em andamento').reduce((s,x)=>s+CENT(x.valor_estimado),0);
   return '<tr><td><div class="cell-main">'+esc(c.numero)+'</div><div class="cell-sub">UG '+esc(c.unidade_gestora)+'</div></td><td><div class="cotep-obj">'+esc(c.objeto)+'</div></td>'+
   '<td><div class="cotep-itens">'+(its.map(x=>'<button class="cotep-item-chip" data-action="cotepElemento" data-el="'+esc(x.elemento_item||'')+'"'+(x.elemento_item?'':' disabled')+'>'+esc(x.elemento_item||'s/ código')+' · '+money(SIT_CONSUMO.includes(c.situacao)?(x.valor_homologado??x.valor_estimado):x.valor_estimado)+'</button>').join('')||'—')+'</div></td>'+
-  '<td>'+flag(c.situacao)+'</td><td><div class="cell-main">'+moneyC(tot)+'</div><div class="cell-sub">'+(c.situacao==='Em andamento'?'comprometido':SIT_CONSUMO.includes(c.situacao)?'consumido':'liberado')+'</div></td>'+
+  '<td>'+flag(c.situacao)+'</td><td><div class="cell-main">'+moneyC(tot)+'</div><div class="cell-sub">'+(semClassificacao?'A CLASSIFICAR: '+moneyC(semClassificacao)+' fora do saldo':c.situacao==='Em andamento'?'comprometido':SIT_CONSUMO.includes(c.situacao)?'consumido':'liberado')+'</div></td>'+
   '<td><button class="btn small'+(manage?'':' ghost')+'" data-action="cotepCotep" data-id="'+esc(c.id)+'">'+(manage?'Editar':'Ver')+'</button></td></tr>';};
  return '<section class="card section"><div class="toolbar">'+busca('Número, objeto ou elemento-item')+(manage?'<button class="btn primary" data-action="cotepCotep">+ Registrar COTEP</button>':'')+'</div>'+
   '<div class="table-scroll"><table class="data-table cotep-table"><thead><tr><th>COTEP</th><th>Objeto</th><th>Elementos-itens</th><th>Situação</th><th>Valor no limite</th><th>Ação</th></tr></thead><tbody>'+
@@ -402,9 +403,11 @@ function view(ctx){
   if(state.error)return titulo+'<section class="card section"><p class="cotep-note danger">'+esc(state.error)+'</p><button class="btn" data-action="cotepRecarregar">Tentar novamente</button></section>';
   if(!state.loaded)return titulo+'<section class="card section"><p role="status" class="cotep-empty">Carregando dados protegidos…</p></section>';
  }
- const res=calcular(dados(),state.ano,ugPadrao());
+ const d=dados(),res=calcular(d,state.ano,ugPadrao());
+ const semElemento=(d.procedimentos||[]).filter(p=>Number(p.ano)===state.ano&&p.unidade_gestora===ugPadrao()&&p.ativo!==false&&p.situacao==='Em andamento'&&!p.elemento_item);
+ const avisoClassificacao=semElemento.length?'<p class="cotep-note danger" role="status">Atenção: '+semElemento.length+' lançamento(s) de COTEP em andamento sem elemento-item classificado ('+semElemento.map(p=>esc(p.numero)).join(', ')+') somam '+moneyC(semElemento.reduce((s,p)=>s+CENT(p.valor_estimado),0))+'. Esses valores não foram descontados dos saldos por elemento-item. Classifique-os antes de autorizar novas intenções.</p>':'';
  const corpo=state.tab==='intencoes'?abaIntencoes(ctx,res):state.tab==='coteps'?abaCoteps(ctx):abaElementos(res);
- return '<div class="cotep-page">'+cabecalho(ctx,res)+divergencias(res)+kpis(res)+abas(res)+corpo+'</div>';
+ return '<div class="cotep-page">'+cabecalho(ctx,res)+avisoClassificacao+divergencias(res)+kpis(res)+abas(res)+corpo+'</div>';
 }
 
 // ===== Formulários (modais) =====
