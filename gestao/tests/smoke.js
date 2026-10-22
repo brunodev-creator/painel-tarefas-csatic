@@ -334,10 +334,10 @@ test('COTEP: menu visível na barra lateral para todos os perfis',async()=>{
  noErrors();
 });
 
-test('Perfil DTS-1: só COTEP, Almoxarifado, Cota e Acompanhar seções, abrindo em COTEP',async()=>{
+test('Perfil DTS-1: só COTEP, Contratos continuados, Almoxarifado, Cota e Acompanhar seções, abrindo em COTEP',async()=>{
  await loadApp({role:'dts1'});
  const views=$$('#nav [data-view]').filter(b=>win.getComputedStyle(b).display!=='none').map(b=>b.dataset.view).sort().join(',');
- assert(views==='almoxarifado,cotas,cotep,processos','Menus do perfil DTS-1: '+views);
+ assert(views==='almoxarifado,continuados,cotas,cotep,processos','Menus do perfil DTS-1: '+views);
  assert(/Intenções de COTEP/.test(heading()),'Perfil DTS-1 não abriu em Intenções COTEP: '+heading());
  noErrors();
 });
@@ -350,6 +350,69 @@ test('COTEP: os 15 elementos-itens de TIC aparecem mesmo sem movimento',async()=
  assert(/Elementos-itens de TIC/.test($('.cotep-page').textContent),'Grupo TIC sem título');
  click(cotepCard('4006'));await wait(60);
  assert(/Aquisição de software/.test($('#modal-root').textContent),'Detalhe do 4006 sem descrição');
+ noErrors();
+});
+
+// ===== Contratos continuados (dados fictícios gerados pelo módulo no modo demonstração) =====
+async function openCont(opts){localStorage.removeItem('sig-cont-demo-manifestacoes-v1');await loadApp(opts);win.confirm=()=>true;click('#nav [data-view=continuados]');await until(()=>$('.cont-page .cont-kpis'),'módulo de contratos continuados não abriu');}
+const contCard=txt=>$$('.cont-card').find(c=>c.textContent.includes(txt));
+test('Contratos continuados: fiscal vê análise pronta, gráfico e seus contratos',async()=>{
+ await openCont({role:'leitura'});
+ assert(/Contratos continuados/.test(heading()),'Título ausente: '+heading());
+ assert($$('.cont-kpis>div').length===4,'Indicadores ausentes');
+ assert($('.cont-chart svg .real')&&$('.cont-chart svg .saldo'),'Gráfico sem execução realizada ou saldo');
+ assert($('.cont-chart .proj-bg'),'Projeção não diferenciada no gráfico');
+ assert($$('.cont-card').length===4,'Fiscal deveria ver só os 4 contratos vinculados: '+$$('.cont-card').length);
+ assert(!$('[data-tab=gestao]'),'Visão gerencial visível para perfil sem atribuição de gestão');
+ assert(/O saldo cobre novembro\. Para dezembro, o reforço estimado é de R\$/.test(contCard('Conectividade').textContent),'Resumo automático ausente');
+ noErrors();
+});
+test('Contratos continuados: único campo do fiscal, vazio × zero × valor, sugestão não é salva sozinha',async()=>{
+ await openCont({role:'leitura'});
+ click(contCard('Telefonia'));
+ await until(()=>$('.cont-drawer form[data-form=sigContNecessidade]'),'painel do contrato não abriu');
+ const f=$('.cont-drawer form[data-form=sigContNecessidade]');
+ assert(/Saldo adicional necessário até 31\/12\/\d{4} — R\$/.test(f.textContent),'Rótulo do campo diferente do especificado');
+ assert(/Informe quanto precisa acrescentar ao saldo disponível/.test(f.textContent),'Texto de apoio ausente');
+ assert(f.querySelectorAll('input:not([type=hidden])').length===1,'O fiscal deve ter um único campo');
+ assert(/Ainda não informado/.test(f.textContent),'Estado vazio não identificado');
+ click('[data-action=sigContUsarSugestao]');
+ assert($('#cont-valor').value!=='','Sugestão não preencheu o campo');
+ click('[data-action=sigContFechar]');await wait(60);
+ assert(/Aguardando o fiscal/.test(contCard('Telefonia').textContent),'Sugestão registrada sem ação explícita do fiscal');
+ click(contCard('Telefonia'));await until(()=>$('#cont-valor'),'painel não reabriu');
+ setValue($('#cont-valor'),'');$('.cont-drawer form').requestSubmit();await wait(80);
+ assert(/Use 0/.test($('#cont-valor-erro').textContent),'Campo vazio deveria pedir valor (0 = sem necessidade)');
+ setValue($('#cont-valor'),'0');$('.cont-drawer form').requestSubmit();
+ await until(()=>/Avaliado: não precisa/.test($('.cont-drawer')?.textContent||''),'valor zero não registrado como avaliação');
+ setValue($('#cont-valor'),'2.345,67');$('.cont-drawer form').requestSubmit();
+ await until(()=>/R\$ 2\.345,67/.test($('.cont-ok')?.textContent||''),'confirmação de salvamento ausente');
+ assert($$('.cont-drawer .cont-hist li').length>=2,'Histórico de manifestações não registrado');
+ win.document.dispatchEvent(new win.KeyboardEvent('keydown',{key:'Escape'}));await wait(60);
+ assert(!$('.cont-drawer'),'Esc não fechou o painel');
+ noErrors();
+});
+test('Contratos continuados: gestão sem dupla contagem e com atendimento parcial',async()=>{
+ await openCont({role:'admin'});
+ click('[data-tab=gestao]');await until(()=>$('.cont-plan'),'visão gerencial não abriu');
+ const a=win.SIG_CONT._state.analise,t=a.totais;
+ const esperado=a.contratos.reduce((s,c)=>s+(c.manifestacao?(c.atendimento?c.atendimento.pendente:c.manifestacao.valor):(c.reforcoTotal||0)),0);
+ assert(t.planejamento.total===esperado,'Planejamento soma estimativa e manifestação do mesmo contrato');
+ const sup=a.contratos.find(c=>/Suporte técnico/.test(c.titulo));
+ assert(sup.atendimento&&sup.atendimento.status==='parcial'&&sup.atendimento.solicitado===30000000,'Atendimento parcial não reconhecido');
+ assert(sup.atendimento.atendido+sup.atendimento.pendente===sup.atendimento.solicitado,'Solicitado não preservado (atendido + pendente)');
+ assert(a.contratos.some(c=>c.situacao.nivel==='unico'),'Pagamento anual tratado como mensalidade');
+ assert(a.contratos.some(c=>c.situacao.nivel==='sem_dados'),'Histórico insuficiente não identificado');
+ assert($$('.cont-table tbody tr').length>=1,'Tabela gerencial vazia');
+ click('[data-action=sigContFiltro][data-filtro=sem]');await wait(40);
+ assert($$('.cont-table tbody tr').every(r=>/sem manifestação/.test(r.textContent)),'Filtro «sem manifestação» incorreto');
+ noErrors();
+});
+test('Contratos continuados: celular 375 px sem rolagem horizontal da página',async()=>{
+ await openCont({role:'leitura',width:375,height:740});
+ assert(doc.documentElement.scrollWidth<=376,'Rolagem horizontal: '+doc.documentElement.scrollWidth);
+ click(contCard('Conectividade'));await until(()=>$('.cont-drawer'),'painel não abriu no celular');
+ assert($('.cont-drawer').getBoundingClientRect().width<=376,'Painel maior que a tela');
  noErrors();
 });
 

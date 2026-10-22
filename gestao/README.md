@@ -39,6 +39,7 @@ Perfis são guardados no banco e verificados por RLS e funções protegidas. O s
 
 - **Piloto somente com dados fictícios ou devidamente anonimizados.** Hospedagem externa de dados institucionais requer autorização da PMMG e revisão de segurança, backup, disponibilidade e privacidade.
 - Convites por e-mail e troca de senha dependem da configuração do Auth e do provedor de e-mail. Sucesso no formulário não significa que a mensagem já chegou à caixa de entrada.
+- **Contratos continuados**: análise automática da execução dos serviços continuados (PLANILHA ATUAL), projeção para novembro/dezembro e campo único do fiscal («saldo adicional necessário até 31/12»), com visão gerencial DTS-1/SOFI. Guia: [Contratos Continuados](./GUIA_CONTRATOS_CONTINUADOS.md).
 - **Cota orçamentária**: há um snapshot autenticado do `DASHBOARD` da `agora vai - PLANILHA ATUAL`, separado dos dados operacionais. Os valores são históricos, não substituem a conciliação V6 nem demonstram saldo oficial do SIAFI-MG. Guia: [Cotas da PLANILHA ATUAL](./GUIA_COTAS_PLANILHA_ATUAL.md).
 - O assistente utiliza consultas programadas, não uma API paga de IA.
 - Regras de autorização protegem o banco; a versão 2 ainda precisa de testes de penetração e procedimento de recuperação de incidentes antes de uso operacional.
@@ -48,7 +49,7 @@ Perfis são guardados no banco e verificados por RLS e funções protegidas. O s
 - `index.html` / `assets/app.js` / `assets/styles.css`: site estático.
 - `functions/gerenciar-usuarios/index.ts`: função Supabase Deno, publicada no ambiente de teste.
 - `database/schema.sql`: esquema inicial; migrações v2 foram aplicadas diretamente ao banco de testes.
-- `tests/smoke.html` + `tests/smoke.js`: testes de fumaça no navegador, sem dependências, sobre o modo demonstração (28 verificações: menus de 6 perfis, celular 375px, painel inicial, tarefas, autopreenchimento, busca global, assistente, correções do lote de UX e Intenções de COTEP). O módulo COTEP também tem `tests/teste_cotep_calculo.cjs` (Node) e `tests/sql/run.sh` (PostgreSQL local); ver [GUIA_COTEP_INTENCOES.md](./GUIA_COTEP_INTENCOES.md).
+- `tests/smoke.html` + `tests/smoke.js`: testes de fumaça no navegador, sem dependências, sobre o modo demonstração (36 verificações: menus de 6 perfis, celular 375px, painel inicial, tarefas, autopreenchimento, busca global, assistente, correções do lote de UX, Intenções de COTEP e Contratos continuados). O módulo COTEP também tem `tests/teste_cotep_calculo.cjs` (Node) e `tests/sql/run.sh` (PostgreSQL local); ver [GUIA_COTEP_INTENCOES.md](./GUIA_COTEP_INTENCOES.md). Contratos continuados: `tests/teste_continuados_motor.cjs` e `tests/sql/15_testes_continuados.sql`; ver [GUIA_CONTRATOS_CONTINUADOS.md](./GUIA_CONTRATOS_CONTINUADOS.md).
 
 Não é necessário instalar dependências de frontend. Para testes locais, execute `python3 -m http.server 8080` na pasta raiz.
 

@@ -21,3 +21,6 @@ CREATE POLICY usuarios_ler ON public.usuarios FOR SELECT TO authenticated USING(
 -- Regra existente no SIG (migrations anteriores ao módulo COTEP), usada por cota e almoxarifado.
 CREATE OR REPLACE FUNCTION private.can_view_cota() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO ''
 AS $f$ SELECT EXISTS (SELECT 1 FROM public.usuarios u WHERE u.auth_id=auth.uid() AND u.ativo AND u.role IN ('admin','chefia','sofi','chefe_sofi','compras','licitacao','chefe_compras','chefe_licitacao')) $f$;
+-- Regra existente no SIG (migration inicial): conta ativa.
+CREATE OR REPLACE FUNCTION private.is_active() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO ''
+AS $f$ SELECT EXISTS(SELECT 1 FROM public.usuarios u WHERE u.auth_id=auth.uid() AND u.ativo=true) $f$;
