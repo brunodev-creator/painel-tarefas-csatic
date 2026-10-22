@@ -94,14 +94,14 @@ const TABELAS=['sig_cotep_limites','sig_cotep_elementos','sig_cotep_centros','si
 const CHAVES=['limites','elementos','centros','coteps','procedimentos','intencoes','eventos','gestores','saldos'];
 const vazio=()=>Object.fromEntries(CHAVES.map(k=>[k,[]]));
 const state={identity:null,loaded:false,loading:false,error:'',d:vazio(),ano:anoAtual(),tab:'elementos',busca:'',filtro:'todos',filaFiltro:'abertas',sel:new Set(),demo:null,
- visitante:false,precisaCodigo:false,acesso:null};
+ visitante:false,precisaCodigo:false,acesso:null,sync:null,pend:[]};
 // Visitante: código da DTS-1 dura a sessão do navegador; intenções enviadas ficam lembradas neste aparelho.
 const VIS_CODIGO='sig-cotep-codigo',VIS_MINHAS='sig-cotep-minhas',VIS_SOLICITANTE='sig-cotep-solicitante';
 const lerJson=(store,k,def)=>{try{return JSON.parse(store.getItem(k))??def;}catch{return def;}};
 const gravar=(store,k,v)=>{try{v==null?store.removeItem(k):store.setItem(k,JSON.stringify(v));}catch{}};
 const minhasVisitante=()=>new Set(lerJson(localStorage,VIS_MINHAS,[]));
 let ctxAtual=null;
-function syncIdentity(id){if(state.identity!==id){state.identity=id;state.loaded=false;state.loading=false;state.error='';state.d=vazio();state.sel.clear();}}
+function syncIdentity(id){if(state.identity!==id){state.identity=id;state.loaded=false;state.loading=false;state.error='';state.d=vazio();state.sel.clear();state.sync=null;state.pend=[];}}
 async function loadVisitante(rest){
  const st=await rest('/rest/v1/rpc/sig_cotep_publico_status','POST',{});
  if(!st?.ativo)throw Error('O acesso de visitante às Intenções de COTEP está desativado pela DTS-1.');
@@ -126,6 +126,10 @@ async function load(rest,force=false,opts={}){
   state.d=Object.fromEntries(CHAVES.map((k,i)=>[k,Array.isArray(rows[i])?rows[i]:[]]));
   // Situação do acesso de visitante (o código nunca é lido; só se é exigido).
   state.acesso=await rest('/rest/v1/rpc/sig_cotep_publico_status','POST',{}).catch(()=>null);
+  // Sincronização diária com a PLANILHA ATUAL: última execução e pendências para a DTS-1.
+  const [sy,pe]=await Promise.all([rest('/rest/v1/sig_cotep_sincronizacoes?select=*&order=id.desc&limit=1').catch(()=>[]),
+   rest('/rest/v1/sig_cotep_pendencias?select=*&resolvida=eq.false&order=criada_em.asc').catch(()=>[])]);
+  state.sync=Array.isArray(sy)?sy[0]||null:null;state.pend=Array.isArray(pe)?pe:[];
   if(state.acesso)state.acesso.limite_por_hora=(await rest('/rest/v1/sig_cotep_acesso_publico?select=limite_por_hora').catch(()=>[]))?.[0]?.limite_por_hora;
   state.loaded=true;
  }catch(e){
@@ -296,6 +300,19 @@ function cabecalho(ctx,res){
   '<button class="btn" data-action="cotepRecarregar" aria-label="Atualizar dados">↻</button></div></div>'+
   (l?'<p class="cotep-note">Critério operacional PMMG: limite anual controlado por elemento-item. Intenções pendentes não abatem o saldo; reservas aprovadas e COTEPs em andamento, sim.'+(ctx.demo?' <em>Demonstração: dados fictícios em memória, nada é gravado.</em>':'')+'</p>':'');
 }
+const TIPO_PEND={classificar:'Classificar elemento-item',distribuir_homologado:'Distribuir homologado',saldo_insuficiente:'Saldo insuficiente',divergencia:'Conferir'};
+function sincronizacao(ctx){
+ if(ctx.visitante||ctx.demo)return '';
+ const s=state.sync,pend=gestor(ctx)?state.pend:[];
+ const info='<p class="cotep-note cotep-sync">'+(s?'Atualização automática diária com a PLANILHA ATUAL (Portal de Compras): última em <strong>'+esc(quando(s.executado_em))+'</strong> · '+
+  esc(s.linhas)+' COTEP(s) lidas, '+esc(s.atualizadas)+' atualizada(s), '+esc(s.criadas)+' nova(s)':'Sincronização diária com a PLANILHA ATUAL ainda não executada.')+
+  ' Os dados deste painel vêm direto do banco e se atualizam a cada 5 minutos.</p>';
+ if(!pend.length)return info;
+ return info+'<section class="card section cotep-pend"><h2 class="cotep-grupo">Pendências da sincronização <span>'+pend.length+'</span></h2><ul class="cotep-list">'+pend.map(p=>
+  '<li><strong>COTEP '+esc(p.numero)+' · '+esc(TIPO_PEND[p.tipo]||p.tipo)+'</strong><span class="cotep-li-val">'+(p.valor_homologado>0?'homologado '+money(p.valor_homologado):'referência '+money(p.valor_referencia))+'</span>'+
+  '<small>'+esc(p.objeto||'')+(p.codigos_itens?' · CATMAS '+esc(p.codigos_itens):'')+(p.materiais?' · '+esc(String(p.materiais).slice(0,160)):'')+'<br>'+esc(p.mensagem||'')+'</small>'+
+  '<button class="btn small" data-action="cotepPendencia" data-id="'+esc(p.id)+'">'+(p.tipo==='classificar'?'Registrar COTEP':'Abrir COTEP')+'</button></li>').join('')+'</ul></section>';
+}
 function divergencias(res){
  // Confere o cálculo local com a visão sig_cotep_saldos do banco (mesma fonte de dados).
  const d=dados();if(!d.saldos?.length)return '';
@@ -404,7 +421,7 @@ function view(ctx){
  }
  const res=calcular(dados(),state.ano,ugPadrao());
  const corpo=state.tab==='intencoes'?abaIntencoes(ctx,res):state.tab==='coteps'?abaCoteps(ctx):abaElementos(res);
- return '<div class="cotep-page">'+cabecalho(ctx,res)+divergencias(res)+kpis(res)+abas(res)+corpo+'</div>';
+ return '<div class="cotep-page">'+cabecalho(ctx,res)+sincronizacao(ctx)+divergencias(res)+kpis(res)+abas(res)+corpo+'</div>';
 }
 
 // ===== Formulários (modais) =====
@@ -512,7 +529,7 @@ function formCotep(ctx,c){
    '<ul class="cotep-list">'+its.map(x=>'<li><strong>'+esc(x.elemento_item||'s/ código')+'</strong><span class="cotep-li-val">estimado '+money(x.valor_estimado)+(x.valor_homologado!=null?' · homologado '+money(x.valor_homologado):'')+'</span></li>').join('')+'</ul>'+
    (ints.length?'<p class="helper">Intenções atendidas: '+ints.map(i=>esc(i.centro)).join(', ')+'</p>':'')+'</div>';
  }
- return '<form data-form="cotepCotep" class="cotep-form" data-cotep-live="cotep">'+(c?'<input type="hidden" name="id" value="'+esc(c.id)+'">':'')+
+ return '<form data-form="cotepCotep" class="cotep-form" data-cotep-live="cotep">'+(c?.id?'<input type="hidden" name="id" value="'+esc(c.id)+'">':'')+
   '<input type="hidden" name="ano" value="'+esc(c?.ano||state.ano)+'"><input type="hidden" name="unidade_gestora" value="'+esc(c?.unidade_gestora||ugPadrao())+'">'+
   '<div class="form-grid">'+campo('numero','Número da COTEP',c?.numero||'','text','required maxlength="35" placeholder="Ex.: 131/'+state.ano+'"')+
   selecao('situacao','Situação',SIT_COTEP,c?.situacao||'Em andamento')+area('objeto','Objeto',c?.objeto||'','required minlength="8"')+
@@ -523,7 +540,7 @@ function formCotep(ctx,c){
   '<button type="button" class="btn small" data-action="cotepItemAdd">+ Elemento-item</button>'+
   (ctx.admin?'<div class="form-row full cotep-excecao" data-excecao hidden><label for="cf-justificativa_excecao">Exceção ao limite (somente administrador)</label><textarea id="cf-justificativa_excecao" name="justificativa_excecao" rows="2" placeholder="Use apenas para registrar fato já homologado; mínimo 20 caracteres"></textarea></div>':'')+
   (ints.length?'<p class="helper">Intenções vinculadas: '+ints.map(i=>esc(i.centro)+' ('+esc(i.elemento_item)+')').join(', ')+'. Se a COTEP for fracassada, deserta ou cancelada, elas voltam à fila como pendentes.</p>':'')+
-  rodape(c?'Salvar COTEP':'Registrar COTEP')+'</form>';
+  rodape(c?.id?'Salvar COTEP':'Registrar COTEP')+'</form>';
 }
 function atualizarCotepInfo(form){
  const d=dados(),id=form.querySelector('[name=id]')?.value||null,ano=form.querySelector('[name=ano]').value,ug=form.querySelector('[name=unidade_gestora]').value;
@@ -562,6 +579,8 @@ function formParametros(ctx){
   '<label class="cotep-check-label"><input type="checkbox" name="sem_codigo"> dispensar código</label>'+
   '<input name="limite_por_hora" type="number" min="1" max="1000" value="'+esc(state.acesso?.limite_por_hora||60)+'" aria-label="Limite de envios por hora" title="Envios por hora">'+
   '<button class="btn small primary">Salvar</button></form></section>'+
+  (ctx.admin?'<section class="cotep-param"><h3>Sincronização diária com a PLANILHA ATUAL</h3><p class="helper">O Apps Script <span class="code">integracao/SIG_SINCRONIZACAO_DIARIA.gs</span> envia todo dia as COTEPs da aba CONTROLE_PROCESSOS_COMPRA. '+
+   (state.sync?'Última execução: '+esc(quando(state.sync.executado_em))+'.':'Ainda não executada.')+'</p><button class="btn small" data-action="cotepToken">Gerar token de integração</button></section>':'')+
   '<section class="cotep-param"><h3>Centros solicitantes</h3><form data-form="cotepCentro" class="cotep-inline-form"><input name="nome" required maxlength="120" placeholder="Nome do centro" aria-label="Nome do centro"><select name="ativo" aria-label="Situação"><option value="true">Ativo</option><option value="false">Inativo</option></select><button class="btn small primary">Salvar</button></form>'+
   '<div class="cotep-catalogo">'+d.centros.map(c=>'<span class="'+(c.ativo===false?'off':'')+'">'+esc(c.nome)+(c.ativo===false?' (inativo)':'')+'</span>').join('')+'</div></section>'+gest+'</div>';
 }
@@ -585,7 +604,7 @@ const reabrir=(ctx,fn)=>{ctx.closeModal();ctx.render();if(fn)fn();};
 async function click(name,el,ctx){
  ctxAtual=ctx;
  const id=el.dataset.id,manage=gestor(ctx);
- const leitura=['cotepAba','cotepFiltro','cotepFila','cotepElemento','cotepIntencao','cotepCotep','cotepRecarregar','cotepSel','cotepLimparSel','cotepItemAdd','cotepItemRemover'];
+ const leitura=['cotepPendencia','cotepAba','cotepFiltro','cotepFila','cotepElemento','cotepIntencao','cotepCotep','cotepRecarregar','cotepSel','cotepLimparSel','cotepItemAdd','cotepItemRemover'];
  if(ctx.preview&&!leitura.includes(name))return ctx.toast('Prévia somente leitura.');
  switch(name){
  case 'cotepRecarregar':if(!ctx.demo)await load(ctx.rest,true,{visitante:!!ctx.visitante});ctx.render();return;
@@ -636,6 +655,19 @@ async function click(name,el,ctx){
   ctx.openModal(name==='cotepAgrupar'?'Agrupar intenções':'Prioridade em lote',ids.length+' selecionada(s)',
    '<form data-form="'+(name==='cotepAgrupar'?'cotepAgrupar':'cotepPriorizar')+'" class="cotep-form"><div class="form-grid">'+
    (name==='cotepAgrupar'?campo('grupo','Nome do grupo (vazio remove)','','text','maxlength="60" placeholder="Ex.: Suprimentos 2º semestre"'):selecao('prioridade','Prioridade',PRIORIDADES,'Alta'))+'</div>'+rodape('Aplicar')+'</form>');return;
+ }
+ if(name==='cotepPendencia'){
+  const p=state.pend.find(x=>x.id===id);if(!p)return;
+  const c=dados().coteps.find(x=>Number(x.ano)===Number(p.ano)&&x.unidade_gestora===p.unidade_gestora&&x.numero===p.numero)||
+   {ano:p.ano,unidade_gestora:p.unidade_gestora,numero:p.numero,objeto:p.objeto||'',situacao:p.valor_homologado>0?'Finalizada':'Em andamento',documento:'Portal de Compras · CATMAS '+(p.codigos_itens||'')};
+  ctx.openModal(c.id?'COTEP '+c.numero:'Registrar COTEP '+c.numero,(TIPO_PEND[p.tipo]||'')+' · '+(p.mensagem||''),formCotep(ctx,c),true);
+  const f=document.querySelector('#modal-root form[data-form="cotepCotep"]');if(f)atualizarCotepInfo(f);return;
+ }
+ if(name==='cotepToken'){
+  if(!ctx.admin)return ctx.toast('Somente administrador gera o token.','error');
+  if(!confirm('Gerar novo token de integração? O token anterior deixa de funcionar e o Apps Script precisará do novo.'))return;
+  const out=await ctx.rest('/rest/v1/rpc/sig_integracao_gerar_token','POST',{p_nome:'planilha-agora-vai'});
+  ctx.openModal('Token de integração','Copie agora: ele não é exibido novamente','<div class="cotep-detail"><p class="helper">Na planilha «agora vai - PLANILHA ATUAL», execute <span class="code">sigSyncConfigurar</span> e cole:</p><input class="cotep-token" readonly value="'+esc(out?.token||'')+'" aria-label="Token" onclick="this.select()"></div>');return;
  }
  if(name==='cotepParametros'){ctx.openModal('Parâmetros do controle','Limite, catálogo, centros e gestores DTS-1',formParametros(ctx),true);return;}
 }
@@ -703,6 +735,13 @@ document.addEventListener('change',e=>{
  if(e.target.matches?.('[data-cotep-ano]')){state.ano=Number(e.target.value)||anoAtual();state.sel.clear();ctxAtual?.render();}
  else if(e.target.closest?.('form[data-cotep-live="cotep"]'))atualizarCotepInfo(e.target.closest('form'));
 });
+// Atualização automática: recarrega do banco a cada 5 minutos enquanto o painel estiver visível e sem modal aberto.
+if(typeof setInterval==="function")setInterval(async()=>{
+ const ctx=ctxAtual;
+ if(!ctx||ctx.demo||!state.loaded||state.loading||document.hidden||!document.querySelector('.cotep-page')||document.getElementById('modal-root')?.children.length)return;
+ await load(ctx.rest,true,{visitante:!!ctx.visitante});
+ if(document.querySelector('.cotep-page')&&!document.getElementById('modal-root')?.children.length)ctx.render();
+},300000);
 window.SIG_COTEP={syncIdentity,load,isLoaded,view,click,submit,filter};
 window.SIG_COTEP_CALC=CALC;
 })();

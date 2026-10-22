@@ -66,3 +66,16 @@ Alertas no cartão: **utilização elevada** (≥ 80%), **saldo insuficiente** (
 - `node gestao/tests/teste_cotep_calculo.cjs` — motor de cálculo com os dados de validação.
 - `gestao/tests/sql/run.sh` — PostgreSQL local (≥ 15) com simulação do Supabase: aplica as migrations sobre o histórico importado e executa 64 verificações (saldos, permissões, RLS, conversão sem dupla contagem, liberação de diferença, exceção, exclusão bloqueada) e o teste de concorrência com duas sessões simultâneas.
 - `gestao/tests/smoke.html?auto` — inclui 5 testes do painel em modo demonstração (desktop e celular 375 px).
+
+## Atualização automática diária (PLANILHA ATUAL → SIG)
+
+- O painel lê direto do banco e se recarrega sozinho a cada 5 minutos enquanto estiver aberto.
+- A aba **CONTROLE_PROCESSOS_COMPRA** da «agora vai - PLANILHA ATUAL» é enviada todo dia (≈ 6h) pelo Apps Script
+  `integracao/SIG_SINCRONIZACAO_DIARIA.gs` para a RPC `sig_cotep_sincronizar_portal` (autenticada por token; só o hash fica no banco).
+- Regras: COTEP com um elemento-item é atualizada (estimado, homologado, situação); homologação libera a diferença.
+  COTEP com vários elementos-itens homologada vira pendência «distribuir homologado». COTEP nova é criada só quando
+  todos os códigos CATMAS já são conhecidos num único elemento-item; senão vira pendência «classificar».
+  Estouro de limite vira pendência «saldo insuficiente». Planilha defasada nunca reabre COTEP encerrada.
+- Pendências aparecem no topo do painel para a DTS-1; cadastrar a COTEP encerra a pendência automaticamente.
+- Instalação: administrador gera o token em Parâmetros → «Gerar token de integração»; na planilha, colar o script,
+  executar `sigSyncConfigurar` (cola o token) e `sigSyncInstalarGatilhoDiario`.
